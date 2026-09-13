@@ -137,38 +137,33 @@
       "note": "Ruhigere Woche – FTP-Test + Regatta-Wochenende ab Freitagmittag",
       "days": {
         "Montag": {
-          "focus": "Lockeres Rad statt Laufen (Beine lockern vor FTP-Test, Beintraining diese Woche auf Donnerstag verschoben)",
+          "focus": "FTP-Test (Zwift) + Lauf 8 km",
           "units": [
-            { "name": "Rad Zone 1 (locker)", "type": "rad", "tag": "pflicht", "detail": "30–45 min, ganz entspannt – Beine lockern vor dem FTP-Test morgen", "plannedDurationMin": 30, "matchHint": { "activityTypes": ["cycling", "indoor_cycling", "virtual_ride"] } },
-            { "name": "EMOM", "type": "emom", "tag": "bonus", "detail": "10 min: jede Minute 10 Klimmzüge + 15 Liegestütze", "planLabel": "Plan 1", "plannedDurationMin": 10, "matchHint": { "activityTypes": ["strength_training", "cardio"] } }
+            { "name": "FTP-Test (Zwift)", "type": "rad", "tag": "pflicht", "detail": "Ramp-Test oder 20-Minuten-Test zur FTP-Bestimmung auf dem Indoor-Trainer", "plannedDurationMin": 45, "matchHint": { "activityTypes": ["cycling", "indoor_cycling", "virtual_ride"] } },
+            { "name": "Lauf", "type": "lauf", "tag": "pflicht", "detail": "8 km · Zone 2 (130–140 bpm)", "matchHint": { "activityTypes": ["running"], "minDistanceKm": 6 } }
           ]
         },
         "Dienstag": {
-          "focus": "FTP-Test (Zwift) + Rad Zone 2 + Core",
+          "focus": "Rad Zone 2 (90 min) + Core + EMOM + schweres Beintraining",
           "units": [
-            { "name": "FTP-Test (Zwift)", "type": "rad", "tag": "pflicht", "detail": "Ramp-Test oder 20-Minuten-Test zur FTP-Bestimmung auf dem Indoor-Trainer", "plannedDurationMin": 45, "matchHint": { "activityTypes": ["cycling", "indoor_cycling", "virtual_ride"] } },
-            { "name": "Rad Zone 2", "type": "rad", "tag": "pflicht", "detail": "60 min, nach dem Test", "plannedDurationMin": 60, "matchHint": { "activityTypes": ["cycling", "indoor_cycling", "virtual_ride"] } },
-            { "name": "Core", "type": "core", "tag": "ergaenzung", "detail": "15 min", "plannedDurationMin": 15, "matchHint": { "activityTypes": ["strength_training", "cardio"] } }
-          ]
-        },
-        "Donnerstag": {
-          "focus": "Schweres Beintraining (von Montag verschoben) + Lauf 8 km",
-          "units": [
+            { "name": "Rad Zone 2", "type": "rad", "tag": "pflicht", "detail": "90 min", "plannedDurationMin": 90, "matchHint": { "activityTypes": ["cycling", "indoor_cycling", "virtual_ride"] } },
+            { "name": "Core", "type": "core", "tag": "ergaenzung", "detail": "15 min", "plannedDurationMin": 15, "matchHint": { "activityTypes": ["strength_training", "cardio"] } },
+            { "name": "EMOM", "type": "emom", "tag": "bonus", "detail": "10 min: jede Minute 10 Klimmzüge + 10 Dips", "planLabel": "Plan 2", "plannedDurationMin": 10, "matchHint": { "activityTypes": ["strength_training", "cardio"] } },
             { "name": "Schweres Beintraining", "type": "kraft", "tag": "pflicht", "detail": "Kniebeuge, Kreuzheben, Adduktoren (Innen-/Außenseite) · 3×6–8 Wdh., 2–3 Wdh. im Tank, 3–4 min Pause", "plannedDurationMin": 60, "exercises": [
               { "name": "Kniebeuge", "sets": 3, "reps": "6–8", "rest": "3–4 min" },
               { "name": "Kreuzheben", "sets": 3, "reps": "6–8", "rest": "3–4 min" },
               { "name": "Adduktoren Innenseite", "sets": 3, "reps": "6–8", "rest": "3–4 min" },
               { "name": "Adduktoren Außenseite", "sets": 3, "reps": "6–8", "rest": "3–4 min" }
-            ], "matchHint": { "activityTypes": ["strength_training"] } },
-            { "name": "Lauf", "type": "lauf", "tag": "pflicht", "detail": "8 km · Zone 2 (130–140 bpm)", "matchHint": { "activityTypes": ["running"], "minDistanceKm": 6 } }
+            ], "matchHint": { "activityTypes": ["strength_training"] } }
           ]
         },
-        "Freitag": {
-          "focus": "Optional Rad Zone 2 (je nach Abfahrtszeit zur Regatta)",
+        "Donnerstag": {
+          "focus": "Rad Zone 2 (90 min) + Core + EMOM",
           "units": [
-            { "name": "Rad Zone 2", "type": "rad", "tag": "bonus", "detail": "Nur falls zeitlich vor der Abfahrt noch drin – kein Muss", "matchHint": { "activityTypes": ["cycling", "indoor_cycling", "virtual_ride"] } }
-          ],
-          "fallbackNote": null
+            { "name": "Rad Zone 2", "type": "rad", "tag": "pflicht", "detail": "90 min", "plannedDurationMin": 90, "matchHint": { "activityTypes": ["cycling", "indoor_cycling", "virtual_ride"] } },
+            { "name": "Core", "type": "core", "tag": "ergaenzung", "detail": "15 min", "plannedDurationMin": 15, "matchHint": { "activityTypes": ["strength_training", "cardio"] } },
+            { "name": "EMOM", "type": "emom", "tag": "bonus", "detail": "10 min: jede Minute 10 Klimmzüge + 15 Liegestütze", "planLabel": "Plan 1", "plannedDurationMin": 10, "matchHint": { "activityTypes": ["strength_training", "cardio"] } }
+          ]
         },
         "Samstag": { "focus": "Regatta / Feiern – frei", "units": [] },
         "Sonntag": { "focus": "Regatta-Wochenende – frei", "units": [] }
