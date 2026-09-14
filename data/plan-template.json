@@ -140,16 +140,16 @@
       "note": "Ruhigere Woche – FTP-Test + Regatta-Wochenende ab Freitagmittag",
       "days": {
         "Montag": {
-          "focus": "FTP-Test (Zwift) + Lauf 8 km",
+          "focus": "FTP-Test (Zwift) – Lauf auf Dienstag verschoben",
           "units": [
-            { "name": "FTP-Test (Zwift)", "type": "rad", "tag": "pflicht", "detail": "Ramp-Test oder 20-Minuten-Test zur FTP-Bestimmung auf dem Indoor-Trainer", "plannedDurationMin": 45, "matchHint": { "activityTypes": ["cycling", "indoor_cycling", "virtual_ride"] } },
-            { "name": "Lauf", "type": "lauf", "tag": "pflicht", "detail": "8 km · Zone 2 (130–140 bpm)", "matchHint": { "activityTypes": ["running"], "minDistanceKm": 6 } }
+            { "name": "FTP-Test (Zwift)", "type": "rad", "tag": "pflicht", "detail": "Ramp-Test oder 20-Minuten-Test zur FTP-Bestimmung auf dem Indoor-Trainer", "plannedDurationMin": 45, "matchHint": { "activityTypes": ["cycling", "indoor_cycling", "virtual_ride"] } }
           ]
         },
         "Dienstag": {
-          "focus": "Rad Zone 2 (90 min) + Core + EMOM + schweres Beintraining",
+          "focus": "Lauf 6 km + Core + EMOM + schweres Beintraining + optional Rad Zone 2",
           "units": [
-            { "name": "Rad Zone 2", "type": "rad", "tag": "pflicht", "detail": "90 min", "plannedDurationMin": 90, "matchHint": { "activityTypes": ["cycling", "indoor_cycling", "virtual_ride"] } },
+            { "name": "Lauf", "type": "lauf", "tag": "pflicht", "detail": "6 km · Zone 2 (130–140 bpm)", "matchHint": { "activityTypes": ["running"], "minDistanceKm": 4 } },
+            { "name": "Rad Zone 2", "type": "rad", "tag": "bonus", "detail": "45–60 min, optional", "plannedDurationMin": 50, "matchHint": { "activityTypes": ["cycling", "indoor_cycling", "virtual_ride"] } },
             { "name": "Core", "type": "core", "tag": "ergaenzung", "detail": "15 min", "plannedDurationMin": 15, "matchHint": { "activityTypes": ["strength_training", "cardio"] } },
             { "name": "EMOM", "type": "emom", "tag": "bonus", "detail": "10 min: jede Minute 10 Klimmzüge + 10 Dips", "planLabel": "Plan 2", "plannedDurationMin": 10, "matchHint": { "activityTypes": ["strength_training", "cardio"] } },
             { "name": "Schweres Beintraining", "type": "kraft", "tag": "pflicht", "detail": "Kniebeuge, Kreuzheben, Adduktoren (Innen-/Außenseite) · 3×6–8 Wdh., 2–3 Wdh. im Tank, 3–4 min Pause", "plannedDurationMin": 60, "exercises": [
