@@ -70,7 +70,8 @@
       "weekday": "Donnerstag",
       "focus": "Erholungstag – lockeres Ausrollen",
       "units": [
-        { "name": "Rad Zone 1 (locker)", "type": "rad", "tag": "ergaenzung", "detail": "30 min, ganz entspannt · ~115 bpm – aktive Erholung, kein Training", "plannedDurationMin": 30, "matchHint": { "activityTypes": ["cycling", "indoor_cycling", "virtual_ride"] } }
+        { "name": "Rad Zone 1 (locker)", "type": "rad", "tag": "ergaenzung", "detail": "30 min, ganz entspannt · ~115 bpm – aktive Erholung, kein Training", "plannedDurationMin": 30, "matchHint": { "activityTypes": ["cycling", "indoor_cycling", "virtual_ride"] } },
+        { "name": "EMOM", "type": "emom", "tag": "bonus", "detail": "10 min: jede Minute 10 Klimmzüge + 15 Liegestütze", "planLabel": "Plan 1", "plannedDurationMin": 10, "matchHint": { "activityTypes": ["strength_training", "cardio"] } }
       ]
     },
     {
@@ -103,7 +104,8 @@
       "weekday": "Sonntag",
       "focus": "Erholungstag – lockeres Rad",
       "units": [
-        { "name": "Rad Zone 1 (locker)", "type": "rad", "tag": "pflicht", "detail": "45 min, ganz entspannt", "plannedDurationMin": 45, "matchHint": { "activityTypes": ["cycling", "indoor_cycling", "virtual_ride"] } }
+        { "name": "Rad Zone 1 (locker)", "type": "rad", "tag": "pflicht", "detail": "45 min, ganz entspannt", "plannedDurationMin": 45, "matchHint": { "activityTypes": ["cycling", "indoor_cycling", "virtual_ride"] } },
+        { "name": "EMOM", "type": "emom", "tag": "bonus", "detail": "10 min: jede Minute 10 Klimmzüge + 10 Dips", "planLabel": "Plan 2", "plannedDurationMin": 10, "matchHint": { "activityTypes": ["strength_training", "cardio"] } }
       ]
     }
   ],
