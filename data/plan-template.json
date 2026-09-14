@@ -32,11 +32,13 @@
       "focus": "Zone-2-Lauf + schweres Beintraining",
       "units": [
         { "name": "Zone-2-Lauf", "type": "lauf", "tag": "pflicht", "detail": "6–8 km · 130–140 bpm", "matchHint": { "activityTypes": ["running"] } },
-        { "name": "Schweres Beintraining", "type": "kraft", "tag": "pflicht", "detail": "Kniebeuge, Kreuzheben, Adduktoren (Innen-/Außenseite) · 3×6–8 Wdh., 2–3 Wdh. im Tank, 3–4 min Pause", "plannedDurationMin": 60, "exercises": [
-          { "name": "Kniebeuge", "sets": 3, "reps": "6–8", "rest": "3–4 min" },
-          { "name": "Kreuzheben", "sets": 3, "reps": "6–8", "rest": "3–4 min" },
-          { "name": "Adduktoren Innenseite", "sets": 3, "reps": "6–8", "rest": "3–4 min" },
-          { "name": "Adduktoren Außenseite", "sets": 3, "reps": "6–8", "rest": "3–4 min" }
+        { "name": "Schweres Beintraining", "type": "kraft", "tag": "pflicht", "detail": "Kniebeuge, Kreuzheben, Adduktoren (Innen-/Außenseite), Wadenheben, Beinbeuger · komplette Beinkette in einer Einheit, da Stabi/Supersätze aktuell ausfallen", "plannedDurationMin": 65, "exercises": [
+          { "name": "Kniebeuge", "sets": 2, "reps": "6–8", "rest": "3–4 min" },
+          { "name": "Kreuzheben", "sets": 2, "reps": "6–8", "rest": "3–4 min" },
+          { "name": "Adduktoren Innenseite", "sets": 2, "reps": "6–8", "rest": "3–4 min" },
+          { "name": "Adduktoren Außenseite", "sets": 2, "reps": "6–8", "rest": "3–4 min" },
+          { "name": "Wadenheben", "sets": 3, "reps": "12–15", "rest": "60–90 s" },
+          { "name": "Beinbeuger", "sets": 3, "reps": "12–15", "rest": "60–90 s" }
         ], "matchHint": { "activityTypes": ["strength_training"] } },
         { "name": "EMOM", "type": "emom", "tag": "bonus", "detail": "10 min: jede Minute 10 Klimmzüge + 15 Liegestütze", "planLabel": "Plan 1", "plannedDurationMin": 10, "matchHint": { "activityTypes": ["strength_training", "cardio"] } }
       ]
