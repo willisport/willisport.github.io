@@ -78,7 +78,7 @@
       "focus": "Intervalle + Rad Zone 2 + Bein-Supersätze + EMOM",
       "units": [
         { "name": "Intervalle", "type": "lauf", "tag": "pflicht", "detail": "4×4 min hart (Zielpace ~4:15–4:30 min/km, nahe Schwellen-HF 175 bpm) / 3 min locker traben", "plannedDurationMin": 40, "keySession": true, "matchHint": { "activityTypes": ["running"] } },
-        { "name": "Rad Zone 2", "type": "rad", "tag": "pflicht", "detail": "60 min, im Anschluss an die Intervalle", "plannedDurationMin": 60, "matchHint": { "activityTypes": ["cycling", "indoor_cycling", "virtual_ride"] } },
+        { "name": "Rad Zone 2", "type": "rad", "tag": "pflicht", "detail": "60 min", "plannedDurationMin": 60, "matchHint": { "activityTypes": ["cycling", "indoor_cycling", "virtual_ride"] } },
         { "name": "Bein-Supersätze", "type": "kraft", "tag": "ergaenzung", "detail": "Beinstrecker + Beinbeuger + Wadenheben als Superset · 20 Wdh. je Übung, 2 min Pause, 3 Runden · danach Schienbein + Core · ≥6 h nach dem Lauf", "plannedDurationMin": 15, "matchHint": { "activityTypes": ["strength_training"] } },
         { "name": "EMOM", "type": "emom", "tag": "bonus", "detail": "10 min: jede Minute 10 Klimmzüge + 10 Dips", "planLabel": "Plan 2", "plannedDurationMin": 10, "matchHint": { "activityTypes": ["strength_training", "cardio"] } }
       ],
@@ -101,10 +101,9 @@
     },
     {
       "weekday": "Sonntag",
-      "focus": "Rad Zone 2 + EMOM",
+      "focus": "Erholungstag – lockeres Rad",
       "units": [
-        { "name": "Rad Zone 2", "type": "rad", "tag": "pflicht", "detail": "ca. 90 min", "plannedDurationMin": 90, "matchHint": { "activityTypes": ["cycling", "indoor_cycling", "virtual_ride"] } },
-        { "name": "EMOM", "type": "emom", "tag": "bonus", "detail": "10 min: jede Minute 10 Klimmzüge + 10 Dips", "planLabel": "Plan 2", "plannedDurationMin": 10, "matchHint": { "activityTypes": ["strength_training", "cardio"] } }
+        { "name": "Rad Zone 1 (locker)", "type": "rad", "tag": "pflicht", "detail": "45 min, ganz entspannt", "plannedDurationMin": 45, "matchHint": { "activityTypes": ["cycling", "indoor_cycling", "virtual_ride"] } }
       ]
     }
   ],
