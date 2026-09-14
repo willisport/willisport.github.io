@@ -22,8 +22,8 @@
   },
 
   "targetsByType": {
-    "aufbau": { "runVolumeKm": 23, "bikeVolumeKm": 130, "timeMin": 480, "zone2SharePct": 82 },
-    "recovery": { "runVolumeKm": 15, "bikeVolumeKm": 80, "timeMin": 300, "zone2SharePct": 90 }
+    "aufbau": { "runVolumeKm": 31, "bikeVolumeKm": 130, "timeMin": 480, "zone2SharePct": 82 },
+    "recovery": { "runVolumeKm": 20, "bikeVolumeKm": 80, "timeMin": 300, "zone2SharePct": 90 }
   },
 
   "weekPattern": [
@@ -75,9 +75,10 @@
     },
     {
       "weekday": "Freitag",
-      "focus": "Intervalle + Bein-Supersätze + EMOM",
+      "focus": "Intervalle + Rad Zone 2 + Bein-Supersätze + EMOM",
       "units": [
         { "name": "Intervalle", "type": "lauf", "tag": "pflicht", "detail": "4×4 min hart (Zielpace ~4:15–4:30 min/km, nahe Schwellen-HF 175 bpm) / 3 min locker traben", "plannedDurationMin": 40, "keySession": true, "matchHint": { "activityTypes": ["running"] } },
+        { "name": "Rad Zone 2", "type": "rad", "tag": "pflicht", "detail": "60 min, im Anschluss an die Intervalle", "plannedDurationMin": 60, "matchHint": { "activityTypes": ["cycling", "indoor_cycling", "virtual_ride"] } },
         { "name": "Bein-Supersätze", "type": "kraft", "tag": "ergaenzung", "detail": "Beinstrecker + Beinbeuger + Wadenheben als Superset · 20 Wdh. je Übung, 2 min Pause, 3 Runden · danach Schienbein + Core · ≥6 h nach dem Lauf", "plannedDurationMin": 15, "matchHint": { "activityTypes": ["strength_training"] } },
         { "name": "EMOM", "type": "emom", "tag": "bonus", "detail": "10 min: jede Minute 10 Klimmzüge + 10 Dips", "planLabel": "Plan 2", "plannedDurationMin": 10, "matchHint": { "activityTypes": ["strength_training", "cardio"] } }
       ],
@@ -85,9 +86,9 @@
     },
     {
       "weekday": "Samstag",
-      "focus": "Rad Zone 2 + Core + Arme/Schultern",
+      "focus": "Lauf 8 km + Core + Arme/Schultern",
       "units": [
-        { "name": "Rad Zone 2", "type": "rad", "tag": "pflicht", "detail": "", "matchHint": { "activityTypes": ["cycling", "indoor_cycling", "virtual_ride"] } },
+        { "name": "Lauf", "type": "lauf", "tag": "pflicht", "detail": "8 km · Zone 2 (130–140 bpm)", "matchHint": { "activityTypes": ["running"], "minDistanceKm": 6 } },
         { "name": "Core", "type": "core", "tag": "ergaenzung", "detail": "15 min", "plannedDurationMin": 15, "matchHint": { "activityTypes": ["strength_training", "cardio"] } },
         { "name": "Arme/Schultern", "type": "kraft", "tag": "ergaenzung", "detail": "Schulterdrücken, Seitheben, hintere Schulter, Bizeps-/Trizepsdrücken · 3×10–12 Wdh.", "plannedDurationMin": 25, "exercises": [
           { "name": "Schulterdrücken", "sets": 3, "reps": "10–12", "rest": "60 s" },
