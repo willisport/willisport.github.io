@@ -9,6 +9,9 @@
     "zone2PaceSlowMinKm": "6:10",
     "bikeAvgSpeedLowKmh": 25,
     "bikeAvgSpeedHighKmh": 30,
+    "ftpWatts": 258,
+    "zone2PowerLowW": 144,
+    "zone2PowerHighW": 194,
     "goal": "Ultramarathon 100 km, Zielmonat August 2027",
     "cycle": "3 Aufbauwochen + 1 Recovery-Woche, wiederkehrend"
   },
