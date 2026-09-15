@@ -12,6 +12,7 @@
     "ftpWatts": 258,
     "zone2PowerLowW": 144,
     "zone2PowerHighW": 194,
+    "zone2PowerTargetW": 165,
     "goal": "Ultramarathon 100 km, Zielmonat August 2027",
     "cycle": "3 Aufbauwochen + 1 Recovery-Woche, wiederkehrend"
   },
@@ -37,8 +38,8 @@
           { "name": "Kreuzheben", "sets": 2, "reps": "6–8", "rest": "3–4 min" },
           { "name": "Adduktoren Innenseite", "sets": 2, "reps": "6–8", "rest": "3–4 min" },
           { "name": "Adduktoren Außenseite", "sets": 2, "reps": "6–8", "rest": "3–4 min" },
-          { "name": "Wadenheben", "sets": 3, "reps": "12–15", "rest": "60–90 s" },
-          { "name": "Beinbeuger", "sets": 3, "reps": "12–15", "rest": "60–90 s" }
+          { "name": "Wadenheben", "sets": 2, "reps": "6–8", "rest": "3–4 min" },
+          { "name": "Beinbeuger", "sets": 2, "reps": "6–8", "rest": "3–4 min" }
         ], "matchHint": { "activityTypes": ["strength_training"] } },
         { "name": "EMOM", "type": "emom", "tag": "bonus", "detail": "10 min: jede Minute 10 Klimmzüge + 15 Liegestütze", "planLabel": "Plan 1", "plannedDurationMin": 10, "matchHint": { "activityTypes": ["strength_training", "cardio"] } }
       ]
@@ -47,7 +48,7 @@
       "weekday": "Dienstag",
       "focus": "Rad Zone 2 + Core + EMOM",
       "units": [
-        { "name": "Rad Zone 2", "type": "rad", "tag": "pflicht", "detail": "60 min", "plannedDurationMin": 60, "matchHint": { "activityTypes": ["cycling", "indoor_cycling", "virtual_ride"] } },
+        { "name": "Rad Zone 2", "type": "rad", "tag": "pflicht", "detail": "165 W · 60 min", "plannedDurationMin": 60, "matchHint": { "activityTypes": ["cycling", "indoor_cycling", "virtual_ride"] } },
         { "name": "Core", "type": "core", "tag": "ergaenzung", "detail": "15 min", "plannedDurationMin": 15, "matchHint": { "activityTypes": ["strength_training", "cardio"] } },
         { "name": "EMOM", "type": "emom", "tag": "bonus", "detail": "10 min: jede Minute 10 Klimmzüge + 10 Dips", "planLabel": "Plan 2", "plannedDurationMin": 10, "matchHint": { "activityTypes": ["strength_training", "cardio"] } }
       ]
@@ -57,7 +58,7 @@
       "focus": "Langer Lauf + Rad Zone 2 – Fokustag",
       "units": [
         { "name": "Langer Lauf", "type": "lauf", "tag": "pflicht", "detail": "8 km · Zone 2 (130–140 bpm)", "plannedDurationMin": 50, "keySession": true, "matchHint": { "activityTypes": ["running"], "minDistanceKm": 6 } },
-        { "name": "Rad Zone 2", "type": "rad", "tag": "pflicht", "detail": "60 min", "plannedDurationMin": 60, "keySession": true, "matchHint": { "activityTypes": ["cycling", "indoor_cycling", "virtual_ride"] } },
+        { "name": "Rad Zone 2", "type": "rad", "tag": "pflicht", "detail": "165 W · 60 min", "plannedDurationMin": 60, "keySession": true, "matchHint": { "activityTypes": ["cycling", "indoor_cycling", "virtual_ride"] } },
         { "name": "Bein-Stabi", "type": "kraft", "tag": "bonus", "detail": "Einbeinstand, Copenhagen Plank, Ausfallschritte, seitliches Beinheben · 3×10–12 Wdh. pro Seite, direkt im Anschluss", "plannedDurationMin": 20, "exercises": [
           { "name": "Einbeinstand", "sets": 3, "reps": "30–45 s", "rest": "30 s" },
           { "name": "Copenhagen Plank", "sets": 3, "reps": "20–30 s pro Seite", "rest": "30 s" },
@@ -81,7 +82,7 @@
       "focus": "Intervalle + Rad Zone 2 + Bein-Supersätze + EMOM",
       "units": [
         { "name": "Intervalle", "type": "lauf", "tag": "pflicht", "detail": "4×4 min hart (Zielpace ~4:15–4:30 min/km, nahe Schwellen-HF 175 bpm) / 3 min locker traben", "plannedDurationMin": 40, "keySession": true, "matchHint": { "activityTypes": ["running"] } },
-        { "name": "Rad Zone 2", "type": "rad", "tag": "pflicht", "detail": "60 min", "plannedDurationMin": 60, "matchHint": { "activityTypes": ["cycling", "indoor_cycling", "virtual_ride"] } },
+        { "name": "Rad Zone 2", "type": "rad", "tag": "pflicht", "detail": "165 W · 60 min", "plannedDurationMin": 60, "matchHint": { "activityTypes": ["cycling", "indoor_cycling", "virtual_ride"] } },
         { "name": "Bein-Supersätze", "type": "kraft", "tag": "ergaenzung", "detail": "Beinstrecker + Beinbeuger + Wadenheben als Superset · 20 Wdh. je Übung, 2 min Pause, 3 Runden · danach Schienbein + Core · ≥6 h nach dem Lauf", "plannedDurationMin": 15, "matchHint": { "activityTypes": ["strength_training"] } },
         { "name": "EMOM", "type": "emom", "tag": "bonus", "detail": "10 min: jede Minute 10 Klimmzüge + 10 Dips", "planLabel": "Plan 2", "plannedDurationMin": 10, "matchHint": { "activityTypes": ["strength_training", "cardio"] } }
       ],
@@ -153,7 +154,7 @@
           "focus": "Lauf 6 km + Core + EMOM + schweres Beintraining + optional Rad Zone 2",
           "units": [
             { "name": "Lauf", "type": "lauf", "tag": "pflicht", "detail": "6 km · Zone 2 (130–140 bpm)", "matchHint": { "activityTypes": ["running"], "minDistanceKm": 4 } },
-            { "name": "Rad Zone 2", "type": "rad", "tag": "bonus", "detail": "45–60 min, optional", "plannedDurationMin": 50, "matchHint": { "activityTypes": ["cycling", "indoor_cycling", "virtual_ride"] } },
+            { "name": "Rad Zone 2", "type": "rad", "tag": "bonus", "detail": "165 W · 90 min", "plannedDurationMin": 90, "matchHint": { "activityTypes": ["cycling", "indoor_cycling", "virtual_ride"] } },
             { "name": "Core", "type": "core", "tag": "ergaenzung", "detail": "15 min", "plannedDurationMin": 15, "matchHint": { "activityTypes": ["strength_training", "cardio"] } },
             { "name": "EMOM", "type": "emom", "tag": "bonus", "detail": "10 min: jede Minute 10 Klimmzüge + 10 Dips", "planLabel": "Plan 2", "plannedDurationMin": 10, "matchHint": { "activityTypes": ["strength_training", "cardio"] } },
             { "name": "Schweres Beintraining", "type": "kraft", "tag": "pflicht", "detail": "Kniebeuge, Kreuzheben, Adduktoren (Innen-/Außenseite) · 3×6–8 Wdh., 2–3 Wdh. im Tank, 3–4 min Pause", "plannedDurationMin": 60, "exercises": [
