@@ -168,10 +168,9 @@
           ]
         },
         "Donnerstag": {
-          "focus": "Intervalle (von Freitag verschoben) + Rad Zone 2",
+          "focus": "Rad-Intervalle statt Laufintervalle (Wundscheuern)",
           "units": [
-            { "name": "Intervalle", "type": "lauf", "tag": "pflicht", "detail": "4×4 min hart (Zielpace ~4:15–4:30 min/km, nahe Schwellen-HF 175 bpm) / 3 min locker traben", "plannedDurationMin": 40, "keySession": true, "matchHint": { "activityTypes": ["running"] } },
-            { "name": "Rad Zone 2", "type": "rad", "tag": "pflicht", "detail": "165 W · 60 min", "plannedDurationMin": 60, "matchHint": { "activityTypes": ["cycling", "indoor_cycling", "virtual_ride"] } },
+            { "name": "Rad-Intervalle", "type": "rad", "tag": "pflicht", "detail": "4×4 min hart (~245–270 W bzw. nahe Schwellen-HF 175 bpm) / 3 min locker", "plannedDurationMin": 40, "keySession": true, "matchHint": { "activityTypes": ["cycling", "indoor_cycling", "virtual_ride"] } },
             { "name": "EMOM", "type": "emom", "tag": "bonus", "detail": "10 min: jede Minute 10 Klimmzüge + 15 Liegestütze", "planLabel": "Plan 1", "plannedDurationMin": 10, "matchHint": { "activityTypes": ["strength_training", "cardio"] } }
           ]
         },
