@@ -182,7 +182,23 @@
     "2026-09-21": {
       "note": "Erholung nach dem Regatta-Wochenende",
       "days": {
-        "Montag": { "focus": "Rest Day nach Regatta-Wochenende", "units": [] }
+        "Montag": { "focus": "Rest Day nach Regatta-Wochenende", "units": [] },
+        "Dienstag": {
+          "focus": "Rad Zone 2 + Core + EMOM + schweres Beintraining (von Montag verschoben)",
+          "units": [
+            { "name": "Rad Zone 2", "type": "rad", "tag": "pflicht", "detail": "165 W · 60 min", "plannedDurationMin": 60, "matchHint": { "activityTypes": ["cycling", "indoor_cycling", "virtual_ride"] } },
+            { "name": "Core", "type": "core", "tag": "ergaenzung", "detail": "15 min", "plannedDurationMin": 15, "matchHint": { "activityTypes": ["strength_training", "cardio"] } },
+            { "name": "EMOM", "type": "emom", "tag": "bonus", "detail": "10 min: jede Minute 10 Klimmzüge + 10 Dips", "planLabel": "Plan 2", "plannedDurationMin": 10, "matchHint": { "activityTypes": ["strength_training", "cardio"] } },
+            { "name": "Schweres Beintraining", "type": "kraft", "tag": "pflicht", "detail": "Kniebeuge, Kreuzheben, Adduktoren (Innen-/Außenseite), Wadenheben, Beinbeuger · komplette Beinkette in einer Einheit, da Stabi/Supersätze aktuell ausfallen", "plannedDurationMin": 65, "exercises": [
+              { "name": "Kniebeuge", "sets": 2, "reps": "6–8", "rest": "3–4 min" },
+              { "name": "Kreuzheben", "sets": 2, "reps": "6–8", "rest": "3–4 min" },
+              { "name": "Adduktoren Innenseite", "sets": 2, "reps": "6–8", "rest": "3–4 min" },
+              { "name": "Adduktoren Außenseite", "sets": 2, "reps": "6–8", "rest": "3–4 min" },
+              { "name": "Wadenheben", "sets": 2, "reps": "6–8", "rest": "3–4 min" },
+              { "name": "Beinbeuger", "sets": 2, "reps": "6–8", "rest": "3–4 min" }
+            ], "matchHint": { "activityTypes": ["strength_training"] } }
+          ]
+        }
       }
     }
   },
