@@ -337,6 +337,8 @@ async function bootWithAuth(onData) {
   document.body.classList.add("is-hosted");
 
   const loadEncryptedAndRender = async (dekRawBytes, role, username) => {
+    // Bittet den Browser, die gespeicherte Anmeldung nicht bei Speicherknappheit/Inaktivitaet zu loeschen.
+    try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist(); } catch { /* ignore */ }
     CURRENT_ROLE = role;
     CURRENT_USERNAME = username || "";
     CURRENT_DEK = dekRawBytes;
