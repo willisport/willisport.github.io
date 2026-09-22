@@ -127,6 +127,44 @@ a { color: var(--sky-400); }
 }
 .nav-icon { font-size: 14px; width: 16px; text-align: center; opacity: .9; }
 
+/* ---------- Sport / Iris mode switch (owner only) ---------- */
+
+.mode-switch[hidden], .mode-switch-mobile[hidden] { display: none !important; }
+.mode-switch {
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  margin-bottom: 14px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+}
+.mode-btn {
+  flex: 1;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-weight: 700;
+  padding: 8px 6px;
+  border-radius: 7px;
+  cursor: pointer;
+  transition: background .15s ease, color .15s ease;
+}
+.mode-btn:hover { color: var(--text-dim); }
+.mode-btn.is-active {
+  background: linear-gradient(135deg, var(--ocean-600), var(--ocean-500));
+  color: #eaf7ff;
+  box-shadow: 0 0 0 1px var(--ocean-500), 0 0 14px rgba(47,125,196,0.35);
+}
+.mode-btn[data-mode="iris"].is-active {
+  background: linear-gradient(135deg, #3a2a6d, var(--ocean-500));
+  box-shadow: 0 0 0 1px var(--sky-400), 0 0 16px rgba(91,196,240,0.4);
+}
+
+.sport-nav[hidden] { display: none !important; }
+
 .sidenav-footer {
   margin-top: auto;
   padding: 14px 12px 4px;
@@ -674,14 +712,17 @@ body.is-viewer .note-box { opacity: .7; cursor: not-allowed; }
   .content { padding: 20px 16px 96px; }
   .bottomnav {
     display: flex;
+    flex-direction: column;
     position: fixed; left: 0; right: 0; bottom: 0;
     background: rgba(13,22,32,0.92);
     backdrop-filter: blur(10px);
     border-top: 1px solid var(--border-soft);
     padding: 8px 6px calc(8px + env(safe-area-inset-bottom));
-    justify-content: space-around;
     z-index: 40;
   }
+  .bottomnav-row { display: flex; justify-content: space-around; }
+  .bottomnav-row[hidden] { display: none !important; }
+  .mode-switch-mobile { margin: 0 4px 8px; }
   .bn-item {
     background: none; border: none; color: var(--muted);
     display: flex; flex-direction: column; align-items: center; gap: 3px;
@@ -700,3 +741,65 @@ body.is-viewer .note-box { opacity: .7; cursor: not-allowed; }
 @media (min-width: 961px) and (max-width: 1180px) {
   .grid-4 { grid-template-columns: repeat(2, 1fr); }
 }
+
+/* ---------- Iris hub ---------- */
+
+.iris-stage {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 36px 20px 30px;
+  margin-bottom: 22px;
+  position: relative;
+  overflow: hidden;
+  background: radial-gradient(ellipse at 50% -10%, rgba(91,196,240,0.14), transparent 60%), var(--surface-1);
+  border: 1px solid var(--ocean-700);
+  border-radius: var(--r-lg);
+}
+
+.iris-orb-wrap { width: 168px; height: 168px; margin-bottom: 18px; }
+.iris-orb { width: 100%; height: 100%; overflow: visible; }
+.iris-ring { fill: none; stroke-width: 2; transform-origin: 100px 100px; }
+.iris-ring-1 { stroke: var(--ocean-600); opacity: .55; animation: iris-spin 18s linear infinite; }
+.iris-ring-2 { stroke: var(--sky-400); opacity: .75; stroke-dasharray: 6 10; animation: iris-spin 11s linear infinite reverse; }
+.iris-ring-3 { stroke: var(--teal); opacity: .5; stroke-dasharray: 2 6; animation: iris-spin 7s linear infinite; }
+.iris-core {
+  fill: url(#iris-core-grad);
+  animation: iris-pulse 3.2s ease-in-out infinite;
+  transform-origin: 100px 100px;
+}
+.iris-core-dot { fill: var(--ice-300); animation: iris-pulse 3.2s ease-in-out infinite .3s; transform-origin: 100px 100px; }
+@keyframes iris-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+@keyframes iris-pulse {
+  0%, 100% { transform: scale(1); opacity: .9; }
+  50% { transform: scale(1.06); opacity: 1; }
+}
+.iris-stage.is-speaking .iris-core,
+.iris-stage.is-speaking .iris-core-dot { animation-duration: 0.9s; }
+.iris-stage.is-speaking .iris-ring-2 { animation-duration: 4s; }
+
+.iris-greeting {
+  font-family: var(--font-display);
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--ice-300);
+  letter-spacing: -0.01em;
+}
+.iris-sub { color: var(--muted); font-size: 13px; margin-top: 6px; max-width: 420px; }
+
+.iris-speak-btn {
+  margin-top: 16px;
+  border: 1px solid var(--sky-400);
+  background: var(--surface-2);
+  color: var(--ice-300);
+  font-family: var(--font-body);
+  font-size: 12.5px;
+  font-weight: 700;
+  padding: 9px 18px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background .15s ease, box-shadow .15s ease;
+}
+.iris-speak-btn:hover { background: var(--surface-3); box-shadow: 0 0 12px rgba(91,196,240,0.3); }
+.iris-speak-btn:disabled { opacity: .55; cursor: default; }

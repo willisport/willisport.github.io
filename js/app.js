@@ -504,14 +504,38 @@ function buildSleepTips(sleep) {
 
 /* ---------- tab navigation ---------- */
 
+let LAST_SPORT_TAB = "heute";
+
 function setupTabs() {
   document.querySelectorAll("[data-tab]").forEach(btn => {
     btn.addEventListener("click", () => {
       const tab = btn.dataset.tab;
+      LAST_SPORT_TAB = tab;
       document.querySelectorAll("[data-tab]").forEach(b => b.classList.toggle("is-active", b.dataset.tab === tab));
       document.querySelectorAll("[data-tab-panel]").forEach(p => p.classList.toggle("is-active", p.dataset.tabPanel === tab));
       window.scrollTo({ top: 0 });
     });
+  });
+}
+
+/* ---------- Sport / Iris mode switch (owner only, see setupLoginsNavItem) ---------- */
+
+function setMode(mode) {
+  document.querySelectorAll(".mode-btn").forEach(b => b.classList.toggle("is-active", b.dataset.mode === mode));
+  const sportNav = document.getElementById("sport-nav");
+  const bottomRow = document.getElementById("bottomnav-row");
+  if (sportNav) sportNav.hidden = mode === "iris";
+  if (bottomRow) bottomRow.hidden = mode === "iris";
+  document.querySelectorAll(".tab-panel").forEach(p => {
+    p.classList.toggle("is-active", p.dataset.tabPanel === (mode === "iris" ? "iris" : LAST_SPORT_TAB));
+  });
+  window.scrollTo({ top: 0 });
+  if (mode === "iris") speakIrisGreeting();
+}
+
+function setupModeSwitch() {
+  document.querySelectorAll(".mode-btn").forEach(btn => {
+    btn.addEventListener("click", () => setMode(btn.dataset.mode));
   });
 }
 
@@ -1825,18 +1849,77 @@ async function logoutUser(username, statusEl, btn) {
 
 let PRISTINE_DATA = null;
 
-/* ---------- Airis: Mail-/Kalenderuebersicht (nur Owner) ---------- */
+/* ---------- Iris: gesprochener Status-Hub (nur Owner) ---------- */
 
-function renderAiris(data) {
-  const panel = document.getElementById("tab-airis");
+let LAST_IRIS_DATA = null;
+
+const IRIS_ORB_SVG = `
+  <div class="iris-orb-wrap">
+    <svg class="iris-orb" viewBox="0 0 200 200">
+      <defs>
+        <radialGradient id="iris-core-grad" cx="50%" cy="50%" r="50%">
+          <stop offset="0%" stop-color="var(--ice-300)" />
+          <stop offset="55%" stop-color="var(--sky-400)" />
+          <stop offset="100%" stop-color="var(--ocean-600)" />
+        </radialGradient>
+      </defs>
+      <circle class="iris-ring iris-ring-1" cx="100" cy="100" r="92" />
+      <circle class="iris-ring iris-ring-2" cx="100" cy="100" r="74" />
+      <circle class="iris-ring iris-ring-3" cx="100" cy="100" r="58" />
+      <circle class="iris-core" cx="100" cy="100" r="34" />
+      <circle class="iris-core-dot" cx="100" cy="100" r="7" />
+    </svg>
+  </div>`;
+
+function buildIrisBriefing(data) {
+  if (!data) return "Hallo, hier ist Iris. Ich hab noch keine aktuellen Daten - sobald der erste Sync durch ist, sag ich dir mehr.";
+  const parts = [];
+  const gmx = data.mail && data.mail.gmx;
+  const icloud = data.mail && data.mail.icloud;
+  if (gmx && !gmx.error) parts.push(`${gmx.unread} ungelesene Mails bei G-M-X`);
+  if (icloud && !icloud.error) parts.push(`${icloud.unread} bei iCloud`);
+  const cal = data.calendar || {};
+  if (!cal.error && (cal.events || []).length) {
+    const next = cal.events[0];
+    parts.push(`Nächster Termin: ${next.summary}, ${next.when}`);
+  }
+  if (!parts.length) return "Hallo, hier ist Iris. Aktuell nichts Dringendes, alles im grünen Bereich.";
+  return "Hallo, hier ist Iris. " + parts.join(". ") + ".";
+}
+
+function speakText(text) {
+  if (!("speechSynthesis" in window) || !text) return;
+  const stage = document.getElementById("iris-stage");
+  try {
+    window.speechSynthesis.cancel();
+    const utter = new SpeechSynthesisUtterance(text);
+    utter.lang = "de-DE";
+    utter.rate = 1.0;
+    utter.onstart = () => { if (stage) stage.classList.add("is-speaking"); };
+    utter.onend = () => { if (stage) stage.classList.remove("is-speaking"); };
+    utter.onerror = () => { if (stage) stage.classList.remove("is-speaking"); };
+    window.speechSynthesis.speak(utter);
+  } catch {
+    // Sprachausgabe im Browser evtl. nicht verfuegbar - UI funktioniert trotzdem stumm weiter.
+  }
+}
+
+function speakIrisGreeting() {
+  speakText(buildIrisBriefing(LAST_IRIS_DATA));
+}
+
+function renderIris(data) {
+  const panel = document.getElementById("tab-iris");
   if (!panel || typeof CURRENT_ROLE === "undefined" || CURRENT_ROLE !== "owner") return;
+  if (data) LAST_IRIS_DATA = data;
+
   if (!data) {
     panel.innerHTML = `
-      <div class="page-head">
-        <div class="page-eyebrow">Airis</div>
-        <div class="page-title">Übersicht</div>
-      </div>
-      <div class="stack"><div class="card"><div class="card-note">Lade…</div></div></div>`;
+      <div class="iris-stage" id="iris-stage">
+        ${IRIS_ORB_SVG}
+        <div class="iris-greeting">Hallo, hier ist Iris.</div>
+        <div class="iris-sub">Lade deine aktuelle Übersicht…</div>
+      </div>`;
     return;
   }
 
@@ -1871,10 +1954,11 @@ function renderAiris(data) {
 
   const updated = data.syncedAt ? new Date(data.syncedAt).toLocaleString("de-DE", { dateStyle: "short", timeStyle: "short" }) : "–";
   panel.innerHTML = `
-    <div class="page-head">
-      <div class="page-eyebrow">Airis</div>
-      <div class="page-title">Übersicht</div>
-      <div class="page-sub">Zuletzt aktualisiert: ${escapeHtml(updated)}</div>
+    <div class="iris-stage" id="iris-stage">
+      ${IRIS_ORB_SVG}
+      <div class="iris-greeting">Hallo, hier ist Iris.</div>
+      <div class="iris-sub">Zuletzt aktualisiert: ${escapeHtml(updated)}</div>
+      <button class="iris-speak-btn" id="iris-speak-btn" type="button">🔊 Briefing vorlesen</button>
     </div>
     <div class="stack">
       ${mailCard("GMX", data.mail && data.mail.gmx)}
@@ -1884,6 +1968,9 @@ function renderAiris(data) {
         ${calBody}
       </div>
     </div>`;
+
+  const speakBtn = document.getElementById("iris-speak-btn");
+  if (speakBtn) speakBtn.addEventListener("click", () => speakText(buildIrisBriefing(data)));
 }
 
 function renderAll(freshData) {
@@ -1902,11 +1989,12 @@ function renderAll(freshData) {
   renderKraft(data);
   renderPlanaenderungen(data);
   renderLogins();
-  renderAiris();
+  renderIris();
 }
 
 document.addEventListener("DOMContentLoaded", () => {
   setupTabs();
+  setupModeSwitch();
   setupInteractions();
   setupSyncButton();
   bootWithAuth(renderAll);
