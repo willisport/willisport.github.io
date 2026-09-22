@@ -296,6 +296,23 @@ async function pollForFreshSync(prevSyncedAt, maxWaitMs = 150000, intervalMs = 6
 
 function setupLoginsNavItem() {
   document.querySelectorAll('[data-tab="logins"]').forEach(el => { el.hidden = CURRENT_ROLE !== "owner"; });
+  document.querySelectorAll('[data-tab="airis"]').forEach(el => { el.hidden = CURRENT_ROLE !== "owner"; });
+}
+
+/* Airis: separater, nur fuer den Owner sichtbarer Bereich (Mail-/Kalenderuebersicht).
+   Eigene verschluesselte Datei statt in training-data.enc.json, damit ein Viewer-Zugriff
+   (auch versehentlich) diese Datei nie anfragt, geschweige denn entschluesseln koennte -
+   Verteidigung in der Tiefe zusaetzlich zum reinen UI-Ausblenden oben. */
+async function loadAirisStatus() {
+  if (CURRENT_ROLE !== "owner" || !CURRENT_DEK) return;
+  try {
+    const encFile = await fetch(`${RAW_DATA_BASE}/data/airis-status.enc.json`, { cache: "no-store" }).then(r => r.json());
+    const data = await decryptDataFile(CURRENT_DEK, encFile);
+    if (typeof renderAiris === "function") renderAiris(data);
+  } catch {
+    // Datei existiert evtl. noch nicht (erster Sync steht noch aus) oder Abruf fehlgeschlagen -
+    // Tab zeigt dann seinen eigenen "noch keine Daten"-Zustand.
+  }
 }
 
 /**
@@ -351,6 +368,7 @@ async function bootWithAuth(onData) {
       setupLogoutControl();
       setupHostedSyncButton(onData);
       setupLoginsNavItem();
+      loadAirisStatus();
       showSyncStatus(data.syncedAt);
     } catch (err) {
       document.getElementById("tab-heute").innerHTML =

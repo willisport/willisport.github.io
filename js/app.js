@@ -1825,6 +1825,67 @@ async function logoutUser(username, statusEl, btn) {
 
 let PRISTINE_DATA = null;
 
+/* ---------- Airis: Mail-/Kalenderuebersicht (nur Owner) ---------- */
+
+function renderAiris(data) {
+  const panel = document.getElementById("tab-airis");
+  if (!panel || typeof CURRENT_ROLE === "undefined" || CURRENT_ROLE !== "owner") return;
+  if (!data) {
+    panel.innerHTML = `
+      <div class="page-head">
+        <div class="page-eyebrow">Airis</div>
+        <div class="page-title">Übersicht</div>
+      </div>
+      <div class="stack"><div class="card"><div class="card-note">Lade…</div></div></div>`;
+    return;
+  }
+
+  const mailCard = (label, m) => {
+    if (!m) return "";
+    if (m.error) {
+      return `
+        <div class="card">
+          <div class="card-head"><span class="card-title">${escapeHtml(label)}</span></div>
+          <div class="card-note" style="color:var(--amber);">${escapeHtml(m.error)}</div>
+        </div>`;
+    }
+    const items = (m.important || []).map(i => `
+      <div class="qa-item" style="margin-bottom:6px;">
+        <div class="qa-question" style="font-size:13px;">${escapeHtml(i.from)}</div>
+        <div class="card-note">${escapeHtml(i.subject)}</div>
+      </div>`).join("");
+    return `
+      <div class="card">
+        <div class="card-head"><span class="card-title">${escapeHtml(label)}</span><span class="card-note">${m.unread} ungelesen</span></div>
+        ${items || `<div class="card-note">Nichts Wichtiges offen.</div>`}
+      </div>`;
+  };
+
+  const cal = data.calendar || {};
+  const calBody = cal.error
+    ? `<div class="card-note" style="color:var(--amber);">${escapeHtml(cal.error)}</div>`
+    : ((cal.events || []).length
+      ? cal.events.map(e => `
+        <div class="day-mini-unit"><span style="flex:1;">${escapeHtml(e.summary)}<div class="unit-detail" style="margin-top:2px;">${escapeHtml(e.when)}${e.location ? " · " + escapeHtml(e.location) : ""}</div></span></div>`).join("")
+      : `<div class="card-note">Keine anstehenden Termine gefunden.</div>`);
+
+  const updated = data.syncedAt ? new Date(data.syncedAt).toLocaleString("de-DE", { dateStyle: "short", timeStyle: "short" }) : "–";
+  panel.innerHTML = `
+    <div class="page-head">
+      <div class="page-eyebrow">Airis</div>
+      <div class="page-title">Übersicht</div>
+      <div class="page-sub">Zuletzt aktualisiert: ${escapeHtml(updated)}</div>
+    </div>
+    <div class="stack">
+      ${mailCard("GMX", data.mail && data.mail.gmx)}
+      ${mailCard("iCloud", data.mail && data.mail.icloud)}
+      <div class="card">
+        <div class="card-head"><span class="card-title">Nächste Termine</span></div>
+        ${calBody}
+      </div>
+    </div>`;
+}
+
 function renderAll(freshData) {
   if (freshData) PRISTINE_DATA = freshData;
   const data = structuredClone(PRISTINE_DATA);
@@ -1841,6 +1902,7 @@ function renderAll(freshData) {
   renderKraft(data);
   renderPlanaenderungen(data);
   renderLogins();
+  renderAiris();
 }
 
 document.addEventListener("DOMContentLoaded", () => {
