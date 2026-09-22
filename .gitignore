@@ -3,6 +3,7 @@ sync/.garmin_tokens/
 sync/__pycache__/
 *.pyc
 sync/sync.log
+.claude/settings.local.json
 
 # Klartext-Trainingsdaten sollen NIE ins (oeffentliche) Repo -
 # nur data/training-data.enc.json (verschluesselt) und data/auth-config.json
