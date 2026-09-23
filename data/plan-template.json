@@ -242,7 +242,7 @@
           ]
         },
         "Donnerstag": {
-          "focus": "Erster Arbeitstag 10–16 · Rad nüchtern + Intervalle",
+          "focus": "Arbeit 10–16 · Abfahrt 8:30 · zurück ca. 17:15 (Fahrt je ca. 1 h 15) · Rad nüchtern + Intervalle",
           "units": [
             {"name": "Rad Zone 2", "type": "rad", "tag": "pflicht", "detail": "165 W · 60 min · 7:00 Uhr, nüchtern", "plannedDurationMin": 60, "matchHint": {"activityTypes": ["cycling", "indoor_cycling", "virtual_ride"]}},
             {"name": "Intervalle", "type": "lauf", "tag": "pflicht", "detail": "4×4 min hart (Zielpace ~4:15–4:30 min/km, nahe Schwellen-HF 175 bpm) / 3 min locker traben · 18:30 Uhr, nicht nüchtern", "plannedDurationMin": 40, "keySession": true, "matchHint": {"activityTypes": ["running"]}},
@@ -250,7 +250,7 @@
           ]
         },
         "Freitag": {
-          "focus": "Frühdienst 7–13 · kein Morgenrad (Abfahrt 5:30)",
+          "focus": "Arbeit 7–13 · Abfahrt 5:30 · zurück ca. 14:15 (Fahrt je ca. 1 h 15) · kein Morgenrad",
           "units": [
             {"name": "Rad Zone 1 (locker)", "type": "rad", "tag": "pflicht", "detail": "45 min, ganz entspannt · 15:30 Uhr", "plannedDurationMin": 45, "matchHint": {"activityTypes": ["cycling", "indoor_cycling", "virtual_ride"]}},
             {"name": "Core", "type": "core", "tag": "ergaenzung", "detail": "15 min", "plannedDurationMin": 15, "matchHint": {"activityTypes": ["strength_training", "cardio"]}},
@@ -277,14 +277,14 @@
       "note": "Aufbauwoche mit Schulung Di–Do; lange Einheiten an den Spätdienst-Vormittagen",
       "days": {
         "Montag": {
-          "focus": "Spätdienst 16–22 · Langer Lauf am Vormittag",
+          "focus": "Arbeit 16–22 · Abfahrt 14:30 · zurück ca. 23:15 (Fahrt je ca. 1 h 15) · Langer Lauf am Vormittag",
           "units": [
             {"name": "Langer Lauf", "type": "lauf", "tag": "pflicht", "detail": "12 km · Zone 2 (130–140 bpm) · 9:00 Uhr, nach dem Frühstück", "plannedDurationMin": 73, "keySession": true, "matchHint": {"activityTypes": ["running"], "minDistanceKm": 10}},
             {"name": "EMOM", "type": "emom", "tag": "bonus", "detail": "10 min: jede Minute 10 Klimmzüge + 15 Liegestütze", "planLabel": "Plan 1", "plannedDurationMin": 10, "matchHint": {"activityTypes": ["strength_training", "cardio"]}}
           ]
         },
         "Dienstag": {
-          "focus": "Schulung 9–13 · Rad nüchtern + lockerer Lauf + Core",
+          "focus": "Schulung 9–13 · Abfahrt 7:30 · zurück ca. 14:15 (Fahrt je ca. 1 h 15) · Rad nüchtern + lockerer Lauf + Core",
           "units": [
             {"name": "Rad Zone 2", "type": "rad", "tag": "pflicht", "detail": "165 W · 60 min · 6:00 Uhr, nüchtern", "plannedDurationMin": 60, "matchHint": {"activityTypes": ["cycling", "indoor_cycling", "virtual_ride"]}},
             {"name": "Zone-2-Lauf", "type": "lauf", "tag": "pflicht", "detail": "6 km · 130–140 bpm · 16:30 Uhr", "plannedDurationMin": 37, "matchHint": {"activityTypes": ["running"], "minDistanceKm": 4}},
@@ -293,14 +293,14 @@
           ]
         },
         "Mittwoch": {
-          "focus": "Seminar/Schulung ab 9:00 · Ruhetag",
+          "focus": "Seminar/Schulung ab 9:00 · Abfahrt ca. 7:30 · Ruhetag",
           "units": [
             {"name": "Rad Zone 1 (locker)", "type": "rad", "tag": "pflicht", "detail": "45 min, ganz entspannt · 6:15 Uhr", "plannedDurationMin": 45, "matchHint": {"activityTypes": ["cycling", "indoor_cycling", "virtual_ride"]}},
             {"name": "EMOM", "type": "emom", "tag": "bonus", "detail": "10 min: jede Minute 10 Klimmzüge + 15 Liegestütze", "planLabel": "Plan 1", "plannedDurationMin": 10, "matchHint": {"activityTypes": ["strength_training", "cardio"]}}
           ]
         },
         "Donnerstag": {
-          "focus": "Schulung 9–13 · Rad nüchtern + Intervalle",
+          "focus": "Schulung 9–13 · Abfahrt 7:30 · zurück ca. 14:15 (Fahrt je ca. 1 h 15) · Rad nüchtern + Intervalle",
           "units": [
             {"name": "Rad Zone 2", "type": "rad", "tag": "pflicht", "detail": "165 W · 60 min · 6:00 Uhr, nüchtern", "plannedDurationMin": 60, "matchHint": {"activityTypes": ["cycling", "indoor_cycling", "virtual_ride"]}},
             {"name": "Intervalle", "type": "lauf", "tag": "pflicht", "detail": "4×4 min hart (Zielpace ~4:15–4:30 min/km, nahe Schwellen-HF 175 bpm) / 3 min locker traben · 17:30 Uhr, nicht nüchtern", "plannedDurationMin": 40, "keySession": true, "matchHint": {"activityTypes": ["running"]}},
@@ -308,7 +308,7 @@
           ]
         },
         "Freitag": {
-          "focus": "Spätdienst 13–19 · Langes Rad am Vormittag",
+          "focus": "Arbeit 13–19 · Abfahrt 11:30 · zurück ca. 20:15 (Fahrt je ca. 1 h 15) · Langes Rad am Vormittag",
           "units": [
             {"name": "Langes Rad Zone 2", "type": "rad", "tag": "pflicht", "detail": "165 W · 2 h · 7:30 Uhr, mit Frühstück/Verpflegung", "plannedDurationMin": 120, "keySession": true, "matchHint": {"activityTypes": ["cycling", "indoor_cycling", "virtual_ride"]}},
             {"name": "EMOM", "type": "emom", "tag": "bonus", "detail": "10 min: jede Minute 10 Klimmzüge + 15 Liegestütze", "planLabel": "Plan 1", "plannedDurationMin": 10, "matchHint": {"activityTypes": ["strength_training", "cardio"]}}
@@ -336,14 +336,14 @@
       "note": "Recovery-Woche + Schulungswoche (Mo/Di 9–16, Mi 12–16)",
       "days": {
         "Montag": {
-          "focus": "Schulung 9–16 · Ruhetag",
+          "focus": "Schulung 9–16 · Abfahrt 7:30 · zurück ca. 17:15 (Fahrt je ca. 1 h 15) · Ruhetag",
           "units": [
             {"name": "Rad Zone 1 (locker)", "type": "rad", "tag": "pflicht", "detail": "45 min, ganz entspannt · 6:00 Uhr", "plannedDurationMin": 45, "matchHint": {"activityTypes": ["cycling", "indoor_cycling", "virtual_ride"]}},
             {"name": "EMOM", "type": "emom", "tag": "bonus", "detail": "10 min: jede Minute 10 Klimmzüge + 15 Liegestütze", "planLabel": "Plan 1", "plannedDurationMin": 10, "matchHint": {"activityTypes": ["strength_training", "cardio"]}}
           ]
         },
         "Dienstag": {
-          "focus": "Schulung 9–16 · Rad nüchtern + kurzer Lauf + Core",
+          "focus": "Schulung 9–16 · Abfahrt 7:30 · zurück ca. 17:15 (Fahrt je ca. 1 h 15) · Rad nüchtern + kurzer Lauf + Core",
           "units": [
             {"name": "Rad Zone 2", "type": "rad", "tag": "pflicht", "detail": "165 W · 60 min · 6:00 Uhr, nüchtern", "plannedDurationMin": 60, "matchHint": {"activityTypes": ["cycling", "indoor_cycling", "virtual_ride"]}},
             {"name": "Zone-2-Lauf", "type": "lauf", "tag": "pflicht", "detail": "5 km · 130–140 bpm · 18:00 Uhr", "plannedDurationMin": 30, "matchHint": {"activityTypes": ["running"], "minDistanceKm": 4}},
@@ -352,7 +352,7 @@
           ]
         },
         "Mittwoch": {
-          "focus": "Schulung 12–16 · Rad nüchtern + leichtere schwere Beine",
+          "focus": "Schulung 12–16 · Abfahrt 10:30 · zurück ca. 17:15 (Fahrt je ca. 1 h 15) · Rad nüchtern + leichtere schwere Beine",
           "units": [
             {"name": "Rad Zone 2", "type": "rad", "tag": "pflicht", "detail": "165 W · 60 min · 7:30 Uhr, nüchtern", "plannedDurationMin": 60, "matchHint": {"activityTypes": ["cycling", "indoor_cycling", "virtual_ride"]}},
             {"name": "Schweres Beintraining", "type": "kraft", "tag": "pflicht", "detail": "Kniebeuge, Kreuzheben, Adduktoren (Innen-/Außenseite), Wadenheben, Beinbeuger · komplette Beinkette in einer Einheit · Recovery-Woche: leichter, 3–4 Wdh. im Tank · 18:30 Uhr", "plannedDurationMin": 65, "exercises": [{"name": "Kniebeuge", "sets": 2, "reps": "6–8", "rest": "3–4 min"}, {"name": "Kreuzheben", "sets": 2, "reps": "6–8", "rest": "3–4 min"}, {"name": "Adduktoren Innenseite", "sets": 2, "reps": "6–8", "rest": "3–4 min"}, {"name": "Adduktoren Außenseite", "sets": 2, "reps": "6–8", "rest": "3–4 min"}, {"name": "Wadenheben", "sets": 2, "reps": "6–8", "rest": "3–4 min"}, {"name": "Beinbeuger", "sets": 2, "reps": "6–8", "rest": "3–4 min"}], "matchHint": {"activityTypes": ["strength_training"]}},
@@ -374,14 +374,14 @@
           ]
         },
         "Samstag": {
-          "focus": "Dienst 9:30–15:30 · Ruhetag",
+          "focus": "Arbeit 9:30–15:30 · Abfahrt 8:00 · zurück ca. 16:45 (Fahrt je ca. 1 h 15) · Ruhetag",
           "units": [
             {"name": "Rad Zone 1 (locker)", "type": "rad", "tag": "pflicht", "detail": "45 min, ganz entspannt · 6:30 Uhr", "plannedDurationMin": 45, "matchHint": {"activityTypes": ["cycling", "indoor_cycling", "virtual_ride"]}},
             {"name": "EMOM", "type": "emom", "tag": "bonus", "detail": "10 min: jede Minute 10 Klimmzüge + 15 Liegestütze", "planLabel": "Plan 1", "plannedDurationMin": 10, "matchHint": {"activityTypes": ["strength_training", "cardio"]}}
           ]
         },
         "Sonntag": {
-          "focus": "Dienst 9:30–15:30 · Rad nüchtern + Lauf + Core",
+          "focus": "Arbeit 9:30–15:30 · Abfahrt 8:00 · zurück ca. 16:45 (Fahrt je ca. 1 h 15) · Rad nüchtern + Lauf + Core",
           "units": [
             {"name": "Rad Zone 2", "type": "rad", "tag": "pflicht", "detail": "165 W · 45 min · 6:30 Uhr, nüchtern", "plannedDurationMin": 45, "matchHint": {"activityTypes": ["cycling", "indoor_cycling", "virtual_ride"]}},
             {"name": "Zone-2-Lauf", "type": "lauf", "tag": "pflicht", "detail": "6 km · 130–140 bpm · 17:30 Uhr", "plannedDurationMin": 37, "matchHint": {"activityTypes": ["running"], "minDistanceKm": 4}},
@@ -395,7 +395,7 @@
       "note": "Frühdienst 7–13 Mo–Fr (Abfahrt 5:30) – unter der Woche keine nüchterne Morgenfahrt möglich",
       "days": {
         "Montag": {
-          "focus": "Frühdienst 7–13 · Rad + schwere Beine",
+          "focus": "Arbeit 7–13 · Abfahrt 5:30 · zurück ca. 14:15 (Fahrt je ca. 1 h 15) · Rad + schwere Beine",
           "units": [
             {"name": "Rad Zone 2", "type": "rad", "tag": "pflicht", "detail": "165 W · 45 min · 14:45 Uhr", "plannedDurationMin": 45, "matchHint": {"activityTypes": ["cycling", "indoor_cycling", "virtual_ride"]}},
             {"name": "Schweres Beintraining", "type": "kraft", "tag": "pflicht", "detail": "Kniebeuge, Kreuzheben, Adduktoren (Innen-/Außenseite), Wadenheben, Beinbeuger · komplette Beinkette in einer Einheit · 16:00 Uhr", "plannedDurationMin": 65, "exercises": [{"name": "Kniebeuge", "sets": 2, "reps": "6–8", "rest": "3–4 min"}, {"name": "Kreuzheben", "sets": 2, "reps": "6–8", "rest": "3–4 min"}, {"name": "Adduktoren Innenseite", "sets": 2, "reps": "6–8", "rest": "3–4 min"}, {"name": "Adduktoren Außenseite", "sets": 2, "reps": "6–8", "rest": "3–4 min"}, {"name": "Wadenheben", "sets": 2, "reps": "6–8", "rest": "3–4 min"}, {"name": "Beinbeuger", "sets": 2, "reps": "6–8", "rest": "3–4 min"}], "matchHint": {"activityTypes": ["strength_training"]}},
@@ -403,7 +403,7 @@
           ]
         },
         "Dienstag": {
-          "focus": "Frühdienst 7–13 · Lauf + Core",
+          "focus": "Arbeit 7–13 · Abfahrt 5:30 · zurück ca. 14:15 (Fahrt je ca. 1 h 15) · Lauf + Core",
           "units": [
             {"name": "Zone-2-Lauf", "type": "lauf", "tag": "pflicht", "detail": "7 km · 130–140 bpm · 15:30 Uhr", "plannedDurationMin": 43, "matchHint": {"activityTypes": ["running"], "minDistanceKm": 5}},
             {"name": "Core", "type": "core", "tag": "ergaenzung", "detail": "15 min", "plannedDurationMin": 15, "matchHint": {"activityTypes": ["strength_training", "cardio"]}},
@@ -411,21 +411,21 @@
           ]
         },
         "Mittwoch": {
-          "focus": "Frühdienst 7–13 · Ruhetag",
+          "focus": "Arbeit 7–13 · Abfahrt 5:30 · zurück ca. 14:15 (Fahrt je ca. 1 h 15) · Ruhetag",
           "units": [
             {"name": "Rad Zone 1 (locker)", "type": "rad", "tag": "pflicht", "detail": "45 min, ganz entspannt · 15:30 Uhr", "plannedDurationMin": 45, "matchHint": {"activityTypes": ["cycling", "indoor_cycling", "virtual_ride"]}},
             {"name": "EMOM", "type": "emom", "tag": "bonus", "detail": "10 min: jede Minute 10 Klimmzüge + 15 Liegestütze", "planLabel": "Plan 1", "plannedDurationMin": 10, "matchHint": {"activityTypes": ["strength_training", "cardio"]}}
           ]
         },
         "Donnerstag": {
-          "focus": "Frühdienst 7–13 · Intervalle",
+          "focus": "Arbeit 7–13 · Abfahrt 5:30 · zurück ca. 14:15 (Fahrt je ca. 1 h 15) · Intervalle",
           "units": [
             {"name": "Intervalle", "type": "lauf", "tag": "pflicht", "detail": "4×4 min hart (Zielpace ~4:15–4:30 min/km, nahe Schwellen-HF 175 bpm) / 3 min locker traben · 16:00 Uhr, nicht nüchtern", "plannedDurationMin": 40, "keySession": true, "matchHint": {"activityTypes": ["running"]}},
             {"name": "EMOM", "type": "emom", "tag": "bonus", "detail": "10 min: jede Minute 10 Klimmzüge + 10 Dips", "planLabel": "Plan 2", "plannedDurationMin": 10, "matchHint": {"activityTypes": ["strength_training", "cardio"]}}
           ]
         },
         "Freitag": {
-          "focus": "Frühdienst 7–13 · Langes Rad am Nachmittag",
+          "focus": "Arbeit 7–13 · Abfahrt 5:30 · zurück ca. 14:15 (Fahrt je ca. 1 h 15) · Langes Rad am Nachmittag",
           "units": [
             {"name": "Langes Rad Zone 2", "type": "rad", "tag": "pflicht", "detail": "165 W · 2 h · 15:00 Uhr, mit Frühstück/Verpflegung (bei Müdigkeit 90 min)", "plannedDurationMin": 120, "keySession": true, "matchHint": {"activityTypes": ["cycling", "indoor_cycling", "virtual_ride"]}},
             {"name": "EMOM", "type": "emom", "tag": "bonus", "detail": "10 min: jede Minute 10 Klimmzüge + 15 Liegestütze", "planLabel": "Plan 1", "plannedDurationMin": 10, "matchHint": {"activityTypes": ["strength_training", "cardio"]}}
@@ -452,7 +452,7 @@
       "note": "Spätdienste Mo–Mi, Do/Fr frei; Dienstplan November folgt",
       "days": {
         "Montag": {
-          "focus": "Spätdienst 15–21 · Rad nüchtern + schwere Beine",
+          "focus": "Arbeit 15–21 · Abfahrt 13:30 · zurück ca. 22:15 (Fahrt je ca. 1 h 15) · Rad nüchtern + schwere Beine",
           "units": [
             {"name": "Rad Zone 2", "type": "rad", "tag": "pflicht", "detail": "165 W · 60 min · 7:30 Uhr, nüchtern", "plannedDurationMin": 60, "matchHint": {"activityTypes": ["cycling", "indoor_cycling", "virtual_ride"]}},
             {"name": "Schweres Beintraining", "type": "kraft", "tag": "pflicht", "detail": "Kniebeuge, Kreuzheben, Adduktoren (Innen-/Außenseite), Wadenheben, Beinbeuger · komplette Beinkette in einer Einheit · 10:30 Uhr", "plannedDurationMin": 65, "exercises": [{"name": "Kniebeuge", "sets": 2, "reps": "6–8", "rest": "3–4 min"}, {"name": "Kreuzheben", "sets": 2, "reps": "6–8", "rest": "3–4 min"}, {"name": "Adduktoren Innenseite", "sets": 2, "reps": "6–8", "rest": "3–4 min"}, {"name": "Adduktoren Außenseite", "sets": 2, "reps": "6–8", "rest": "3–4 min"}, {"name": "Wadenheben", "sets": 2, "reps": "6–8", "rest": "3–4 min"}, {"name": "Beinbeuger", "sets": 2, "reps": "6–8", "rest": "3–4 min"}], "matchHint": {"activityTypes": ["strength_training"]}},
@@ -460,14 +460,14 @@
           ]
         },
         "Dienstag": {
-          "focus": "Spätdienst 15–21 · Rad nüchtern + Arme/Schultern",
+          "focus": "Arbeit 15–21 · Abfahrt 13:30 · zurück ca. 22:15 (Fahrt je ca. 1 h 15) · Rad nüchtern + Arme/Schultern",
           "units": [
             {"name": "Rad Zone 2", "type": "rad", "tag": "pflicht", "detail": "165 W · 60 min · 8:00 Uhr, nüchtern", "plannedDurationMin": 60, "matchHint": {"activityTypes": ["cycling", "indoor_cycling", "virtual_ride"]}},
             {"name": "Arme/Schultern", "type": "kraft", "tag": "ergaenzung", "detail": "Schulterdrücken, Seitheben, hintere Schulter, Bizeps-/Trizepsdrücken · 3×10–12 Wdh. (statt EMOM)", "plannedDurationMin": 25, "exercises": [{"name": "Schulterdrücken", "sets": 3, "reps": "10–12", "rest": "60 s"}, {"name": "Seitheben", "sets": 3, "reps": "10–12", "rest": "60 s"}, {"name": "Hintere Schulter (Reverse Flys)", "sets": 3, "reps": "10–12", "rest": "60 s"}, {"name": "Bizepscurls", "sets": 3, "reps": "10–12", "rest": "60 s"}, {"name": "Trizepsdrücken", "sets": 3, "reps": "10–12", "rest": "60 s"}], "matchHint": {"activityTypes": ["strength_training"]}}
           ]
         },
         "Mittwoch": {
-          "focus": "Spätdienst 13–19 · Langes Rad am Vormittag",
+          "focus": "Arbeit 13–19 · Abfahrt 11:30 · zurück ca. 20:15 (Fahrt je ca. 1 h 15) · Langes Rad am Vormittag",
           "units": [
             {"name": "Langes Rad Zone 2", "type": "rad", "tag": "pflicht", "detail": "165 W · 2 h · 7:30 Uhr, mit Frühstück/Verpflegung", "plannedDurationMin": 120, "keySession": true, "matchHint": {"activityTypes": ["cycling", "indoor_cycling", "virtual_ride"]}},
             {"name": "EMOM", "type": "emom", "tag": "bonus", "detail": "10 min: jede Minute 10 Klimmzüge + 10 Dips", "planLabel": "Plan 2", "plannedDurationMin": 10, "matchHint": {"activityTypes": ["strength_training", "cardio"]}}
@@ -490,7 +490,7 @@
           ]
         },
         "Samstag": {
-          "focus": "Dienst 8–14 · Ruhetag",
+          "focus": "Arbeit 8–14 · Abfahrt 6:30 · zurück ca. 15:15 (Fahrt je ca. 1 h 15) · Ruhetag",
           "units": [
             {"name": "Rad Zone 1 (locker)", "type": "rad", "tag": "pflicht", "detail": "45 min, ganz entspannt · 15:30 Uhr", "plannedDurationMin": 45, "matchHint": {"activityTypes": ["cycling", "indoor_cycling", "virtual_ride"]}},
             {"name": "Core", "type": "core", "tag": "ergaenzung", "detail": "15 min", "plannedDurationMin": 15, "matchHint": {"activityTypes": ["strength_training", "cardio"]}},
