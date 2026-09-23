@@ -180,7 +180,7 @@
       }
     },
     "2026-09-21": {
-      "note": "Erholung nach dem Regatta-Wochenende",
+      "note": "Erholung nach dem Regatta-Wochenende; ab Mittwoch entspannte Restwoche (Zahnarzt-Eingriff, gelasert – Termine Mi+Do)",
       "days": {
         "Montag": { "focus": "Rest Day nach Regatta-Wochenende", "units": [] },
         "Dienstag": {
@@ -198,6 +198,19 @@
               { "name": "Beinbeuger", "sets": 2, "reps": "6–8", "rest": "3–4 min" }
             ], "matchHint": { "activityTypes": ["strength_training"] } }
           ]
+        },
+        "Mittwoch": {
+          "focus": "Ruhetag – Zahnarzt (gelasert), kein Training",
+          "units": []
+        },
+        "Freitag": {
+          "focus": "Zone-2-Lauf statt Intervalle – entspannte Restwoche nach Zahnarzt",
+          "units": [
+            { "name": "Zone-2-Lauf", "type": "lauf", "tag": "pflicht", "detail": "6–8 km · 130–140 bpm", "matchHint": { "activityTypes": ["running"] } },
+            { "name": "Rad Zone 2", "type": "rad", "tag": "ergaenzung", "detail": "165 W · 45 min, locker – optional", "plannedDurationMin": 45, "matchHint": { "activityTypes": ["cycling", "indoor_cycling", "virtual_ride"] } },
+            { "name": "EMOM", "type": "emom", "tag": "bonus", "detail": "10 min: jede Minute 10 Klimmzüge + 10 Dips", "planLabel": "Plan 2", "plannedDurationMin": 10, "matchHint": { "activityTypes": ["strength_training", "cardio"] } }
+          ],
+          "fallbackNote": null
         }
       }
     }
