@@ -294,9 +294,12 @@ async function pollForFreshSync(prevSyncedAt, maxWaitMs = 150000, intervalMs = 6
   return null;
 }
 
+/* Iris ist gebaut, aber vorerst von der Website genommen - auf true setzen, sobald alles fertig ist. */
+const IRIS_ENABLED = false;
+
 function setupLoginsNavItem() {
   document.querySelectorAll('[data-tab="logins"]').forEach(el => { el.hidden = CURRENT_ROLE !== "owner"; });
-  document.querySelectorAll('#mode-switch, #mode-switch-mobile').forEach(el => { el.hidden = CURRENT_ROLE !== "owner"; });
+  document.querySelectorAll('#mode-switch, #mode-switch-mobile').forEach(el => { el.hidden = !(IRIS_ENABLED && CURRENT_ROLE === "owner"); });
 }
 
 /* Iris: separater, nur fuer den Owner sichtbarer Bereich (Mail-/Kalenderuebersicht).
@@ -306,7 +309,7 @@ function setupLoginsNavItem() {
    Dateiname/Backend bewusst noch "airis-status" (Sync-Task laeuft bereits darauf),
    nur die sichtbare Oberflaeche heisst jetzt "Iris". */
 async function loadIrisStatus() {
-  if (CURRENT_ROLE !== "owner" || !CURRENT_DEK) return;
+  if (!IRIS_ENABLED || CURRENT_ROLE !== "owner" || !CURRENT_DEK) return;
   try {
     const encFile = await fetch(`${RAW_DATA_BASE}/data/airis-status.enc.json`, { cache: "no-store" }).then(r => r.json());
     const data = await decryptDataFile(CURRENT_DEK, encFile);
