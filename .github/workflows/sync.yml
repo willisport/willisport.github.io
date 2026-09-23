@@ -22,7 +22,9 @@ jobs:
       - name: Garmin-Token-Cache wiederherstellen
         uses: actions/cache@v4
         with:
-          path: sync/.garmin_tokens
+          path: |
+            sync/.garmin_tokens
+            sync/.renpho_session.enc.json
           key: garmin-tokens-${{ github.run_id }}
           restore-keys: garmin-tokens-
 

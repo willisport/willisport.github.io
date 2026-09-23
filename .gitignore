@@ -1,5 +1,6 @@
 sync/.env
 sync/.garmin_tokens/
+sync/.renpho_session.enc.json
 sync/__pycache__/
 *.pyc
 sync/sync.log
