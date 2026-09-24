@@ -203,14 +203,34 @@
           "focus": "Ruhetag – Zahnarzt (gelasert), kein Training",
           "units": []
         },
-        "Freitag": {
-          "focus": "Zone-2-Lauf statt Intervalle – entspannte Restwoche nach Zahnarzt",
+        "Donnerstag": {
+          "focus": "Rad Zone 2 (1 h) + EMOM – Wiedereinstieg nach Zahnarzt",
           "units": [
-            { "name": "Zone-2-Lauf", "type": "lauf", "tag": "pflicht", "detail": "6–8 km · 130–140 bpm", "matchHint": { "activityTypes": ["running"] } },
-            { "name": "Rad Zone 2", "type": "rad", "tag": "ergaenzung", "detail": "165 W · 45 min, locker – optional", "plannedDurationMin": 45, "matchHint": { "activityTypes": ["cycling", "indoor_cycling", "virtual_ride"] } },
+            { "name": "Rad Zone 2", "type": "rad", "tag": "pflicht", "detail": "165 W · 60 min, drinnen", "plannedDurationMin": 60, "matchHint": { "activityTypes": ["cycling", "indoor_cycling", "virtual_ride"] } },
+            { "name": "EMOM", "type": "emom", "tag": "bonus", "detail": "10 min: jede Minute 10 Klimmzüge + 15 Liegestütze", "planLabel": "Plan 1", "plannedDurationMin": 10, "matchHint": { "activityTypes": ["strength_training", "cardio"] } }
+          ]
+        },
+        "Freitag": {
+          "focus": "Langer Lauf statt Intervalle – wenn die Beine mitmachen",
+          "units": [
+            { "name": "Langer Lauf", "type": "lauf", "tag": "pflicht", "detail": "12 km · Zone 2 (130–140 bpm), vorher essen · wenn die Beine sehr gut sind bis 13 km, nicht mehr (bisher längster Lauf: 10 km)", "plannedDurationMin": 73, "keySession": true, "matchHint": { "activityTypes": ["running"], "minDistanceKm": 10 } },
             { "name": "EMOM", "type": "emom", "tag": "bonus", "detail": "10 min: jede Minute 10 Klimmzüge + 10 Dips", "planLabel": "Plan 2", "plannedDurationMin": 10, "matchHint": { "activityTypes": ["strength_training", "cardio"] } }
           ],
           "fallbackNote": null
+        },
+        "Samstag": {
+          "focus": "Locker nach dem langen Lauf – Rad + Core + Arme/Schultern",
+          "units": [
+            { "name": "Rad Zone 1 (locker)", "type": "rad", "tag": "pflicht", "detail": "45 min, ganz entspannt", "plannedDurationMin": 45, "matchHint": { "activityTypes": ["cycling", "indoor_cycling", "virtual_ride"] } },
+            { "name": "Core", "type": "core", "tag": "ergaenzung", "detail": "15 min", "plannedDurationMin": 15, "matchHint": { "activityTypes": ["strength_training", "cardio"] } },
+            { "name": "Arme/Schultern", "type": "kraft", "tag": "ergaenzung", "detail": "Schulterdrücken, Seitheben, hintere Schulter, Bizeps-/Trizepsdrücken · 3×10–12 Wdh.", "plannedDurationMin": 25, "exercises": [
+              { "name": "Schulterdrücken", "sets": 3, "reps": "10–12", "rest": "60 s" },
+              { "name": "Seitheben", "sets": 3, "reps": "10–12", "rest": "60 s" },
+              { "name": "Hintere Schulter (Reverse Flys)", "sets": 3, "reps": "10–12", "rest": "60 s" },
+              { "name": "Bizepscurls", "sets": 3, "reps": "10–12", "rest": "60 s" },
+              { "name": "Trizepsdrücken", "sets": 3, "reps": "10–12", "rest": "60 s" }
+            ], "matchHint": { "activityTypes": ["strength_training"] } }
+          ]
         }
       }
     },
