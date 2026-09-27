@@ -239,39 +239,23 @@
       }
     },
     "2026-09-28": {
-      "note": "Ausbildungsstart Do 01.10. – Plan an den Dienstplan angepasst (Rad-Start = Schichtbeginn minus 3 h, nie vor 6:00 Uhr)",
+      "note": "Pause bis Freitag – Antibiotikum (Zahn), Ausbildungsstart Do 01.10.",
       "days": {
         "Montag": {
-          "focus": "Frei · Rad nüchtern + schwere Beine",
-          "units": [
-            {"name": "Rad Zone 2", "type": "rad", "tag": "pflicht", "detail": "165 W · 60 min · 7:00 Uhr, nüchtern", "plannedDurationMin": 60, "matchHint": {"activityTypes": ["cycling", "indoor_cycling", "virtual_ride"]}},
-            {"name": "Schweres Beintraining", "type": "kraft", "tag": "pflicht", "detail": "Kniebeuge, Kreuzheben, Adduktoren (Innen-/Außenseite), Wadenheben, Beinbeuger · komplette Beinkette in einer Einheit · 17:30 Uhr", "plannedDurationMin": 65, "exercises": [{"name": "Kniebeuge", "sets": 2, "reps": "6–8", "rest": "3–4 min"}, {"name": "Kreuzheben", "sets": 2, "reps": "6–8", "rest": "3–4 min"}, {"name": "Adduktoren Innenseite", "sets": 2, "reps": "6–8", "rest": "3–4 min"}, {"name": "Adduktoren Außenseite", "sets": 2, "reps": "6–8", "rest": "3–4 min"}, {"name": "Wadenheben", "sets": 2, "reps": "6–8", "rest": "3–4 min"}, {"name": "Beinbeuger", "sets": 2, "reps": "6–8", "rest": "3–4 min"}], "matchHint": {"activityTypes": ["strength_training"]}},
-            {"name": "EMOM", "type": "emom", "tag": "bonus", "detail": "10 min: jede Minute 10 Klimmzüge + 15 Liegestütze", "planLabel": "Plan 1", "plannedDurationMin": 10, "matchHint": {"activityTypes": ["strength_training", "cardio"]}}
-          ]
+          "focus": "Pause – Antibiotikum, kein Training",
+          "units": []
         },
         "Dienstag": {
-          "focus": "Frei · Rad nüchtern + Lauf + Core",
-          "units": [
-            {"name": "Rad Zone 2", "type": "rad", "tag": "pflicht", "detail": "165 W · 60 min · 7:00 Uhr, nüchtern", "plannedDurationMin": 60, "matchHint": {"activityTypes": ["cycling", "indoor_cycling", "virtual_ride"]}},
-            {"name": "Zone-2-Lauf", "type": "lauf", "tag": "pflicht", "detail": "7 km · 130–140 bpm · 17:30 Uhr", "plannedDurationMin": 43, "matchHint": {"activityTypes": ["running"], "minDistanceKm": 5}},
-            {"name": "Core", "type": "core", "tag": "ergaenzung", "detail": "15 min", "plannedDurationMin": 15, "matchHint": {"activityTypes": ["strength_training", "cardio"]}},
-            {"name": "EMOM", "type": "emom", "tag": "bonus", "detail": "10 min: jede Minute 10 Klimmzüge + 10 Dips", "planLabel": "Plan 2", "plannedDurationMin": 10, "matchHint": {"activityTypes": ["strength_training", "cardio"]}}
-          ]
+          "focus": "Pause – Antibiotikum, kein Training",
+          "units": []
         },
         "Mittwoch": {
-          "focus": "Ruhetag – nur lockeres Rad",
-          "units": [
-            {"name": "Rad Zone 1 (locker)", "type": "rad", "tag": "pflicht", "detail": "45 min, ganz entspannt · 7:00 Uhr", "plannedDurationMin": 45, "matchHint": {"activityTypes": ["cycling", "indoor_cycling", "virtual_ride"]}},
-            {"name": "EMOM", "type": "emom", "tag": "bonus", "detail": "10 min: jede Minute 10 Klimmzüge + 15 Liegestütze", "planLabel": "Plan 1", "plannedDurationMin": 10, "matchHint": {"activityTypes": ["strength_training", "cardio"]}}
-          ]
+          "focus": "Pause – Antibiotikum, kein Training",
+          "units": []
         },
         "Donnerstag": {
-          "focus": "Arbeit 10–16 · Abfahrt 8:30 · zurück ca. 17:15 (Fahrt je ca. 1 h 15) · Rad nüchtern + Intervalle",
-          "units": [
-            {"name": "Rad Zone 2", "type": "rad", "tag": "pflicht", "detail": "165 W · 60 min · 7:00 Uhr, nüchtern", "plannedDurationMin": 60, "matchHint": {"activityTypes": ["cycling", "indoor_cycling", "virtual_ride"]}},
-            {"name": "Intervalle", "type": "lauf", "tag": "pflicht", "detail": "4×4 min hart (Zielpace ~4:15–4:30 min/km, nahe Schwellen-HF 175 bpm) / 3 min locker traben · 18:30 Uhr, nicht nüchtern", "plannedDurationMin": 40, "keySession": true, "matchHint": {"activityTypes": ["running"]}},
-            {"name": "EMOM", "type": "emom", "tag": "bonus", "detail": "10 min: jede Minute 10 Klimmzüge + 10 Dips", "planLabel": "Plan 2", "plannedDurationMin": 10, "matchHint": {"activityTypes": ["strength_training", "cardio"]}}
-          ]
+          "focus": "Arbeit 10–16 · Abfahrt 8:30 · zurück ca. 17:15 (Fahrt je ca. 1 h 15) · Pause – Antibiotikum, kein Training",
+          "units": []
         },
         "Freitag": {
           "focus": "Arbeit 7–13 · Abfahrt 5:30 · zurück ca. 14:15 (Fahrt je ca. 1 h 15) · kein Morgenrad",
