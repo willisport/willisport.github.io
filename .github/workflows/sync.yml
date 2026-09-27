@@ -38,6 +38,8 @@ jobs:
           GARMIN_PASSWORD: ${{ secrets.GARMIN_PASSWORD }}
           RENPHO_EMAIL: ${{ secrets.RENPHO_EMAIL }}
           RENPHO_PASSWORD: ${{ secrets.RENPHO_PASSWORD }}
+          HEALTH_BRIDGE_URL: ${{ secrets.HEALTH_BRIDGE_URL }}
+          HEALTH_BRIDGE_TOKEN: ${{ secrets.HEALTH_BRIDGE_TOKEN }}
           DATA_ENCRYPTION_KEY: ${{ secrets.DATA_ENCRYPTION_KEY }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: python sync.py

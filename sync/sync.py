@@ -27,6 +27,7 @@ load_dotenv(Path(__file__).parent / ".env")
 
 import garmin_source
 import renpho_source
+import health_bridge_source
 import crypto_utils
 from plan_match import activities_on_date, unit_matches_activity
 from common import weekday_de, monday_of, iso_date, fmt_short, month_name_de
@@ -357,21 +358,32 @@ def main():
         print(f"[FEHLER] Garmin-Sync fehlgeschlagen, breche ab: {e}")
         sys.exit(1)
 
-    # --- Renpho (Gewicht) ---
-    # Jeder Login (auch ein wiederverwendeter, abgelaufener Token) kann die Renpho-App
-    # auf dem Handy ausloggen (nur eine Sitzung pro Konto). Deshalb hier nur einmal
-    # taeglich in einem festen Fenster versuchen statt bei jedem 10-Minuten-Sync -
-    # an anderen Tagesstunden bleibt einfach der zuletzt bekannte Wert stehen.
-    RENPHO_HOUR_UTC = 4  # ~6 Uhr Berlin (Sommerzeit) - kurz nach dem ueblichen Morgen-Wiegen
+    # --- Gewicht: bevorzugt Apple Health (per Kurzbefehl -> health-weight-bridge),
+    # sonst Renpho direkt als Rueckfallebene. ---
     weights = []
-    if datetime.now(timezone.utc).hour == RENPHO_HOUR_UTC:
-        try:
-            weights = renpho_source.fetch_weight_history()
-            print(f"  Renpho: {len(weights)} Gewichtsmessungen geladen")
-        except Exception as e:
-            print(f"  [warn] Renpho-Sync uebersprungen: {e}")
-    else:
-        print(f"  Renpho: ausserhalb des taeglichen Zeitfensters ({RENPHO_HOUR_UTC} Uhr UTC) uebersprungen, letzter Stand behalten")
+    try:
+        latest = health_bridge_source.fetch_latest_weight()
+        if latest:
+            weights = [latest]
+            print(f"  Gewicht (Apple Health via Bridge): {latest['weightKg']} kg am {latest['date']}")
+    except Exception as e:
+        print(f"  [warn] health-weight-bridge nicht erreichbar: {e}")
+
+    # Renpho-Fallback: jeder Login (auch ein wiederverwendeter, abgelaufener Token) kann
+    # die Renpho-App auf dem Handy ausloggen (nur eine Sitzung pro Konto). Deshalb nur
+    # einmal taeglich versuchen, und nur wenn die Bridge (noch) keinen Wert von heute hat.
+    RENPHO_HOUR_UTC = 4  # ~6 Uhr Berlin (Sommerzeit) - kurz nach dem ueblichen Morgen-Wiegen
+    if not weights or weights[0]["date"] != iso_date(today):
+        if datetime.now(timezone.utc).hour == RENPHO_HOUR_UTC:
+            try:
+                renpho_weights = renpho_source.fetch_weight_history()
+                print(f"  Renpho: {len(renpho_weights)} Gewichtsmessungen geladen")
+                if renpho_weights:
+                    weights = renpho_weights
+            except Exception as e:
+                print(f"  [warn] Renpho-Sync uebersprungen: {e}")
+        else:
+            print(f"  Renpho: ausserhalb des taeglichen Zeitfensters ({RENPHO_HOUR_UTC} Uhr UTC) uebersprungen, letzter Stand behalten")
     if not weights:
         prev_weight = (previous.get("today") or {}).get("body", {}).get("weightKg")
         if prev_weight:
