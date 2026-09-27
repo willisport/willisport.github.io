@@ -231,6 +231,10 @@
               { "name": "Trizepsdrücken", "sets": 3, "reps": "10–12", "rest": "60 s" }
             ], "matchHint": { "activityTypes": ["strength_training"] } }
           ]
+        },
+        "Sonntag": {
+          "focus": "Pause – Zahnschmerzen (evtl. Antibiotikum), kein Training",
+          "units": []
         }
       }
     },
