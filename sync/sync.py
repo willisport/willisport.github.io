@@ -358,12 +358,21 @@ def main():
         sys.exit(1)
 
     # --- Renpho (Gewicht) ---
-    try:
-        weights = renpho_source.fetch_weight_history()
-        print(f"  Renpho: {len(weights)} Gewichtsmessungen geladen")
-    except Exception as e:
-        print(f"  [warn] Renpho-Sync uebersprungen: {e}")
-        weights = []
+    # Jeder Login (auch ein wiederverwendeter, abgelaufener Token) kann die Renpho-App
+    # auf dem Handy ausloggen (nur eine Sitzung pro Konto). Deshalb hier nur einmal
+    # taeglich in einem festen Fenster versuchen statt bei jedem 10-Minuten-Sync -
+    # an anderen Tagesstunden bleibt einfach der zuletzt bekannte Wert stehen.
+    RENPHO_HOUR_UTC = 4  # ~6 Uhr Berlin (Sommerzeit) - kurz nach dem ueblichen Morgen-Wiegen
+    weights = []
+    if datetime.now(timezone.utc).hour == RENPHO_HOUR_UTC:
+        try:
+            weights = renpho_source.fetch_weight_history()
+            print(f"  Renpho: {len(weights)} Gewichtsmessungen geladen")
+        except Exception as e:
+            print(f"  [warn] Renpho-Sync uebersprungen: {e}")
+    else:
+        print(f"  Renpho: ausserhalb des taeglichen Zeitfensters ({RENPHO_HOUR_UTC} Uhr UTC) uebersprungen, letzter Stand behalten")
+    if not weights:
         prev_weight = (previous.get("today") or {}).get("body", {}).get("weightKg")
         if prev_weight:
             weights = [{"date": iso_date(today), "weightKg": prev_weight}]
