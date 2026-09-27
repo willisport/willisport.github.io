@@ -193,15 +193,24 @@ def build_day(plan_day: dict, date: datetime, activities: list, today: datetime,
     units = []
     for pu in plan_day["units"]:
         matched = next((a for a in day_acts if unit_matches_activity(pu, a)), None)
+        detail = pu.get("detail", "")
         if matched:
             status = "done"
+            # Bei Lauf/Rad die tatsaechlich gefahrene/gelaufene Distanz zeigen statt der
+            # geplanten - sonst steht nach einem spontanen Halbmarathon weiter "12 km" da.
+            if pu["type"] in ("lauf", "rad") and matched.get("distanceKm"):
+                dist = matched["distanceKm"]
+                dist_str = f"{dist:.1f}".rstrip("0").rstrip(".") + " km"
+                hr_str = f" · Ø {round(matched['avgHr'])} bpm" if matched.get("avgHr") else ""
+                dur_str = f" · {round(matched['durationMin'])} min" if matched.get("durationMin") else ""
+                detail = f"{dist_str}{dur_str}{hr_str} (geplant: {detail})"
         elif date.date() < today.date():
             status = "skipped"
         else:
             status = "planned"
         units.append({
             "name": pu["name"], "type": pu["type"], "tag": pu["tag"],
-            "status": status, "detail": pu.get("detail", ""),
+            "status": status, "detail": detail,
             **({"keySession": True} if pu.get("keySession") else {}),
             **({"plannedDurationMin": pu["plannedDurationMin"]} if pu.get("plannedDurationMin") else {}),
             **({"planLabel": pu["planLabel"]} if pu.get("planLabel") else {}),
