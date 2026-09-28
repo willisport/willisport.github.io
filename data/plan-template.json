@@ -258,24 +258,20 @@
           "units": []
         },
         "Freitag": {
-          "focus": "Arbeit 7–13 · Abfahrt 5:30 · zurück ca. 14:15 (Fahrt je ca. 1 h 15) · kein Morgenrad",
+          "focus": "Arbeit 7–13 · Abfahrt 5:30 · zurück ca. 14:15 (Fahrt je ca. 1 h 15) · Pause – Training startet erst Samstag",
+          "units": []
+        },
+        "Samstag": {
+          "focus": "Wiedereinstieg – ganz locker",
           "units": [
-            {"name": "Rad Zone 1 (locker)", "type": "rad", "tag": "pflicht", "detail": "45 min, ganz entspannt · 15:30 Uhr", "plannedDurationMin": 45, "matchHint": {"activityTypes": ["cycling", "indoor_cycling", "virtual_ride"]}},
-            {"name": "Core", "type": "core", "tag": "ergaenzung", "detail": "15 min", "plannedDurationMin": 15, "matchHint": {"activityTypes": ["strength_training", "cardio"]}},
+            {"name": "Rad Zone 1 (locker)", "type": "rad", "tag": "pflicht", "detail": "45 min, ganz entspannt · 9:00 Uhr", "plannedDurationMin": 45, "matchHint": {"activityTypes": ["cycling", "indoor_cycling", "virtual_ride"]}},
             {"name": "EMOM", "type": "emom", "tag": "bonus", "detail": "10 min: jede Minute 10 Klimmzüge + 15 Liegestütze", "planLabel": "Plan 1", "plannedDurationMin": 10, "matchHint": {"activityTypes": ["strength_training", "cardio"]}}
           ]
         },
-        "Samstag": {
-          "focus": "Frei · Langer Lauf + Arme/Schultern",
-          "units": [
-            {"name": "Langer Lauf", "type": "lauf", "tag": "pflicht", "detail": "11 km · Zone 2 (130–140 bpm) · 8:30 Uhr, nach dem Frühstück", "plannedDurationMin": 67, "keySession": true, "matchHint": {"activityTypes": ["running"], "minDistanceKm": 9}},
-            {"name": "Arme/Schultern", "type": "kraft", "tag": "ergaenzung", "detail": "Schulterdrücken, Seitheben, hintere Schulter, Bizeps-/Trizepsdrücken · 3×10–12 Wdh. (statt EMOM)", "plannedDurationMin": 25, "exercises": [{"name": "Schulterdrücken", "sets": 3, "reps": "10–12", "rest": "60 s"}, {"name": "Seitheben", "sets": 3, "reps": "10–12", "rest": "60 s"}, {"name": "Hintere Schulter (Reverse Flys)", "sets": 3, "reps": "10–12", "rest": "60 s"}, {"name": "Bizepscurls", "sets": 3, "reps": "10–12", "rest": "60 s"}, {"name": "Trizepsdrücken", "sets": 3, "reps": "10–12", "rest": "60 s"}], "matchHint": {"activityTypes": ["strength_training"]}}
-          ]
-        },
         "Sonntag": {
-          "focus": "Frei · Langes Rad",
+          "focus": "Wiedereinstieg – moderat, ab morgen wieder normaler Plan",
           "units": [
-            {"name": "Langes Rad Zone 2", "type": "rad", "tag": "pflicht", "detail": "165 W · 2 h · 9:00 Uhr, mit Frühstück/Verpflegung", "plannedDurationMin": 120, "keySession": true, "matchHint": {"activityTypes": ["cycling", "indoor_cycling", "virtual_ride"]}},
+            {"name": "Rad Zone 2", "type": "rad", "tag": "pflicht", "detail": "165 W · 60 min · 9:00 Uhr", "plannedDurationMin": 60, "matchHint": {"activityTypes": ["cycling", "indoor_cycling", "virtual_ride"]}},
             {"name": "EMOM", "type": "emom", "tag": "bonus", "detail": "10 min: jede Minute 10 Klimmzüge + 10 Dips", "planLabel": "Plan 2", "plannedDurationMin": 10, "matchHint": {"activityTypes": ["strength_training", "cardio"]}}
           ]
         }
