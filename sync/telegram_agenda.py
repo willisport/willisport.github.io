@@ -12,9 +12,43 @@ from datetime import datetime, timedelta
 
 import requests
 
+import mail_check
+
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PLAN_PATH = os.path.join(ROOT, "data", "plan-template.json")
 WEEKDAYS = ["Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag", "Sonntag"]
+
+# Berlin-Adlershof - kein API-Key noetig (Open-Meteo ist komplett kostenlos).
+WEATHER_LAT, WEATHER_LON = 52.435, 13.541
+WEATHER_CODES = {
+    0: "Klar", 1: "Meist klar", 2: "Teils bewölkt", 3: "Bewölkt",
+    45: "Nebel", 48: "Nebel (Reif)", 51: "Leichter Nieselregen", 53: "Nieselregen", 55: "Starker Nieselregen",
+    61: "Leichter Regen", 63: "Regen", 65: "Starker Regen", 71: "Leichter Schnee", 73: "Schnee", 75: "Starker Schnee",
+    80: "Regenschauer", 81: "Regenschauer", 82: "Heftige Regenschauer",
+    95: "Gewitter", 96: "Gewitter mit Hagel", 99: "Starkes Gewitter mit Hagel",
+}
+
+
+def get_weather(target_date):
+    try:
+        resp = requests.get(
+            "https://api.open-meteo.com/v1/forecast",
+            params={
+                "latitude": WEATHER_LAT, "longitude": WEATHER_LON,
+                "daily": "temperature_2m_min,temperature_2m_max,precipitation_probability_max,weathercode",
+                "timezone": "Europe/Berlin",
+            },
+            timeout=10,
+        )
+        resp.raise_for_status()
+        d = resp.json()["daily"]
+        idx = d["time"].index(target_date.strftime("%Y-%m-%d"))
+        code = d["weathercode"][idx]
+        lo, hi = round(d["temperature_2m_min"][idx]), round(d["temperature_2m_max"][idx])
+        rain = d["precipitation_probability_max"][idx]
+        return f"🌤️ {WEATHER_CODES.get(code, 'Wetter')}, {lo}–{hi}°C, Regenwahrscheinlichkeit {rain} %"
+    except Exception as e:
+        return f"🌤️ Wetter nicht abrufbar ({e})"
 
 
 def load_plan():
@@ -51,6 +85,24 @@ def format_message(d, day):
     return "\n".join(lines).strip()
 
 
+def get_mail_summary():
+    lines = []
+    for account, label in (("gmx", "GMX"), ("icloud", "iCloud")):
+        try:
+            rows = mail_check.scan_unread_important(account)
+        except Exception:
+            rows = None
+        if rows is None:
+            continue  # keine Zugangsdaten hinterlegt - Abschnitt einfach weglassen
+        if rows:
+            top = rows[0]
+            extra = f" (u.a. {top['addr']}: {top['subject'][:60]})" if len(rows) else ""
+            lines.append(f"📬 {label}: {len(rows)} wichtige ungelesen{extra}")
+        else:
+            lines.append(f"📬 {label}: nichts Wichtiges offen")
+    return "\n".join(lines)
+
+
 def send(text):
     token = os.environ["TELEGRAM_BOT_TOKEN"]
     chat_id = os.environ["TELEGRAM_CHAT_ID"]
@@ -69,7 +121,13 @@ def main():
     day = day_for_date(plan, target)
 
     prefix = "☀️ Guten Morgen! Heute steht an:\n\n" if mode == "morning" else "🌙 Für morgen:\n\n"
-    send(prefix + format_message(target, day))
+    body = format_message(target, day)
+    weather = get_weather(target)
+    mail = get_mail_summary()
+    parts = [prefix + body, weather]
+    if mail:
+        parts.append(mail)
+    send("\n\n".join(p for p in parts if p))
     print("gesendet:", mode, target.strftime("%Y-%m-%d"))
 
 

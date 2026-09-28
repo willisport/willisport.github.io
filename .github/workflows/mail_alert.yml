@@ -1,0 +1,47 @@
+name: Mail-Sofortalarm
+
+on:
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  alert:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Alarm pruefen und ggf. senden
+        working-directory: sync
+        env:
+          GMX_USER: ${{ secrets.GMX_USER }}
+          GMX_PASS: ${{ secrets.GMX_PASS }}
+          ICLOUD_USER: ${{ secrets.ICLOUD_USER }}
+          ICLOUD_PASS: ${{ secrets.ICLOUD_PASS }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          DATA_ENCRYPTION_KEY: ${{ secrets.DATA_ENCRYPTION_KEY }}
+        run: |
+          pip install requests cryptography --quiet
+          python mail_alert.py
+
+      - name: Verschluesselten State committen
+        run: |
+          git config user.name "basis-sync-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add data/mail-alert-state.enc.json
+          git diff --staged --quiet && exit 0
+          git commit -m "Mail-Alarm-Status aktualisiert"
+          for i in 1 2 3 4 5; do
+            git push && exit 0
+            git fetch origin main
+            git rebase -X ours origin/main
+          done
+          git push
