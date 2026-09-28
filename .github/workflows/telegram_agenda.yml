@@ -1,0 +1,41 @@
+name: Telegram Tagesagenda
+
+on:
+  schedule:
+    - cron: "0 6 * * *"   # ~8 Uhr Berlin (Sommerzeit) / 7 Uhr (Winterzeit) - Morgen-Nachricht
+    - cron: "0 18 * * *"  # ~20 Uhr Berlin (Sommerzeit) / 19 Uhr (Winterzeit) - Abend-Nachricht
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "morning oder evening"
+        default: "morning"
+
+jobs:
+  agenda:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Modus bestimmen
+        id: mode
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "mode=${{ inputs.mode }}" >> "$GITHUB_OUTPUT"
+          elif [ "${{ github.event.schedule }}" = "0 6 * * *" ]; then
+            echo "mode=morning" >> "$GITHUB_OUTPUT"
+          else
+            echo "mode=evening" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Nachricht senden
+        working-directory: sync
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          pip install requests --quiet
+          python telegram_agenda.py "${{ steps.mode.outputs.mode }}"
