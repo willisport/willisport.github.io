@@ -1863,13 +1863,20 @@ const IRIS_ORB_SVG = `
           <stop offset="100%" stop-color="var(--ocean-600)" />
         </radialGradient>
       </defs>
+      <circle class="iris-ring iris-ring-0" cx="100" cy="100" r="98" />
       <circle class="iris-ring iris-ring-1" cx="100" cy="100" r="92" />
       <circle class="iris-ring iris-ring-2" cx="100" cy="100" r="74" />
       <circle class="iris-ring iris-ring-3" cx="100" cy="100" r="58" />
       <circle class="iris-core" cx="100" cy="100" r="34" />
       <circle class="iris-core-dot" cx="100" cy="100" r="7" />
     </svg>
-  </div>`;
+  </div>
+  <div class="iris-status-line" id="iris-status-line">BEREIT</div>`;
+
+function setIrisStatusLine(text) {
+  const el = document.getElementById("iris-status-line");
+  if (el) el.textContent = text;
+}
 
 function buildIrisBriefing(data) {
   if (!data) return "Hallo, hier ist Airis. Ich hab noch keine aktuellen Daten - sobald der erste Sync durch ist, sag ich dir mehr.";
@@ -1908,9 +1915,9 @@ function speakText(text) {
     utter.lang = "de-DE";
     utter.rate = 1.0;
     utter.volume = volume;
-    utter.onstart = () => { if (stage) stage.classList.add("is-speaking"); };
-    utter.onend = () => { if (stage) stage.classList.remove("is-speaking"); };
-    utter.onerror = () => { if (stage) stage.classList.remove("is-speaking"); };
+    utter.onstart = () => { if (stage) stage.classList.add("is-speaking"); setIrisStatusLine("ICH SPRECHE…"); };
+    utter.onend = () => { if (stage) stage.classList.remove("is-speaking"); setIrisStatusLine("BEREIT"); };
+    utter.onerror = () => { if (stage) stage.classList.remove("is-speaking"); setIrisStatusLine("BEREIT"); };
     window.speechSynthesis.speak(utter);
   } catch {
     // Sprachausgabe im Browser evtl. nicht verfuegbar - UI funktioniert trotzdem stumm weiter.
@@ -1940,7 +1947,7 @@ function renderIris(data) {
     if (!m) return "";
     if (m.error) {
       return `
-        <div class="card">
+        <div class="card iris-card">
           <div class="card-head"><span class="card-title">${escapeHtml(label)}</span></div>
           <div class="card-note" style="color:var(--amber);">${escapeHtml(m.error)}</div>
         </div>`;
@@ -1951,7 +1958,7 @@ function renderIris(data) {
         <div class="card-note">${escapeHtml(i.subject)}</div>
       </div>`).join("");
     return `
-      <div class="card">
+      <div class="card iris-card">
         <div class="card-head"><span class="card-title">${escapeHtml(label)}</span><span class="card-note">${m.unread} ungelesen</span></div>
         ${items || `<div class="card-note">Nichts Wichtiges offen.</div>`}
       </div>`;
@@ -1973,9 +1980,16 @@ function renderIris(data) {
       <div class="iris-greeting">Hallo, hier ist Airis.</div>
       <div class="iris-sub">Zuletzt aktualisiert: ${escapeHtml(updated)}</div>
       <button class="iris-speak-btn" id="iris-speak-btn" type="button">🔊 Briefing vorlesen</button>
-      <div class="iris-volume-row">
-        <button class="iris-volume-btn" id="iris-volume-btn" type="button" title="Stumm/laut">🔊</button>
-        <input type="range" id="iris-volume-slider" class="iris-volume-slider" min="0" max="100" step="5" />
+      <div class="iris-controls-row">
+        <div class="iris-volume-row">
+          <button class="iris-volume-btn" id="iris-volume-btn" type="button" title="Stumm/laut">🔊</button>
+          <input type="range" id="iris-volume-slider" class="iris-volume-slider" min="0" max="100" step="5" />
+        </div>
+        ${hasMic ? `
+        <div class="iris-mic-row">
+          <button class="iris-mic-toggle" id="iris-mic-toggle" type="button" title="Mikrofon an/aus">🎙️</button>
+          <span class="iris-mic-viz" id="iris-mic-viz" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span></span>
+        </div>` : ""}
       </div>
       <div class="iris-cmd-row">
         <input type="text" id="iris-cmd-input" class="iris-cmd-input" placeholder="z. B. 'Weg nach Hause' oder 'Wie ist mein Training heute'" />
@@ -1987,7 +2001,7 @@ function renderIris(data) {
     <div class="stack">
       ${mailCard("GMX", data.mail && data.mail.gmx)}
       ${mailCard("iCloud", data.mail && data.mail.icloud)}
-      <div class="card">
+      <div class="card iris-card">
         <div class="card-head"><span class="card-title">Nächste Termine</span></div>
         ${calBody}
       </div>
@@ -1997,6 +2011,66 @@ function renderIris(data) {
   if (speakBtn) speakBtn.addEventListener("click", () => speakText(buildIrisBriefing(data)));
   setupIrisCommandBox(data);
   setupIrisVolumeControl();
+  setupIrisMicToggle();
+}
+
+/* ---------- Mikrofon: eigener Ein/Aus-Schalter + echte Lautstaerke-Anzeige ---------- */
+
+function getIrisMicEnabled() {
+  try { return localStorage.getItem("irisMicEnabled") !== "0"; } catch { return true; }
+}
+function setIrisMicEnabled(v) {
+  try { localStorage.setItem("irisMicEnabled", v ? "1" : "0"); } catch { /* ignore */ }
+}
+
+let irisAudioCtx = null, irisAnalyser = null, irisMicStream = null, irisVizRaf = null;
+
+async function startMicVisualizer() {
+  const viz = document.getElementById("iris-mic-viz");
+  try {
+    irisMicStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    irisAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const source = irisAudioCtx.createMediaStreamSource(irisMicStream);
+    irisAnalyser = irisAudioCtx.createAnalyser();
+    irisAnalyser.fftSize = 256;
+    source.connect(irisAnalyser);
+    const buf = new Uint8Array(irisAnalyser.frequencyBinCount);
+    const tick = () => {
+      irisAnalyser.getByteFrequencyData(buf);
+      const avg = buf.reduce((a, b) => a + b, 0) / buf.length / 255;
+      if (viz) viz.style.setProperty("--lvl", avg.toFixed(3));
+      irisVizRaf = requestAnimationFrame(tick);
+    };
+    tick();
+  } catch {
+    // Mikrofonzugriff verweigert oder nicht verfuegbar - Diktat laeuft trotzdem ueber SpeechRecognition weiter,
+    // nur ohne die zusaetzliche Pegelanzeige.
+  }
+}
+
+function stopMicVisualizer() {
+  if (irisVizRaf) cancelAnimationFrame(irisVizRaf);
+  if (irisMicStream) irisMicStream.getTracks().forEach(t => t.stop());
+  if (irisAudioCtx) irisAudioCtx.close();
+  irisVizRaf = null; irisMicStream = null; irisAudioCtx = null; irisAnalyser = null;
+  const viz = document.getElementById("iris-mic-viz");
+  if (viz) viz.style.setProperty("--lvl", "0");
+}
+
+function setupIrisMicToggle() {
+  const toggle = document.getElementById("iris-mic-toggle");
+  const cmdMic = document.getElementById("iris-cmd-mic");
+  if (!toggle) return;
+
+  const apply = (enabled) => {
+    setIrisMicEnabled(enabled);
+    toggle.classList.toggle("is-off", !enabled);
+    toggle.textContent = enabled ? "🎙️" : "🎙️🚫";
+    if (cmdMic) cmdMic.disabled = !enabled;
+    if (!enabled) stopMicVisualizer();
+  };
+  apply(getIrisMicEnabled());
+  toggle.addEventListener("click", () => apply(!getIrisMicEnabled()));
 }
 
 function setupIrisVolumeControl() {
@@ -2086,10 +2160,14 @@ function setupIrisCommandBox(airisData) {
       handleIrisCommand(text, airisData);
       input.value = "";
     };
-    rec.onstart = () => micBtn.classList.add("is-listening");
-    rec.onend = () => micBtn.classList.remove("is-listening");
-    rec.onerror = () => micBtn.classList.remove("is-listening");
-    micBtn.addEventListener("click", () => { try { rec.start(); } catch { /* laeuft schon */ } });
+    rec.onstart = () => { micBtn.classList.add("is-listening"); setIrisStatusLine("ICH HÖRE ZU…"); startMicVisualizer(); };
+    rec.onend = () => { micBtn.classList.remove("is-listening"); setIrisStatusLine("BEREIT"); stopMicVisualizer(); };
+    rec.onerror = () => { micBtn.classList.remove("is-listening"); setIrisStatusLine("BEREIT"); stopMicVisualizer(); };
+    micBtn.disabled = !getIrisMicEnabled();
+    micBtn.addEventListener("click", () => {
+      if (!getIrisMicEnabled()) return;
+      try { rec.start(); } catch { /* laeuft schon */ }
+    });
   }
 }
 
