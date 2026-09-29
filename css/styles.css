@@ -951,6 +951,22 @@ body.is-viewer .note-box { opacity: .7; cursor: not-allowed; }
 .iris-mic-viz span:nth-child(4) { height: calc(4px + var(--lvl, 0) * 20px); }
 .iris-mic-viz span:nth-child(5) { height: calc(4px + var(--lvl, 0) * 10px); }
 
+.iris-mic-unlock {
+  margin-top: 12px;
+  border: 1px solid var(--teal);
+  background: var(--teal-dim);
+  color: var(--teal);
+  font-family: var(--font-body);
+  font-size: 12px;
+  font-weight: 700;
+  padding: 8px 16px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background .15s ease, opacity .15s ease;
+}
+.iris-mic-unlock:hover { background: rgba(47,214,160,0.28); }
+.iris-mic-unlock:disabled { opacity: .6; cursor: default; }
+
 .iris-cmd-row {
   display: flex;
   gap: 8px;

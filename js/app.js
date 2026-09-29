@@ -2023,6 +2023,7 @@ function renderIris(data) {
           <span class="iris-mic-viz" id="iris-mic-viz" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span></span>
         </div>` : `<div class="card-note" style="color:var(--amber);">Spracheingabe wird von diesem Browser nicht unterstützt.</div>`}
       </div>
+      ${hasMic ? `<button class="iris-mic-unlock" id="iris-mic-unlock" type="button">🔓 Mikrofon freischalten</button>` : ""}
       <div class="iris-cmd-row">
         <input type="text" id="iris-cmd-input" class="iris-cmd-input" placeholder="z. B. 'Weg nach Hause' oder 'Wie ist mein Training heute'" />
         ${hasMic ? `<button class="iris-cmd-mic" id="iris-cmd-mic" type="button" title="Sprechen">🎤</button>` : ""}
@@ -2048,6 +2049,7 @@ function renderIris(data) {
   setupIrisCommandBox(data);
   setupIrisVolumeControl();
   setupIrisMicToggle();
+  setupIrisMicUnlock();
 }
 
 /* ---------- Mikrofon: eigener Ein/Aus-Schalter + echte Lautstaerke-Anzeige ---------- */
@@ -2091,6 +2093,36 @@ function stopMicVisualizer() {
   irisVizRaf = null; irisMicStream = null; irisAudioCtx = null; irisAnalyser = null;
   const viz = document.getElementById("iris-mic-viz");
   if (viz) viz.style.setProperty("--lvl", "0");
+}
+
+function setupIrisMicUnlock() {
+  const btn = document.getElementById("iris-mic-unlock");
+  if (!btn) return;
+  btn.addEventListener("click", async () => {
+    btn.disabled = true;
+    const original = btn.textContent;
+    btn.textContent = "Frage Berechtigung ab…";
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      appendIrisLog("airis", "Dieser Browser unterstützt keinen Mikrofonzugriff über die Website.");
+      btn.textContent = original;
+      btn.disabled = false;
+      return;
+    }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      stream.getTracks().forEach(t => t.stop());
+      appendIrisLog("airis", "Mikrofonzugriff erteilt. Du kannst jetzt auf 🎤 tippen und sprechen.");
+      btn.textContent = "✓ Mikrofon freigeschaltet";
+    } catch (err) {
+      const name = err && err.name ? err.name : "unbekannt";
+      let hint = "Bitte in den Browser-Einstellungen für diese Seite freigeben.";
+      if (name === "NotFoundError") hint = "Es wurde kein Mikrofon gefunden.";
+      if (name === "NotAllowedError") hint = "Zugriff wurde blockiert - in Opera meist über das Schloss-/Kamera-Symbol links neben der Adresse freigeben, dann Seite neu laden.";
+      appendIrisLog("airis", `Mikrofonzugriff nicht möglich (${name}). ${hint}`);
+      btn.textContent = original;
+      btn.disabled = false;
+    }
+  });
 }
 
 function setupIrisMicToggle() {
