@@ -294,8 +294,8 @@ async function pollForFreshSync(prevSyncedAt, maxWaitMs = 150000, intervalMs = 6
   return null;
 }
 
-/* Iris ist gebaut, aber vorerst von der Website genommen - auf true setzen, sobald alles fertig ist. */
-const IRIS_ENABLED = false;
+/* Iris ist live. */
+const IRIS_ENABLED = true;
 
 function setupLoginsNavItem() {
   document.querySelectorAll('[data-tab="logins"]').forEach(el => { el.hidden = CURRENT_ROLE !== "owner"; });

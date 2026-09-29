@@ -1887,14 +1887,27 @@ function buildIrisBriefing(data) {
   return "Hallo, hier ist Iris. " + parts.join(". ") + ".";
 }
 
+function getIrisVolume() {
+  try {
+    const v = localStorage.getItem("irisVolume");
+    return v === null ? 1 : Math.max(0, Math.min(1, parseFloat(v)));
+  } catch { return 1; }
+}
+function setIrisVolume(v) {
+  try { localStorage.setItem("irisVolume", String(v)); } catch { /* ignore */ }
+}
+
 function speakText(text) {
   if (!("speechSynthesis" in window) || !text) return;
+  const volume = getIrisVolume();
+  if (volume <= 0) return; // stummgeschaltet - gar nicht erst sprechen
   const stage = document.getElementById("iris-stage");
   try {
     window.speechSynthesis.cancel();
     const utter = new SpeechSynthesisUtterance(text);
     utter.lang = "de-DE";
     utter.rate = 1.0;
+    utter.volume = volume;
     utter.onstart = () => { if (stage) stage.classList.add("is-speaking"); };
     utter.onend = () => { if (stage) stage.classList.remove("is-speaking"); };
     utter.onerror = () => { if (stage) stage.classList.remove("is-speaking"); };
@@ -1953,12 +1966,23 @@ function renderIris(data) {
       : `<div class="card-note">Keine anstehenden Termine gefunden.</div>`);
 
   const updated = data.syncedAt ? new Date(data.syncedAt).toLocaleString("de-DE", { dateStyle: "short", timeStyle: "short" }) : "–";
+  const hasMic = "webkitSpeechRecognition" in window || "SpeechRecognition" in window;
   panel.innerHTML = `
     <div class="iris-stage" id="iris-stage">
       ${IRIS_ORB_SVG}
       <div class="iris-greeting">Hallo, hier ist Iris.</div>
       <div class="iris-sub">Zuletzt aktualisiert: ${escapeHtml(updated)}</div>
       <button class="iris-speak-btn" id="iris-speak-btn" type="button">🔊 Briefing vorlesen</button>
+      <div class="iris-volume-row">
+        <button class="iris-volume-btn" id="iris-volume-btn" type="button" title="Stumm/laut">🔊</button>
+        <input type="range" id="iris-volume-slider" class="iris-volume-slider" min="0" max="100" step="5" />
+      </div>
+      <div class="iris-cmd-row">
+        <input type="text" id="iris-cmd-input" class="iris-cmd-input" placeholder="z. B. 'Weg nach Hause' oder 'Wie ist mein Training heute'" />
+        ${hasMic ? `<button class="iris-cmd-mic" id="iris-cmd-mic" type="button" title="Sprechen">🎤</button>` : ""}
+        <button class="iris-cmd-send" id="iris-cmd-send" type="button">Los</button>
+      </div>
+      <div class="iris-cmd-hint">Probier: "Weg nach Hause" · "Wie ist mein Training heute" · "Lies meine Mails vor"</div>
     </div>
     <div class="stack">
       ${mailCard("GMX", data.mail && data.mail.gmx)}
@@ -1971,6 +1995,101 @@ function renderIris(data) {
 
   const speakBtn = document.getElementById("iris-speak-btn");
   if (speakBtn) speakBtn.addEventListener("click", () => speakText(buildIrisBriefing(data)));
+  setupIrisCommandBox(data);
+  setupIrisVolumeControl();
+}
+
+function setupIrisVolumeControl() {
+  const slider = document.getElementById("iris-volume-slider");
+  const btn = document.getElementById("iris-volume-btn");
+  if (!slider || !btn) return;
+
+  let lastNonZero = getIrisVolume() || 1;
+  const icon = (v) => (v <= 0 ? "🔇" : v < 0.5 ? "🔉" : "🔊");
+  const apply = (v) => {
+    setIrisVolume(v);
+    slider.value = Math.round(v * 100);
+    btn.textContent = icon(v);
+    if (v > 0) lastNonZero = v;
+  };
+  apply(getIrisVolume());
+
+  slider.addEventListener("input", () => apply(slider.value / 100));
+  btn.addEventListener("click", () => apply(getIrisVolume() > 0 ? 0 : lastNonZero));
+}
+
+/* Echte, sofort ausfuehrbare Befehle - kein KI-Rätselraten, feste Muster.
+   Kostenlos, laeuft direkt im Browser, auch auf dem Handy. */
+const HOME_ADDRESS = "Otto-Franke-Straße 53, 12489 Berlin";
+
+function handleIrisCommand(text, airisData) {
+  const t = text.toLowerCase();
+  const stage = document.getElementById("iris-stage");
+
+  if (/nach ?hause|weg nach hause|route|maps|navigation/.test(t)) {
+    speakText("Ich öffne die Route nach Hause.");
+    window.open(`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(HOME_ADDRESS)}`, "_blank");
+    return;
+  }
+  if (/mail|posteingang|postfach/.test(t)) {
+    const gmx = airisData && airisData.mail && airisData.mail.gmx;
+    const ic = airisData && airisData.mail && airisData.mail.icloud;
+    const parts = [];
+    if (gmx && !gmx.error) parts.push(`${gmx.unread} ungelesene bei G-M-X`);
+    if (ic && !ic.error) parts.push(`${ic.unread} bei iCloud`);
+    speakText(parts.length ? "Du hast " + parts.join(" und ") + "." : "Ich habe gerade keinen Mail-Status.");
+    return;
+  }
+  if (/training|heute|plan|sport/.test(t) && typeof APP_DATA !== "undefined" && APP_DATA && APP_DATA.today) {
+    const today = APP_DATA.today;
+    const units = (today.units || []).map(u => u.name).join(", ");
+    speakText(units ? `Heute: ${today.dayFocus || ""}. Einheiten: ${units}.` : "Heute steht laut Plan nichts Festes an.");
+    return;
+  }
+  if (/termin|kalender/.test(t)) {
+    const events = airisData && airisData.calendar && airisData.calendar.events;
+    if (events && events.length) {
+      speakText(`Nächster Termin: ${events[0].summary}, ${events[0].when}.`);
+    } else {
+      speakText("Ich sehe aktuell keinen anstehenden Termin.");
+    }
+    return;
+  }
+  speakText("Das kenne ich noch nicht. Frag mich nach dem Weg nach Hause, deinem Training heute, Mails oder Terminen.");
+}
+
+function setupIrisCommandBox(airisData) {
+  const input = document.getElementById("iris-cmd-input");
+  const sendBtn = document.getElementById("iris-cmd-send");
+  const micBtn = document.getElementById("iris-cmd-mic");
+  if (!input || !sendBtn) return;
+
+  const run = () => {
+    const text = input.value.trim();
+    if (!text) return;
+    handleIrisCommand(text, airisData);
+    input.value = "";
+  };
+  sendBtn.addEventListener("click", run);
+  input.addEventListener("keydown", (e) => { if (e.key === "Enter") run(); });
+
+  if (micBtn) {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    const rec = new SpeechRecognition();
+    rec.lang = "de-DE";
+    rec.continuous = false;
+    rec.interimResults = false;
+    rec.onresult = (e) => {
+      const text = e.results[0][0].transcript;
+      input.value = text;
+      handleIrisCommand(text, airisData);
+      input.value = "";
+    };
+    rec.onstart = () => micBtn.classList.add("is-listening");
+    rec.onend = () => micBtn.classList.remove("is-listening");
+    rec.onerror = () => micBtn.classList.remove("is-listening");
+    micBtn.addEventListener("click", () => { try { rec.start(); } catch { /* laeuft schon */ } });
+  }
 }
 
 function renderAll(freshData) {
