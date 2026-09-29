@@ -1872,7 +1872,7 @@ const IRIS_ORB_SVG = `
   </div>`;
 
 function buildIrisBriefing(data) {
-  if (!data) return "Hallo, hier ist Iris. Ich hab noch keine aktuellen Daten - sobald der erste Sync durch ist, sag ich dir mehr.";
+  if (!data) return "Hallo, hier ist Airis. Ich hab noch keine aktuellen Daten - sobald der erste Sync durch ist, sag ich dir mehr.";
   const parts = [];
   const gmx = data.mail && data.mail.gmx;
   const icloud = data.mail && data.mail.icloud;
@@ -1883,8 +1883,8 @@ function buildIrisBriefing(data) {
     const next = cal.events[0];
     parts.push(`Nächster Termin: ${next.summary}, ${next.when}`);
   }
-  if (!parts.length) return "Hallo, hier ist Iris. Aktuell nichts Dringendes, alles im grünen Bereich.";
-  return "Hallo, hier ist Iris. " + parts.join(". ") + ".";
+  if (!parts.length) return "Hallo, hier ist Airis. Aktuell nichts Dringendes, alles im grünen Bereich.";
+  return "Hallo, hier ist Airis. " + parts.join(". ") + ".";
 }
 
 function getIrisVolume() {
@@ -1930,7 +1930,7 @@ function renderIris(data) {
     panel.innerHTML = `
       <div class="iris-stage" id="iris-stage">
         ${IRIS_ORB_SVG}
-        <div class="iris-greeting">Hallo, hier ist Iris.</div>
+        <div class="iris-greeting">Hallo, hier ist Airis.</div>
         <div class="iris-sub">Lade deine aktuelle Übersicht…</div>
       </div>`;
     return;
@@ -1970,7 +1970,7 @@ function renderIris(data) {
   panel.innerHTML = `
     <div class="iris-stage" id="iris-stage">
       ${IRIS_ORB_SVG}
-      <div class="iris-greeting">Hallo, hier ist Iris.</div>
+      <div class="iris-greeting">Hallo, hier ist Airis.</div>
       <div class="iris-sub">Zuletzt aktualisiert: ${escapeHtml(updated)}</div>
       <button class="iris-speak-btn" id="iris-speak-btn" type="button">🔊 Briefing vorlesen</button>
       <div class="iris-volume-row">
@@ -2009,6 +2009,7 @@ function setupIrisVolumeControl() {
   const apply = (v) => {
     setIrisVolume(v);
     slider.value = Math.round(v * 100);
+    slider.style.setProperty("--fill", `${Math.round(v * 100)}%`);
     btn.textContent = icon(v);
     if (v > 0) lastNonZero = v;
   };
