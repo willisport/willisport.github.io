@@ -2219,45 +2219,66 @@ function setupIrisCommandBox(airisData) {
 
   if (micBtn) {
     const SpeechRecognitionImpl = window.SpeechRecognition || window.webkitSpeechRecognition;
-    const rec = new SpeechRecognitionImpl();
-    rec.lang = "de-DE";
-    rec.continuous = false;
-    rec.interimResults = false;
-
-    let recTimeoutId = null;
     const NO_RESPONSE_HINT = "Ich habe nichts zurückbekommen. Manche Browser (z. B. Opera, Brave, Vivaldi) haben zwar den Mikrofon-Knopf, aber keine funktionierende Spracherkennung im Hintergrund - das kann ich von der Website aus nicht reparieren. Bitte in Chrome oder Edge ausprobieren, oder einfach oben eintippen.";
 
-    rec.onresult = (e) => {
-      clearTimeout(recTimeoutId);
-      const text = e.results[0][0].transcript;
-      input.value = text;
-      appendIrisLog("user", text);
-      handleIrisCommand(text, airisData);
-      input.value = "";
-    };
-    rec.onstart = () => {
-      micBtn.classList.add("is-listening"); setIrisStatusLine("ICH HÖRE ZU…"); startMicVisualizer();
-      clearTimeout(recTimeoutId);
-      recTimeoutId = setTimeout(() => {
-        try { rec.abort(); } catch { /* schon beendet */ }
-        appendIrisLog("airis", NO_RESPONSE_HINT);
-      }, 8000);
-    };
-    rec.onend = () => {
+    let recTimeoutId = null;
+    let activeRec = null; // aktuell laufende Instanz - wird bei jedem Klick frisch erzeugt,
+                           // statt ein evtl. verklemmtes altes Objekt wiederzuverwenden.
+
+    const resetUi = () => {
       clearTimeout(recTimeoutId);
       micBtn.classList.remove("is-listening"); setIrisStatusLine("BEREIT"); stopMicVisualizer();
     };
-    rec.onerror = (e) => {
-      clearTimeout(recTimeoutId);
-      micBtn.classList.remove("is-listening"); setIrisStatusLine("BEREIT"); stopMicVisualizer();
-      appendIrisLog("airis", `(Mikrofon-Fehler: ${e.error || "unbekannt"} - prüf die Mikrofon-Freigabe im Browser)`);
+
+    const startNewRecognition = () => {
+      const rec = new SpeechRecognitionImpl();
+      rec.lang = "de-DE";
+      rec.continuous = false;
+      rec.interimResults = false;
+
+      rec.onresult = (e) => {
+        clearTimeout(recTimeoutId);
+        const text = e.results[0][0].transcript;
+        input.value = text;
+        appendIrisLog("user", text);
+        handleIrisCommand(text, airisData);
+        input.value = "";
+      };
+      rec.onstart = () => {
+        micBtn.classList.add("is-listening"); setIrisStatusLine("ICH HÖRE ZU…"); startMicVisualizer();
+        clearTimeout(recTimeoutId);
+        recTimeoutId = setTimeout(() => {
+          try { rec.abort(); } catch { /* schon beendet */ }
+          activeRec = null;
+          resetUi();
+          appendIrisLog("airis", NO_RESPONSE_HINT);
+        }, 8000);
+      };
+      rec.onend = () => { activeRec = null; resetUi(); };
+      rec.onerror = (e) => {
+        activeRec = null;
+        resetUi();
+        appendIrisLog("airis", `(Mikrofon-Fehler: ${e.error || "unbekannt"} - prüf die Mikrofon-Freigabe im Browser)`);
+      };
+
+      activeRec = rec;
+      try {
+        rec.start();
+      } catch (err) {
+        activeRec = null;
+        resetUi();
+        appendIrisLog("airis", `Mikrofon konnte nicht gestartet werden (${err && err.message ? err.message : err}).`);
+      }
     };
+
     micBtn.disabled = !getIrisMicEnabled();
     micBtn.addEventListener("click", () => {
       if (!getIrisMicEnabled()) return;
-      try { rec.start(); } catch (err) {
-        appendIrisLog("airis", `Mikrofon konnte nicht gestartet werden (${err && err.message ? err.message : err}).`);
+      if (activeRec) {
+        try { activeRec.abort(); } catch { /* ignore */ }
+        activeRec = null;
       }
+      startNewRecognition();
     });
   }
 }
