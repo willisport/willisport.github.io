@@ -1904,23 +1904,50 @@ function setIrisVolume(v) {
   try { localStorage.setItem("irisVolume", String(v)); } catch { /* ignore */ }
 }
 
+function appendIrisLog(role, text) {
+  const log = document.getElementById("iris-log");
+  if (!log || !text) return;
+  const line = document.createElement("div");
+  line.className = `iris-log-line iris-log-${role}`;
+  line.innerHTML = `<span class="iris-log-role">${role === "user" ? "Du" : "Airis"}</span> ${escapeHtml(text)}`;
+  log.appendChild(line);
+  log.scrollTop = log.scrollHeight;
+  while (log.children.length > 12) log.removeChild(log.firstChild);
+}
+
 function speakText(text) {
-  if (!("speechSynthesis" in window) || !text) return;
+  if (!text) return;
+  appendIrisLog("airis", text);
+  if (!("speechSynthesis" in window)) return;
   const volume = getIrisVolume();
   if (volume <= 0) return; // stummgeschaltet - gar nicht erst sprechen
   const stage = document.getElementById("iris-stage");
-  try {
-    window.speechSynthesis.cancel();
-    const utter = new SpeechSynthesisUtterance(text);
-    utter.lang = "de-DE";
-    utter.rate = 1.0;
-    utter.volume = volume;
-    utter.onstart = () => { if (stage) stage.classList.add("is-speaking"); setIrisStatusLine("ICH SPRECHE…"); };
-    utter.onend = () => { if (stage) stage.classList.remove("is-speaking"); setIrisStatusLine("BEREIT"); };
-    utter.onerror = () => { if (stage) stage.classList.remove("is-speaking"); setIrisStatusLine("BEREIT"); };
-    window.speechSynthesis.speak(utter);
-  } catch {
-    // Sprachausgabe im Browser evtl. nicht verfuegbar - UI funktioniert trotzdem stumm weiter.
+
+  const doSpeak = () => {
+    try {
+      window.speechSynthesis.cancel();
+      const utter = new SpeechSynthesisUtterance(text);
+      utter.lang = "de-DE";
+      utter.rate = 1.0;
+      utter.volume = volume;
+      utter.onstart = () => { if (stage) stage.classList.add("is-speaking"); setIrisStatusLine("ICH SPRECHE…"); };
+      utter.onend = () => { if (stage) stage.classList.remove("is-speaking"); setIrisStatusLine("BEREIT"); };
+      utter.onerror = () => { if (stage) stage.classList.remove("is-speaking"); setIrisStatusLine("BEREIT"); };
+      window.speechSynthesis.speak(utter);
+    } catch {
+      // Sprachausgabe im Browser evtl. nicht verfuegbar - Text bleibt trotzdem im Log sichtbar.
+    }
+  };
+
+  // Manche Chromium-Browser (u.a. teils Opera) laden die Stimmenliste erst asynchron nach -
+  // ohne diese Wartelogik bleibt der allererste speak()-Aufruf nach dem Laden manchmal stumm.
+  if (window.speechSynthesis.getVoices().length === 0) {
+    let spoken = false;
+    const once = () => { if (spoken) return; spoken = true; doSpeak(); };
+    window.speechSynthesis.addEventListener("voiceschanged", once, { once: true });
+    setTimeout(once, 500);
+  } else {
+    doSpeak();
   }
 }
 
@@ -1974,8 +2001,13 @@ function renderIris(data) {
 
   const updated = data.syncedAt ? new Date(data.syncedAt).toLocaleString("de-DE", { dateStyle: "short", timeStyle: "short" }) : "–";
   const hasMic = "webkitSpeechRecognition" in window || "SpeechRecognition" in window;
+  const nowLabel = new Date().toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" });
   panel.innerHTML = `
     <div class="iris-stage" id="iris-stage">
+      <div class="iris-topbar">
+        <span>AIRIS</span><span class="iris-topbar-dot">●</span><span>ONLINE</span>
+        <span class="iris-topbar-sep">|</span><span>${escapeHtml(nowLabel)}</span>
+      </div>
       ${IRIS_ORB_SVG}
       <div class="iris-greeting">Hallo, hier ist Airis.</div>
       <div class="iris-sub">Zuletzt aktualisiert: ${escapeHtml(updated)}</div>
@@ -1989,7 +2021,7 @@ function renderIris(data) {
         <div class="iris-mic-row">
           <button class="iris-mic-toggle" id="iris-mic-toggle" type="button" title="Mikrofon an/aus">🎙️</button>
           <span class="iris-mic-viz" id="iris-mic-viz" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span></span>
-        </div>` : ""}
+        </div>` : `<div class="card-note" style="color:var(--amber);">Spracheingabe wird von diesem Browser nicht unterstützt.</div>`}
       </div>
       <div class="iris-cmd-row">
         <input type="text" id="iris-cmd-input" class="iris-cmd-input" placeholder="z. B. 'Weg nach Hause' oder 'Wie ist mein Training heute'" />
@@ -1997,6 +2029,10 @@ function renderIris(data) {
         <button class="iris-cmd-send" id="iris-cmd-send" type="button">Los</button>
       </div>
       <div class="iris-cmd-hint">Probier: "Weg nach Hause" · "Wie ist mein Training heute" · "Lies meine Mails vor"</div>
+    </div>
+    <div class="card iris-card iris-log-card">
+      <div class="card-head"><span class="card-title">Agent-Log</span><span class="card-note">Gespräch mit Airis</span></div>
+      <div class="iris-log" id="iris-log"><div class="iris-log-line iris-log-airis"><span class="iris-log-role">Airis</span> Sag etwas, oder tippʼ eine Frage oben ein.</div></div>
     </div>
     <div class="stack">
       ${mailCard("GMX", data.mail && data.mail.gmx)}
@@ -2142,6 +2178,7 @@ function setupIrisCommandBox(airisData) {
   const run = () => {
     const text = input.value.trim();
     if (!text) return;
+    appendIrisLog("user", text);
     handleIrisCommand(text, airisData);
     input.value = "";
   };
@@ -2149,20 +2186,24 @@ function setupIrisCommandBox(airisData) {
   input.addEventListener("keydown", (e) => { if (e.key === "Enter") run(); });
 
   if (micBtn) {
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    const rec = new SpeechRecognition();
+    const SpeechRecognitionImpl = window.SpeechRecognition || window.webkitSpeechRecognition;
+    const rec = new SpeechRecognitionImpl();
     rec.lang = "de-DE";
     rec.continuous = false;
     rec.interimResults = false;
     rec.onresult = (e) => {
       const text = e.results[0][0].transcript;
       input.value = text;
+      appendIrisLog("user", text);
       handleIrisCommand(text, airisData);
       input.value = "";
     };
     rec.onstart = () => { micBtn.classList.add("is-listening"); setIrisStatusLine("ICH HÖRE ZU…"); startMicVisualizer(); };
     rec.onend = () => { micBtn.classList.remove("is-listening"); setIrisStatusLine("BEREIT"); stopMicVisualizer(); };
-    rec.onerror = () => { micBtn.classList.remove("is-listening"); setIrisStatusLine("BEREIT"); stopMicVisualizer(); };
+    rec.onerror = (e) => {
+      micBtn.classList.remove("is-listening"); setIrisStatusLine("BEREIT"); stopMicVisualizer();
+      appendIrisLog("airis", `(Mikrofon-Fehler: ${e.error || "unbekannt"} - prüf die Mikrofon-Freigabe im Browser)`);
+    };
     micBtn.disabled = !getIrisMicEnabled();
     micBtn.addEventListener("click", () => {
       if (!getIrisMicEnabled()) return;

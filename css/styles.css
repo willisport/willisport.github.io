@@ -749,13 +749,15 @@ body.is-viewer .note-box { opacity: .7; cursor: not-allowed; }
   flex-direction: column;
   align-items: center;
   text-align: center;
-  padding: 36px 20px 30px;
-  margin-bottom: 22px;
+  padding: 46px 20px 30px;
+  margin-bottom: 16px;
   position: relative;
   overflow: hidden;
   background:
-    radial-gradient(ellipse at 50% -10%, rgba(91,196,240,0.16), transparent 60%),
+    radial-gradient(ellipse at 50% -10%, rgba(91,196,240,0.18), transparent 60%),
     repeating-linear-gradient(180deg, rgba(91,196,240,0.025) 0px, rgba(91,196,240,0.025) 1px, transparent 1px, transparent 3px),
+    repeating-linear-gradient(90deg, rgba(91,196,240,0.05) 0px, rgba(91,196,240,0.05) 1px, transparent 1px, transparent 34px),
+    repeating-linear-gradient(0deg, rgba(91,196,240,0.05) 0px, rgba(91,196,240,0.05) 1px, transparent 1px, transparent 34px),
     var(--surface-1);
   border: 1px solid var(--ocean-700);
   border-radius: var(--r-lg);
@@ -770,7 +772,17 @@ body.is-viewer .note-box { opacity: .7; cursor: not-allowed; }
 .iris-stage::before { top: 10px; left: 10px; border-right: none; border-bottom: none; }
 .iris-stage::after { bottom: 10px; right: 10px; border-left: none; border-top: none; }
 
-.iris-orb-wrap { width: 168px; height: 168px; margin-bottom: 14px; filter: drop-shadow(0 0 18px rgba(91,196,240,0.25)); transition: filter .4s ease; }
+.iris-topbar {
+  position: absolute; top: 12px; left: 50%; transform: translateX(-50%);
+  display: flex; align-items: center; gap: 7px;
+  font-family: var(--font-display); font-size: 10px; font-weight: 700;
+  letter-spacing: .14em; color: var(--muted); text-transform: uppercase;
+  white-space: nowrap;
+}
+.iris-topbar-dot { color: var(--teal); font-size: 8px; animation: iris-pulse 2.4s ease-in-out infinite; }
+.iris-topbar-sep { opacity: .4; }
+
+.iris-orb-wrap { width: 210px; height: 210px; margin-bottom: 14px; filter: drop-shadow(0 0 18px rgba(91,196,240,0.25)); transition: filter .4s ease; }
 .iris-orb { width: 100%; height: 100%; overflow: visible; }
 .iris-ring { fill: none; stroke-width: 2; transform-origin: 100px 100px; }
 .iris-ring-0 { stroke: var(--ocean-600); opacity: .8; stroke-width: 1; stroke-dasharray: 1 7.5; animation: iris-spin 40s linear infinite; }
@@ -978,12 +990,40 @@ body.is-viewer .note-box { opacity: .7; cursor: not-allowed; }
 }
 .iris-cmd-hint { margin-top: 10px; font-size: 11px; color: var(--muted); max-width: 480px; }
 
+.iris-log-card { margin-bottom: var(--gap, 16px); }
+.iris-log {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 220px;
+  overflow-y: auto;
+  font-family: var(--font-body);
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+.iris-log-line { color: var(--text-dim); padding: 2px 0; }
+.iris-log-role {
+  display: inline-block;
+  font-family: var(--font-display);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  padding: 1px 7px;
+  border-radius: 999px;
+  margin-right: 7px;
+}
+.iris-log-airis .iris-log-role { background: var(--teal-dim); color: var(--teal); }
+.iris-log-user .iris-log-role { background: var(--ocean-700); color: var(--ice-300); }
+.iris-log-user { color: var(--text); }
+
 .card.iris-card { border-color: var(--ocean-600); }
 .card.iris-card::before {
   content: "";
   background: none;
   top: 10px; left: 10px; right: auto; height: 12px; width: 12px;
   border-top: 2px solid var(--sky-400); border-left: 2px solid var(--sky-400);
+  pointer-events: none;
 }
 .card.iris-card::after {
   content: "";
