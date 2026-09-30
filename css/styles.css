@@ -281,12 +281,21 @@ a { color: var(--sky-400); }
   height: 100%;
   border-radius: 999px;
   background: linear-gradient(90deg, var(--ocean-700), var(--ocean-500) 55%, var(--sky-400));
-  box-shadow: 0 0 10px rgba(91,196,240,0.25);
+  box-shadow: 0 0 16px rgba(91,196,240,0.5), 0 0 4px rgba(166,228,255,0.6);
   transition: width .4s ease;
+  position: relative;
+  overflow: visible;
+}
+.bar-fill::after {
+  content: "";
+  position: absolute; top: 0; right: 0; bottom: 0; width: 10px;
+  border-radius: 999px;
+  background: radial-gradient(circle, rgba(255,255,255,0.9), transparent 70%);
+  opacity: .8;
 }
 .bar-fill.over { background: linear-gradient(90deg, var(--ocean-600), var(--sky-400) 55%, var(--ice-300)); }
-.bar-fill.low { background: linear-gradient(90deg, var(--amber-dim), var(--amber)); box-shadow: 0 0 10px rgba(242,161,60,0.2); }
-.bar-fill.good { background: linear-gradient(90deg, var(--teal-dim), var(--teal)); box-shadow: 0 0 10px rgba(47,214,160,0.25); }
+.bar-fill.low { background: linear-gradient(90deg, var(--amber-dim), var(--amber)); box-shadow: 0 0 16px rgba(242,161,60,0.4), 0 0 4px rgba(242,161,60,0.5); }
+.bar-fill.good { background: linear-gradient(90deg, var(--teal-dim), var(--teal)); box-shadow: 0 0 16px rgba(47,214,160,0.45), 0 0 4px rgba(47,214,160,0.55); }
 
 .bar-target {
   position: absolute;
@@ -306,6 +315,7 @@ a { color: var(--sky-400); }
 
 .bar-mini-track { height: 7px; }
 .bar-mini-track .bar-fill { box-shadow: none; }
+.bar-mini-track .bar-fill::after { display: none; }
 
 /* ---------- Tags / priority pills ---------- */
 
@@ -403,7 +413,7 @@ a { color: var(--sky-400); }
 .ring-wrap { position: relative; width: 96px; height: 96px; flex-shrink: 0; }
 .ring-wrap svg { transform: rotate(-90deg); }
 .ring-track { fill: none; stroke: var(--surface-2); stroke-width: 8; }
-.ring-fill { fill: none; stroke: url(#ringGradient); stroke-width: 8; stroke-linecap: round; transition: stroke-dashoffset .5s ease; }
+.ring-fill { fill: none; stroke: url(#ringGradient); stroke-width: 8; stroke-linecap: round; transition: stroke-dashoffset .5s ease; filter: drop-shadow(0 0 6px rgba(91,196,240,0.55)); }
 .ring-label {
   position: absolute; inset: 0; display: flex; flex-direction: column;
   align-items: center; justify-content: center;
@@ -434,12 +444,15 @@ a { color: var(--sky-400); }
 
 /* ---------- Charts ---------- */
 
-.chart-svg { width: 100%; height: auto; display: block; }
+.chart-svg { width: 100%; height: auto; display: block; overflow: visible; }
 .chart-grid-line { stroke: var(--border-soft); stroke-width: 1; }
 .chart-axis-label { fill: var(--muted); font-size: 9px; font-family: var(--font-body); }
-.chart-line { fill: none; stroke: var(--sky-400); stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; }
+.chart-line {
+  fill: none; stroke: var(--sky-400); stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round;
+  filter: drop-shadow(0 0 3px rgba(91,196,240,0.9)) drop-shadow(0 0 9px rgba(91,196,240,0.5));
+}
 .chart-area { fill: url(#areaGradient); opacity: .5; }
-.chart-dot { fill: var(--ice-300); stroke: var(--ink); stroke-width: 2; }
+.chart-dot { fill: var(--ice-300); stroke: var(--ink); stroke-width: 2; filter: drop-shadow(0 0 4px rgba(166,228,255,0.85)); }
 
 /* ---------- Log list ---------- */
 
