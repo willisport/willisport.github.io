@@ -1575,6 +1575,184 @@ function renderPlanaenderungen() {
   }
 }
 
+/* ---------- Dienstplan-Generator ----------
+   Berechnet die Trainingszeiten fuer eine Schicht-Woche automatisch nach den
+   festen Regeln (statt dass ich - Claude - das jede Woche von Hand ausrechne):
+     Abfahrt   = Schichtbeginn - Fahrzeit - 15 min Puffer
+     Rueckkehr = Schichtende   + Fahrzeit
+     Rad-Start (nuechtern) = Abfahrt - Fahrraddauer - 30 min Vorbereitung,
+       sofern das nicht vor 6:00 liegt - sonst wandert das Rad auf
+       Rueckkehr + 30 min (dann nicht mehr nuechtern).
+   Diese Formel wurde aus den bisherigen, von Hand geschriebenen Wochen
+   rueckgerechnet und stimmt exakt mit der "-3h, nie vor 6 Uhr"-Faustregel
+   ueberein. Ergebnis ist ein fertiger weekOverrides-JSON-Block zum
+   Kopieren - kein automatisches Schreiben ins Repo (das braeuchte einen
+   serverseitigen Schluessel), aber der Rechenaufwand entfaellt komplett. */
+
+const DP_WEEKDAYS = ["Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag", "Sonntag"];
+const DP_TRAVEL_DEFAULT_MIN = 75;
+const DP_DEPART_BUFFER_MIN = 15;
+const DP_PREP_BUFFER_MIN = 30;
+const DP_AFTERNOON_BUFFER_MIN = 30;
+const DP_AFTERWORK_GAP_MIN = 120;
+const DP_OFFDAY_RAD_TIME = "07:00";
+const DP_OFFDAY_MAIN_TIME = "09:00";
+const DP_MORNING_FLOOR_MIN = 6 * 60;
+
+function dpTimeToMin(hhmm) {
+  const [h, m] = hhmm.split(":").map(Number);
+  return h * 60 + m;
+}
+function dpMinToTime(min) {
+  min = ((Math.round(min) % 1440) + 1440) % 1440;
+  return `${String(Math.floor(min / 60)).padStart(2, "0")}:${String(min % 60).padStart(2, "0")}`;
+}
+function dpNextMondayIso(fromDate = new Date()) {
+  const d = new Date(fromDate);
+  const day = d.getDay(); // 0=So, 1=Mo, ...
+  const diff = day === 1 ? 7 : (8 - day) % 7 || 7;
+  d.setDate(d.getDate() + diff);
+  return d.toISOString().slice(0, 10);
+}
+
+async function dpLoadPlanTemplate() {
+  const res = await fetch("data/plan-template.json?_=" + Date.now(), { cache: "no-store" });
+  if (!res.ok) throw new Error(`plan-template.json: HTTP ${res.status}`);
+  return res.json();
+}
+
+/** shiftsByWeekday: { [weekday]: {start:"HH:MM", end:"HH:MM"} | null } */
+function computeDienstplanWeek(weekPattern, shiftsByWeekday, travelMin) {
+  const days = {};
+  DP_WEEKDAYS.forEach((weekday, i) => {
+    const template = weekPattern[i];
+    const shift = shiftsByWeekday[weekday];
+    let radTime, radFasted, mainTime, focusPrefix = "";
+
+    if (shift && shift.start && shift.end) {
+      const shiftStartMin = dpTimeToMin(shift.start);
+      const shiftEndMin = dpTimeToMin(shift.end);
+      const departMin = shiftStartMin - travelMin - DP_DEPART_BUFFER_MIN;
+      const returnMin = shiftEndMin + travelMin;
+      const radUnit = template.units.find(u => u.type === "rad");
+      const rideDurMin = radUnit ? (radUnit.plannedDurationMin || 60) : 60;
+      const morningStartMin = departMin - rideDurMin - DP_PREP_BUFFER_MIN;
+      if (morningStartMin >= DP_MORNING_FLOOR_MIN) {
+        radTime = dpMinToTime(morningStartMin); radFasted = true;
+      } else {
+        radTime = dpMinToTime(returnMin + DP_AFTERNOON_BUFFER_MIN); radFasted = false;
+      }
+      mainTime = dpMinToTime(returnMin + DP_AFTERWORK_GAP_MIN);
+      const travelH = (travelMin / 60).toFixed(travelMin % 60 === 0 ? 0 : 2);
+      focusPrefix = `Arbeit ${shift.start}–${shift.end} · Abfahrt ${dpMinToTime(departMin)} · zurück ca. ${dpMinToTime(returnMin)} (Fahrt je ca. ${travelH} h) · `;
+    } else {
+      radTime = DP_OFFDAY_RAD_TIME; radFasted = true;
+      mainTime = DP_OFFDAY_MAIN_TIME;
+    }
+
+    const units = template.units.map(u => {
+      if (u.tag !== "pflicht") return { ...u };
+      if (u.type === "rad") {
+        return { ...u, detail: `${u.detail} · ${radTime} Uhr${radFasted ? ", nüchtern" : ""}` };
+      }
+      return { ...u, detail: `${u.detail} · ${mainTime} Uhr` };
+    });
+
+    days[weekday] = { focus: focusPrefix + template.focus, units };
+  });
+  return days;
+}
+
+function renderDienstplan() {
+  const panel = document.getElementById("tab-dienstplan");
+  if (!panel || typeof CURRENT_ROLE === "undefined" || CURRENT_ROLE !== "owner") return;
+
+  panel.innerHTML = `
+    <div class="page-head">
+      <div class="page-eyebrow">Dienstplan</div>
+      <div class="page-title">Wochenplan aus Schichten erzeugen</div>
+      <div class="page-sub">Schichten eintragen - die Zeiten für Rad/Lauf/Kraft werden automatisch nach den festen Regeln berechnet (Rad-Start = Abfahrt − Fahrraddauer − 30 min, nie vor 6 Uhr; sonst wandert es nach Feierabend).</div>
+    </div>
+    <div class="stack">
+      <div class="card">
+        <div class="card-head"><span class="card-title">Woche</span></div>
+        <div class="grid grid-2" style="gap:12px;">
+          <div>
+            <label class="card-note" style="display:block; margin-bottom:4px;">Montag der Woche</label>
+            <input type="date" id="dp-monday" class="text-input" />
+          </div>
+          <div>
+            <label class="card-note" style="display:block; margin-bottom:4px;">Fahrzeit je Strecke (Minuten)</label>
+            <input type="number" id="dp-travel" class="text-input" value="${DP_TRAVEL_DEFAULT_MIN}" min="0" max="240" />
+          </div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-head"><span class="card-title">Schichten</span><span class="card-note">Leer lassen = frei</span></div>
+        <div id="dp-days" class="stack" style="gap:8px;"></div>
+      </div>
+      <button id="dp-generate" class="btn-small" type="button">Woche generieren</button>
+      <div class="card" id="dp-result" hidden>
+        <div class="card-head"><span class="card-title">Ergebnis</span><span class="card-note">Kopieren, mir schicken ("trag das ein") - oder selbst bei GitHub in data/plan-template.json unter "weekOverrides" einfügen</span></div>
+        <textarea id="dp-output" class="note-box" readonly style="min-height:260px; font-family:monospace; font-size:12px; white-space:pre;"></textarea>
+        <button id="dp-copy" class="btn-small" type="button" style="margin-top:8px;">📋 Kopieren</button>
+        <span class="card-note" id="dp-copy-status" style="margin-left:8px;"></span>
+      </div>
+    </div>`;
+
+  const mondayInput = document.getElementById("dp-monday");
+  mondayInput.value = dpNextMondayIso();
+
+  const daysHost = document.getElementById("dp-days");
+  daysHost.innerHTML = DP_WEEKDAYS.map(wd => `
+    <div class="unit" style="align-items:center; gap:10px;">
+      <div style="width:90px; font-weight:600; flex-shrink:0;">${wd}</div>
+      <input type="time" class="text-input dp-start" data-weekday="${escapeHtml(wd)}" style="max-width:120px;" />
+      <span class="card-note">bis</span>
+      <input type="time" class="text-input dp-end" data-weekday="${escapeHtml(wd)}" style="max-width:120px;" />
+    </div>`).join("");
+
+  document.getElementById("dp-generate").addEventListener("click", async () => {
+    const btn = document.getElementById("dp-generate");
+    btn.disabled = true;
+    const originalLabel = btn.textContent;
+    btn.textContent = "Lade Plan-Vorlage…";
+    try {
+      const plan = await dpLoadPlanTemplate();
+      const monday = mondayInput.value;
+      const travelMin = parseInt(document.getElementById("dp-travel").value, 10) || DP_TRAVEL_DEFAULT_MIN;
+      const shifts = {};
+      DP_WEEKDAYS.forEach(wd => {
+        const s = daysHost.querySelector(`.dp-start[data-weekday="${wd}"]`).value;
+        const e = daysHost.querySelector(`.dp-end[data-weekday="${wd}"]`).value;
+        shifts[wd] = (s && e) ? { start: s, end: e } : null;
+      });
+      const days = computeDienstplanWeek(plan.weekPattern, shifts, travelMin);
+      const block = { [monday]: { days } };
+      document.getElementById("dp-output").value = JSON.stringify(block, null, 2);
+      document.getElementById("dp-result").hidden = false;
+    } catch (err) {
+      alert("Konnte die Plan-Vorlage nicht laden: " + (err && err.message ? err.message : err));
+    } finally {
+      btn.disabled = false;
+      btn.textContent = originalLabel;
+    }
+  });
+
+  document.getElementById("dp-copy").addEventListener("click", async () => {
+    const ta = document.getElementById("dp-output");
+    const statusEl = document.getElementById("dp-copy-status");
+    try {
+      await navigator.clipboard.writeText(ta.value);
+    } catch {
+      ta.select();
+      document.execCommand("copy");
+    }
+    statusEl.textContent = "Kopiert!";
+    setTimeout(() => { statusEl.textContent = ""; }, 2500);
+  });
+}
+
 /* ---------- render: Logins (nur Owner) ---------- */
 
 let LOGIN_REQUESTS_CACHE = null;
@@ -2298,6 +2476,7 @@ function renderAll(freshData) {
   renderCoach(data);
   renderKraft(data);
   renderPlanaenderungen(data);
+  renderDienstplan();
   renderLogins();
   renderIris();
 }
