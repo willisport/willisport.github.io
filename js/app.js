@@ -122,6 +122,50 @@ function setNoteOverride(date, text) {
   overrides[date] = day;
   saveOverrides(overrides);
 }
+/* ---------- Coach-Rueckmeldung -> automatische Belastungsanpassung -----------
+   Feste Stichwoerter statt echter KI (gleiches Prinzip wie bei Airis): tippt
+   Willi im Coach-Feld z.B. "Beine fuehlen sich schwer an", wird die Woche
+   automatisch als Deload markiert und die Wochenziele (Lauf/Rad/Zeit) um 15%
+   reduziert - jederzeit mit "Beine sind wieder gut" rueckgaengig machbar. */
+
+const FEEDBACK_DELOAD_RE = /beine.*(schwer|müde|kaputt)|müde beine|erschöpft|ausgelaugt|übertraining|zu viel training/i;
+const FEEDBACK_CLEAR_RE = /beine.*(gut|frisch|stark|erholt)|wieder fit|erholt heute/i;
+const DELOAD_FACTOR = 0.85;
+
+function detectFeedbackAdjustment(text) {
+  if (FEEDBACK_DELOAD_RE.test(text)) return "deload";
+  if (FEEDBACK_CLEAR_RE.test(text)) return "clear";
+  return null;
+}
+
+function setDeloadOverride(weekStart, active, reason) {
+  const overrides = loadOverrides();
+  overrides.__deload = overrides.__deload || {};
+  if (active) overrides.__deload[weekStart] = { active: true, reason };
+  else delete overrides.__deload[weekStart];
+  saveOverrides(overrides);
+}
+
+function getDeloadOverride(weekStart) {
+  const overrides = loadOverrides();
+  return (overrides.__deload && overrides.__deload[weekStart]) || null;
+}
+
+function applyDeload(data) {
+  const deload = getDeloadOverride(data.week.startDate);
+  data.week.deloadActive = !!(deload && deload.active);
+  data.week.deloadReason = deload ? deload.reason : null;
+  if (data.week.deloadActive) {
+    const f = DELOAD_FACTOR;
+    data.week.targets = {
+      ...data.week.targets,
+      runVolumeKm: Math.round(data.week.targets.runVolumeKm * f * 10) / 10,
+      bikeVolumeKm: Math.round(data.week.targets.bikeVolumeKm * f * 10) / 10,
+      timeMin: Math.round(data.week.targets.timeMin * f),
+    };
+  }
+}
+
 function applyOverrides(data) {
   const overrides = loadOverrides();
   const applyTo = (units, dateStr) => {
@@ -717,6 +761,12 @@ function renderHeute(data) {
         <div class="card-note" style="margin-top:6px;">Mehrere Warnsignale gleichzeitig – heute eher lockerer angehen oder einen Ruhetag einschieben.</div>
       </div>` : ""}
 
+      ${data.week.deloadActive ? `
+      <div class="card accent-amber">
+        <div class="card-head"><span class="card-title">⚠ Belastung reduziert</span></div>
+        <div class="card-note">Wegen deiner Rückmeldung im Coach-Tab („${escapeHtml(data.week.deloadReason || "")}") sind die Wochenziele um 15% runtergesetzt.</div>
+      </div>` : ""}
+
       <div class="card accent-teal">
         <div class="card-head"><span class="card-title">Heutige Einheiten</span><span class="card-note">Kreis: geplant → erledigt → abgelehnt · Dropdown: Tag wählen · Uhr: Zeit ändern · 🪄: automatisch sinnvoll verschieben</span></div>
         <div class="unit-list">${unitsHtml}</div>
@@ -1120,6 +1170,12 @@ function renderCoach(data) {
     </div>
 
     <div class="stack">
+      ${w.deloadActive ? `
+      <div class="card accent-amber">
+        <div class="card-head"><span class="card-title">⚠ Belastung reduziert</span></div>
+        <div class="card-note">Wegen deiner Rückmeldung „${escapeHtml(w.deloadReason || "")}" sind Lauf-/Rad-/Zeitziele diese Woche um 15% runtergesetzt. Tipp „Beine sind wieder gut" ins Feld unten, um das aufzuheben.</div>
+      </div>` : ""}
+
       <div class="card coach-hero">
         <div class="coach-headline">${rec.headline}</div>
         <ul class="coach-reasons">${rec.reasons.map(r => `<li>${r}</li>`).join("")}</ul>
@@ -1243,6 +1299,21 @@ function setupCoachQA(data) {
   const ask = () => {
     const question = input.value.trim();
     if (!question) return;
+    const adjustment = detectFeedbackAdjustment(question);
+    if (adjustment === "deload") {
+      setDeloadOverride(data.week.startDate, true, question);
+      input.value = "";
+      showToast(`<div class="title">Belastung reduziert</div><div>Wegen „${escapeHtml(question)}" sind die Wochenziele (Lauf/Rad/Zeit) für diese Woche um 15% runtergesetzt. Sag „Beine sind wieder gut", um das aufzuheben.</div>`);
+      if (PRISTINE_DATA) renderAll();
+      return;
+    }
+    if (adjustment === "clear") {
+      setDeloadOverride(data.week.startDate, false, null);
+      input.value = "";
+      showToast(`<div class="title">Belastung zurückgesetzt</div><div>Die Wochenziele laufen wieder normal.</div>`);
+      if (PRISTINE_DATA) renderAll();
+      return;
+    }
     const answer = answerCoachQuestion(question, data);
     const item = document.createElement("div");
     item.className = "qa-item";
@@ -2536,6 +2607,7 @@ function renderAll(freshData) {
   const data = structuredClone(PRISTINE_DATA);
   applyMoves(data);
   applyOverrides(data);
+  applyDeload(data);
   APP_DATA = data;
   const sidenavGoalEl = document.getElementById("sidenav-goal");
   if (sidenavGoalEl) sidenavGoalEl.textContent = data.profile.goal.replace("Ultramarathon ", "");
