@@ -299,6 +299,7 @@ const IRIS_ENABLED = true;
 
 function setupLoginsNavItem() {
   document.querySelectorAll('[data-tab="logins"]').forEach(el => { el.hidden = CURRENT_ROLE !== "owner"; });
+  document.querySelectorAll('[data-tab="dienstplan"]').forEach(el => { el.hidden = CURRENT_ROLE !== "owner"; });
   document.querySelectorAll('#mode-switch, #mode-switch-mobile').forEach(el => { el.hidden = !(IRIS_ENABLED && CURRENT_ROLE === "owner"); });
 }
 
