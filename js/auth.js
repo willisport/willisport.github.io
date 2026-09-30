@@ -314,6 +314,7 @@ async function loadIrisStatus() {
     const encFile = await fetch(`${RAW_DATA_BASE}/data/airis-status.enc.json`, { cache: "no-store" }).then(r => r.json());
     const data = await decryptDataFile(CURRENT_DEK, encFile);
     if (typeof renderIris === "function") renderIris(data);
+    if (typeof updateHeuteCalendarCard === "function") updateHeuteCalendarCard(data);
   } catch {
     // Datei existiert evtl. noch nicht (erster Sync steht noch aus) oder Abruf fehlgeschlagen -
     // Tab zeigt dann seinen eigenen "noch keine Daten"-Zustand.

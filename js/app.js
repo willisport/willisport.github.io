@@ -135,7 +135,40 @@ function applyOverrides(data) {
   };
   applyTo(data.today.units, data.today.date);
   data.week.days.forEach(d => applyTo(d.units, d.date));
+  applyTimeOverrides(data.today.units, data.today.date);
+  data.week.days.forEach(d => applyTimeOverrides(d.units, d.date));
   data.today.note = (overrides[data.today.date] && overrides[data.today.date].note) || "";
+}
+
+/* ---------- manuelle Uhrzeit-Anpassung einer Einheit (z.B. "Rad morgens nicht
+   geschafft, mache es nachmittags") - ersetzt eine evtl. vorhandene Zeit-
+   Angabe im Detail-Text, statt sie zu duplizieren. ---------- */
+
+const TIME_ANNOTATION_RE = / · \d{2}:\d{2} Uhr(, nüchtern)?( \(angepasst\))?$/;
+
+function setTimeOverride(date, unitName, time) {
+  const overrides = loadOverrides();
+  overrides.__times = overrides.__times || {};
+  const key = `${date}|${unitName}`;
+  if (!time) delete overrides.__times[key];
+  else overrides.__times[key] = time;
+  saveOverrides(overrides);
+}
+
+function applyTimeOverrides(units, dateStr) {
+  const overrides = loadOverrides();
+  const times = overrides.__times || {};
+  units.forEach(u => {
+    const time = times[`${dateStr}|${u.name}`];
+    if (!time) return;
+    u.detail = `${u.detail.replace(TIME_ANNOTATION_RE, "")} · ${time} Uhr (angepasst)`;
+    u.timeOverride = time;
+  });
+}
+
+function timeOverrideHtml(u, currentDate) {
+  if (!canEdit()) return "";
+  return `<input type="time" class="text-input time-override-input" data-date="${currentDate}" data-unit="${escapeHtml(u.name)}" value="${u.timeOverride || ""}" title="Uhrzeit anpassen (z. B. Rad morgens nicht geschafft → nachmittags)" style="max-width:92px; padding:6px 8px; font-size:12px; flex-shrink:0;" />`;
 }
 
 /* ---------- manuelles Verschieben einer Einheit auf einen anderen Wochentag ---------- */
@@ -452,7 +485,7 @@ function setupWeekPlanClicks(weeks) {
 
 function unitRowHtml(u, dateStr, weekDays, weekStart) {
   const moveControls = weekDays
-    ? `${moveSelectHtml(u, dateStr, weekDays, weekStart)}${autoMoveButtonHtml(u)}`
+    ? `${timeOverrideHtml(u, dateStr)}${moveSelectHtml(u, dateStr, weekDays, weekStart)}${autoMoveButtonHtml(u)}`
     : "";
   return `
     <div class="day-mini-unit">
@@ -570,6 +603,14 @@ function setupInteractions() {
 
   document.body.addEventListener("change", (e) => {
     if (typeof CURRENT_ROLE !== "undefined" && CURRENT_ROLE === "viewer") return;
+
+    const timeInput = e.target.closest(".time-override-input");
+    if (timeInput) {
+      setTimeOverride(timeInput.dataset.date, timeInput.dataset.unit, timeInput.value);
+      if (PRISTINE_DATA) renderAll();
+      return;
+    }
+
     const sel = e.target.closest(".move-select");
     if (!sel) return;
     const targetDate = sel.value;
@@ -617,6 +658,32 @@ function setupSyncButton() {
 
 /* ---------- render: Heute ---------- */
 
+/* ---------- Heute: Kalender-Widget (liest denselben verschluesselten Status
+   wie der Airis-Tab, damit Termine nicht nur dort, sondern auch direkt auf
+   der Haupt-Startseite sichtbar sind) ---------- */
+
+function renderHeuteCalendarBody(airisData) {
+  if (!airisData) {
+    return `<div class="card-head"><span class="card-title">Heute im Kalender</span></div><div class="card-note">Lade Kalenderdaten…</div>`;
+  }
+  const cal = airisData.calendar || {};
+  if (cal.error) {
+    return `<div class="card-head"><span class="card-title">Heute im Kalender</span></div><div class="card-note" style="color:var(--amber);">${escapeHtml(cal.error)}</div>`;
+  }
+  const events = cal.events || [];
+  if (!events.length) {
+    return `<div class="card-head"><span class="card-title">Heute im Kalender</span></div><div class="card-note">Keine anstehenden Termine gefunden.</div>`;
+  }
+  const items = events.slice(0, 4).map(e => `
+    <div class="day-mini-unit"><span style="flex:1;">${escapeHtml(e.summary)}<div class="unit-detail" style="margin-top:2px;">${escapeHtml(e.when)}${e.location ? " · " + escapeHtml(e.location) : ""}</div></span></div>`).join("");
+  return `<div class="card-head"><span class="card-title">Heute im Kalender</span><span class="card-note">nächste Termine</span></div>${items}`;
+}
+
+function updateHeuteCalendarCard(airisData) {
+  const el = document.getElementById("heute-calendar-card");
+  if (el) el.innerHTML = renderHeuteCalendarBody(airisData);
+}
+
 function renderHeute(data) {
   const t = data.today;
   const recoveryScore = computeRecoveryScore(t.sleep);
@@ -630,6 +697,7 @@ function renderHeute(data) {
         ${u.movedFromWeekday ? `<div class="moved-note">verschoben von ${u.movedFromWeekday}</div>` : ""}
       </div>
       <span class="tag ${u.tag}">${u.tag}</span>
+      ${timeOverrideHtml(u, t.date)}
       ${moveSelectHtml(u, t.date, data.week.days, data.week.startDate)}
       ${autoMoveButtonHtml(u)}
     </div>`).join("");
@@ -650,9 +718,11 @@ function renderHeute(data) {
       </div>` : ""}
 
       <div class="card accent-teal">
-        <div class="card-head"><span class="card-title">Heutige Einheiten</span><span class="card-note">Kreis: geplant → erledigt → abgelehnt · Dropdown: Tag wählen · 🪄: automatisch sinnvoll verschieben</span></div>
+        <div class="card-head"><span class="card-title">Heutige Einheiten</span><span class="card-note">Kreis: geplant → erledigt → abgelehnt · Dropdown: Tag wählen · Uhr: Zeit ändern · 🪄: automatisch sinnvoll verschieben</span></div>
         <div class="unit-list">${unitsHtml}</div>
       </div>
+
+      <div class="card" id="heute-calendar-card">${renderHeuteCalendarBody(LAST_IRIS_DATA)}</div>
 
       <div class="grid grid-2">
         <div class="card">
@@ -800,7 +870,7 @@ function renderWoche(data) {
           <div class="bar-track"><div class="bar-fill ${w.actuals.loadVsAvgPct < -30 ? "low" : ""}" style="width:${clamp(w.actuals.loadVsAvgPct + 100, 0, 100)}%"></div></div>
           ${w.actuals.loadTrendNote ? `<div class="card-note" style="margin-top:6px; color:${w.actuals.loadTrendNote.level === "high" ? "var(--amber)" : "var(--text-dim)"};">${escapeHtml(w.actuals.loadTrendNote.text)}</div>` : ""}
         </div>
-        <div class="card-note" style="margin-top:10px;">Höhenmeter diese Woche: <b>${w.actuals.elevationGainM.toLocaleString("de-DE")} hm</b></div>
+        <div class="card-note" style="margin-top:10px;">Höhenmeter diese Woche: <b>${(w.actuals.elevationGainM ?? 0).toLocaleString("de-DE")} hm</b></div>
       </div>
 
       <div class="week-grid">${buildWeekOverview(data)}</div>
