@@ -1804,6 +1804,115 @@ function computeDienstplanWeek(weekPattern, shiftsByWeekday, travelMin) {
   return days;
 }
 
+/* ---------- Dienstplan-PDF-Upload: liest Text per PDF.js (komplett im
+   Browser, kein Server) und versucht, Uhrzeiten heuristisch den Wochentagen
+   zuzuordnen (per Datum "DD.MM." oder Wochentagsname in derselben Zeile wie
+   ein Zeitpaar "HH:MM-HH:MM"). Best-Effort: der Rohtext bleibt immer
+   einsehbar, und jedes erkannte Feld muss vor dem Generieren geprüft werden -
+   ohne ein echtes Beispiel von Willis Dienstplan kann das Layout abweichen. */
+
+const DP_WEEKDAY_LOOKUP = {
+  montag: "Montag", mo: "Montag",
+  dienstag: "Dienstag", di: "Dienstag",
+  mittwoch: "Mittwoch", mi: "Mittwoch",
+  donnerstag: "Donnerstag", do: "Donnerstag",
+  freitag: "Freitag", fr: "Freitag",
+  samstag: "Samstag", sa: "Samstag",
+  sonntag: "Sonntag", so: "Sonntag",
+};
+
+function dpNormalizeTime(raw) {
+  const [h, m] = raw.replace(".", ":").split(":");
+  return `${h.padStart(2, "0")}:${(m || "00").padStart(2, "0")}`;
+}
+
+function dpParseShiftsFromText(text, mondayIso) {
+  const monday = new Date(mondayIso + "T00:00:00");
+  const dateToWeekday = {};
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(monday);
+    d.setDate(d.getDate() + i);
+    const key = `${String(d.getDate()).padStart(2, "0")}.${String(d.getMonth() + 1).padStart(2, "0")}`;
+    dateToWeekday[key] = DP_WEEKDAYS[i];
+  }
+
+  const found = {};
+  text.split(/\n+/).forEach(line => {
+    const timeMatch = line.match(/(\d{1,2}[:.]\d{2})\s*(?:-|–|bis)\s*(\d{1,2}[:.]\d{2})/);
+    if (!timeMatch) return;
+
+    let weekday = null;
+    const dateMatch = line.match(/\b(\d{1,2})\.(\d{1,2})\.?/);
+    if (dateMatch) {
+      const key = `${dateMatch[1].padStart(2, "0")}.${dateMatch[2].padStart(2, "0")}`;
+      weekday = dateToWeekday[key] || null;
+    }
+    if (!weekday) {
+      const wdMatch = line.match(/\b(Montag|Dienstag|Mittwoch|Donnerstag|Freitag|Samstag|Sonntag|Mo|Di|Mi|Do|Fr|Sa|So)\b/i);
+      if (wdMatch) weekday = DP_WEEKDAY_LOOKUP[wdMatch[1].toLowerCase()] || null;
+    }
+    if (weekday && !found[weekday]) {
+      found[weekday] = { start: dpNormalizeTime(timeMatch[1]), end: dpNormalizeTime(timeMatch[2]) };
+    }
+  });
+  return found;
+}
+
+async function dpExtractPdfText(file) {
+  if (typeof pdfjsLib === "undefined") throw new Error("PDF-Bibliothek nicht geladen (Internetverbindung prüfen)");
+  const buf = await file.arrayBuffer();
+  const pdf = await pdfjsLib.getDocument({ data: buf }).promise;
+  let text = "";
+  for (let i = 1; i <= pdf.numPages; i++) {
+    const page = await pdf.getPage(i);
+    const content = await page.getTextContent();
+    // getTextContent() liefert nur einzelne Textbloecke mit Position, keine
+    // Zeilenumbrueche - bei Tabellen-/Dienstplan-Layouts mit freier
+    // Positionierung braeuchte man sonst nur eine einzige riesige "Zeile" und
+    // die Wochentag-Zuordnung wuerde durcheinanderfallen. Zeilen deshalb
+    // anhand der Y-Koordinate (transform[5]) rekonstruieren.
+    let lastY = null, line = "";
+    content.items.forEach(item => {
+      const y = item.transform ? item.transform[5] : null;
+      if (lastY !== null && y !== null && Math.abs(y - lastY) > 2) {
+        text += line.trim() + "\n";
+        line = "";
+      }
+      line += item.str + " ";
+      lastY = y;
+    });
+    text += line.trim() + "\n";
+  }
+  return text;
+}
+
+async function dpHandlePdfUpload(file) {
+  const statusEl = document.getElementById("dp-upload-status");
+  const rawDetails = document.getElementById("dp-upload-raw");
+  const rawTextEl = document.getElementById("dp-upload-rawtext");
+  statusEl.textContent = "Lese PDF…";
+  try {
+    const text = await dpExtractPdfText(file);
+    rawTextEl.value = text;
+    rawDetails.hidden = false;
+
+    const monday = document.getElementById("dp-monday").value;
+    const shifts = dpParseShiftsFromText(text, monday);
+    const foundDays = Object.keys(shifts);
+    foundDays.forEach(wd => {
+      const s = document.querySelector(`.dp-start[data-weekday="${wd}"]`);
+      const e = document.querySelector(`.dp-end[data-weekday="${wd}"]`);
+      if (s) s.value = shifts[wd].start;
+      if (e) e.value = shifts[wd].end;
+    });
+    statusEl.textContent = foundDays.length
+      ? `${foundDays.length} von 7 Tagen automatisch erkannt (${foundDays.join(", ")}) - bitte unten prüfen und ggf. korrigieren!`
+      : "Konnte keine Uhrzeiten automatisch zuordnen - Rohtext unten ansehen und Zeiten selbst eintragen.";
+  } catch (err) {
+    statusEl.textContent = "Konnte die PDF nicht lesen: " + (err && err.message ? err.message : err);
+  }
+}
+
 function renderDienstplan() {
   const panel = document.getElementById("tab-dienstplan");
   if (!panel || typeof CURRENT_ROLE === "undefined" || CURRENT_ROLE !== "owner") return;
@@ -1815,6 +1924,15 @@ function renderDienstplan() {
       <div class="page-sub">Schichten eintragen - die Zeiten für Rad/Lauf/Kraft werden automatisch nach den festen Regeln berechnet (Rad-Start = Abfahrt − Fahrraddauer − 30 min, nie vor 6 Uhr; sonst wandert es nach Feierabend).</div>
     </div>
     <div class="stack">
+      <div class="card">
+        <div class="card-head"><span class="card-title">Dienstplan hochladen</span><span class="card-note">PDF - erkennt Uhrzeiten automatisch, bitte danach prüfen</span></div>
+        <input type="file" id="dp-upload" accept=".pdf" class="text-input" style="padding:8px;" />
+        <div class="card-note" id="dp-upload-status" style="margin-top:8px;"></div>
+        <details id="dp-upload-raw" hidden style="margin-top:8px;">
+          <summary class="card-note" style="cursor:pointer;">Erkannten Rohtext anzeigen</summary>
+          <textarea class="note-box" readonly style="min-height:140px; font-family:monospace; font-size:11px; margin-top:6px;" id="dp-upload-rawtext"></textarea>
+        </details>
+      </div>
       <div class="card">
         <div class="card-head"><span class="card-title">Woche</span></div>
         <div class="grid grid-2" style="gap:12px;">
@@ -1843,6 +1961,11 @@ function renderDienstplan() {
 
   const mondayInput = document.getElementById("dp-monday");
   mondayInput.value = dpNextMondayIso();
+
+  document.getElementById("dp-upload").addEventListener("change", (e) => {
+    const file = e.target.files[0];
+    if (file) dpHandlePdfUpload(file);
+  });
 
   const daysHost = document.getElementById("dp-days");
   daysHost.innerHTML = DP_WEEKDAYS.map(wd => `
