@@ -21,11 +21,12 @@ function libKeys(lib) {
 
 function libExerciseRowHtml(e) {
   return `
-    <div class="lib-ex" style="display:grid; grid-template-columns:minmax(120px,2fr) 60px minmax(70px,1fr) minmax(70px,1fr) auto; gap:6px; align-items:center;">
+    <div class="lib-ex" style="display:grid; grid-template-columns:minmax(120px,2fr) 60px minmax(70px,1fr) minmax(70px,1fr) 74px auto; gap:6px; align-items:center;">
       <input type="text" class="text-input lx-name" value="${escapeHtml(e.name)}" placeholder="Übung" />
       <input type="number" class="text-input lx-sets" value="${escapeHtml(e.sets)}" min="1" placeholder="Sätze" />
       <input type="text" class="text-input lx-reps" value="${escapeHtml(e.reps)}" placeholder="Wdh." />
       <input type="text" class="text-input lx-rest" value="${escapeHtml(e.rest)}" placeholder="Pause" />
+      <input type="number" class="text-input lx-kg" value="${e.weightKg ? escapeHtml(e.weightKg) : ""}" placeholder="kg" step="0.5" min="0" />
       <button class="btn-small lx-del" type="button" title="Übung entfernen">✕</button>
     </div>`;
 }
@@ -42,14 +43,14 @@ function kraftLibraryHtml(data) {
         <label class="card-note">Dauer (Min)<input type="number" class="text-input lb-dur" value="${escapeHtml(e.durationMin || 15)}" min="1" /></label>
       </div>
       <label class="card-note" style="display:block; margin-bottom:8px;">Kurztext im Plan<input type="text" class="text-input lb-detail" value="${escapeHtml(e.detail || "")}" /></label>
-      <div class="card-note" style="display:grid; grid-template-columns:minmax(120px,2fr) 60px minmax(70px,1fr) minmax(70px,1fr) auto; gap:6px; margin-bottom:4px;"><span>Übung</span><span>Sätze</span><span>Wdh.</span><span>Pause</span><span></span></div>
+      <div class="card-note" style="display:grid; grid-template-columns:minmax(120px,2fr) 60px minmax(70px,1fr) minmax(70px,1fr) 74px auto; gap:6px; margin-bottom:4px;"><span>Übung</span><span>Sätze</span><span>Wdh.</span><span>Pause</span><span>Gewicht</span><span></span></div>
       <div class="stack lib-exs" style="gap:6px;">${exs.map(libExerciseRowHtml).join("")}</div>
       <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:10px;">
         <button class="btn-small lb-add" type="button">+ Übung</button>
         <button class="btn-small lb-save" type="button">Speichern</button>
         <button class="btn-small lb-reset" type="button" title="Eigene Änderungen verwerfen">Auf Standard</button>
       </div>` : `
-      <div class="exercise-list">${exs.map(x => `<div class="exercise-row"><span class="exercise-name">${escapeHtml(x.name)}</span><span class="exercise-spec">${escapeHtml(x.sets)}×${escapeHtml(x.reps)} · ${escapeHtml(x.rest)} Pause</span></div>`).join("")}</div>`;
+      <div class="exercise-list">${exs.map(x => `<div class="exercise-row"><span class="exercise-name">${escapeHtml(x.name)}</span><span class="exercise-spec">${escapeHtml(x.sets)}×${escapeHtml(x.reps)}${x.weightKg ? " · " + escapeHtml(x.weightKg) + " kg" : ""} · ${escapeHtml(x.rest)} Pause</span></div>`).join("")}</div>`;
     return `
       <details class="card lib-card" data-lib-key="${escapeHtml(key)}">
         <summary style="cursor:pointer; display:flex; justify-content:space-between; gap:8px;">
@@ -103,10 +104,14 @@ function bindKraftLibrary() {
   const root = document.getElementById("tab-kraft");
   if (!root || !canEdit()) return;
   const readCard = (card) => {
-    const exs = [...card.querySelectorAll(".lib-ex")].map(r => ({
-      name: r.querySelector(".lx-name").value.trim(), sets: Number(r.querySelector(".lx-sets").value) || 1,
-      reps: r.querySelector(".lx-reps").value.trim(), rest: r.querySelector(".lx-rest").value.trim(),
-    })).filter(x => x.name);
+    const exs = [...card.querySelectorAll(".lib-ex")].map(r => {
+      const kg = Number(r.querySelector(".lx-kg").value);
+      return {
+        name: r.querySelector(".lx-name").value.trim(), sets: Number(r.querySelector(".lx-sets").value) || 1,
+        reps: r.querySelector(".lx-reps").value.trim(), rest: r.querySelector(".lx-rest").value.trim(),
+        ...(kg > 0 ? { weightKg: kg } : {}),
+      };
+    }).filter(x => x.name);
     return {
       name: card.querySelector(".lb-name").value.trim() || card.dataset.libKey,
       durationMin: Number(card.querySelector(".lb-dur").value) || 15,
@@ -123,10 +128,15 @@ function bindKraftLibrary() {
       const entry = readCard(card);
       const old = currentLibrary(APP_DATA)[key] || {};
       const sig = (list) => JSON.stringify((list || []).map(x => [x.name, x.sets, x.reps, x.rest]));
+      const oldEntry = JSON.parse(JSON.stringify(old));
       if (sig(old.exercises) !== sig(entry.exercises) && entry.detail === (old.detail || "")) {
         entry.detail = libDetailFromExercises(key, entry.durationMin, entry.exercises);
       }
-      applyPlanChange(`„${entry.name}“ gespeichert`, plan => { plan.library = plan.library || {}; plan.library[key] = entry; });
+      applyPlanChange(`„${entry.name}“ gespeichert`, plan => {
+        plan.library = plan.library || {};
+        plan.library[key] = entry;
+        logWeightChanges(plan, oldEntry, entry);
+      });
     });
     card.querySelector(".lb-reset").addEventListener("click", () => {
       applyPlanChange("Auf Standard zurückgesetzt", plan => { if (plan.library) delete plan.library[key]; });

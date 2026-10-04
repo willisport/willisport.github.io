@@ -151,5 +151,44 @@ class SyncIntegration(unittest.TestCase):
         self.assertEqual(self.read("training-data.enc.json")["planState"]["externalEvents"], 0)
 
 
+    def test_shoe_km_are_counted(self):
+        inputs = dict(PLAN_INPUTS, shoes=[{"id": "g18", "name": "Brooks Ghost 18", "startDate": "2026-10-06", "retireKm": 700}])
+        raw = {"__plan": inputs, "__deload": {}}
+        enc = crypto_utils.encrypt_json_bytes(DEK, json.dumps(raw).encode("utf-8"))
+        (self.tmp / "data" / "overrides.enc.json").write_text(json.dumps(enc), encoding="utf-8")
+        acts = [{"name": "L1", "startTime": "2026-10-05T07:00:00", "type": "lauf", "distanceKm": 9.0, "durationMin": 50},
+                {"name": "L2", "startTime": "2026-10-06T16:00:00", "type": "lauf", "distanceKm": 6.2, "durationMin": 40},
+                {"name": "R1", "startTime": "2026-10-07T07:00:00", "type": "rad", "distanceKm": 30.0, "durationMin": 60}]
+        with mock.patch.object(sync.garmin_source, "fetch_activities", lambda *a, **k: acts):
+            sync.main()
+        shoe = self.read("training-data.enc.json")["planState"]["shoes"][0]
+        self.assertEqual(shoe["km"], 6.2)
+        self.assertEqual(shoe["retireKm"], 700)
+
+
+class ShoeKm(unittest.TestCase):
+    RAW = [{"id": "a", "name": "Ghost 18", "startDate": "2026-10-06", "retireKm": 700, "startKm": 20}]
+
+    def acts(self, *rows):
+        return [{"startTime": d + "T07:00:00", "type": t, "distanceKm": km} for d, t, km in rows]
+
+    def test_only_runs_after_start_count_plus_start_km(self):
+        out = sync.compute_shoes(self.RAW, self.acts(("2026-10-05", "lauf", 9), ("2026-10-06", "lauf", 5), ("2026-10-06", "lauf", 2.5),
+                                                     ("2026-10-07", "rad", 40)), [], "2026-08-01")
+        self.assertEqual(out[0]["km"], 27.5)
+
+    def test_km_before_the_window_are_remembered(self):
+        first = sync.compute_shoes(self.RAW, self.acts(("2026-10-06", "lauf", 6)), [], "2026-08-01")
+        later = sync.compute_shoes(self.RAW, self.acts(("2026-12-20", "lauf", 10)), first, "2026-11-01")
+        self.assertEqual(later[0]["km"], 36.0)          # 20 Start + 6 (alt, ausserhalb des Fensters) + 10
+
+    def test_window_days_are_refreshed_not_double_counted(self):
+        first = sync.compute_shoes(self.RAW, self.acts(("2026-10-10", "lauf", 8)), [], "2026-08-01")
+        again = sync.compute_shoes(self.RAW, self.acts(("2026-10-10", "lauf", 8)), first, "2026-08-01")
+        self.assertEqual(again[0]["km"], 28.0)
+
+    def test_incomplete_shoes_are_skipped(self):
+        self.assertEqual(sync.compute_shoes([{"name": "x"}], [], [], "2026-08-01"), [])
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

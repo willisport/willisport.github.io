@@ -147,7 +147,21 @@ const FB_HOLD_RE = /stagnier|nicht (weiter )?(hoch|steiger)|gleich lassen|so las
 const FB_DELOAD_RE = /beine.*(schwer|müde|kaputt)|müde beine|erschöpft|ausgelaugt|übertraining|zu viel training/i;
 const FB_CLEAR_RE = /beine.*(gut|frisch|stark|erholt)|erholt heute/i;
 
+const FB_PAIN_END_RE = /(knie|wade|schienbein|fuß|fuss|achilles|rücken|rueck|muskelkater|schmerz|weh)\w*.*(wieder gut|nicht mehr|weg|vorbei|schmerzfrei|besser)|(wieder|bin) schmerzfrei|keine schmerzen( mehr)?/i;
+function detectInjuryArea(t) {
+  if (/muskelkater/i.test(t)) return "muskelkater";
+  if (/knie/i.test(t)) return "knie";
+  if (/achilles|ferse|fuß|fuss|sprunggelenk/i.test(t)) return "fuss";
+  if (/wade|schienbein/i.test(t)) return "wade";
+  if (/rücken|ruecken/i.test(t)) return "ruecken";
+  if (/schmerz|tut.*weh|zwickt|verletzt|hüfte|leiste|oberschenkel|zerrung/i.test(t)) return "sonstiges";
+  return null;
+}
+
 function detectFeedbackAdjustment(text) {
+  if (FB_PAIN_END_RE.test(text) && !/gesund|krank/i.test(text) && (activeInjury() || detectInjuryArea(text))) return "injury_end";
+  const injArea = detectInjuryArea(text);
+  if (injArea && !/krank|erkältung|erkaeltung|grippe|fieber/i.test(text)) return "injury_" + injArea;
   if (FB_LONGRIDE_OFF_RE.test(text)) return "longride_off";
   if (FB_LONGRIDE_ON_RE.test(text)) return "longride_on";
   if (FB_HEALTHY_RE.test(text)) return "healthy";
@@ -702,7 +716,7 @@ function setupSyncButton() {
 
 const AGENDA_KIND_LABEL = {
   arbeit: "Arbeit", schule: "Schule", termin: "Termin", frei: "Frei",
-  urlaub: "Urlaub", krank: "Krank", sonstiges: "Termin",
+  urlaub: "Urlaub", krank: "Krank", verletzung: "Beschwerden", sonstiges: "Termin",
 };
 
 function agendaItemHtml(it) {
@@ -773,6 +787,7 @@ function renderHeute(data) {
         <div class="unit-list">${unitsHtml}</div>
       </div>
 
+      ${raceCountdownHtml(data)}
       <div class="card" id="heute-agenda-card">${renderHeuteAgendaBody(data)}</div>
 
       <div class="grid grid-2">
@@ -1091,6 +1106,8 @@ function renderPerformance(data) {
 
       ${perfFtpCardHtml(data)}
 
+      ${shoesCardHtml(data)}
+
       ${perfExtrasHtml(data)}
 
       ${data.performance.racePredictions && Object.keys(data.performance.racePredictions).length ? `
@@ -1105,6 +1122,7 @@ function renderPerformance(data) {
       </div>` : ""}
     </div>`;
   bindPerfFtp();
+  bindShoes();
 }
 
 /* ---------- coach rule engine ---------- */
@@ -1321,6 +1339,12 @@ function setupCoachQA(data) {
     const question = input.value.trim();
     if (!question) return;
     const adjustment = detectFeedbackAdjustment(question);
+    if (adjustment && adjustment.startsWith("injury_")) {
+      if (!canEdit()) { showToast(`<div class="title">Nur der Besitzer kann den Plan ändern</div>`); return; }
+      input.value = "";
+      if (adjustment === "injury_end") endInjury(); else setInjury(adjustment.slice(7));
+      return;
+    }
     const planCmd = {
       sick: ["Krank gemeldet", "Training pausiert, bis du „Ich bin wieder gesund“ sagst. Danach steigt die Belastung in ein paar Tagen wieder an.",
         p => { p.sick = { from: isoToday(), to: null }; }],
@@ -1399,7 +1423,7 @@ function strengthUnitBlock(u, dateStr) {
         <div class="exercise-list">${u.exercises.map(e => `
           <div class="exercise-row">
             <span class="exercise-name">${escapeHtml(e.name)}</span>
-            <span class="exercise-spec">${e.sets}×${e.reps} · ${escapeHtml(e.rest)} Pause</span>
+            <span class="exercise-spec">${e.sets}×${e.reps}${e.weightKg ? ` · ${e.weightKg} kg` : ""} · ${escapeHtml(e.rest)} Pause</span>
           </div>`).join("")}</div>
       </div>`;
   }
@@ -1411,7 +1435,7 @@ function strengthReferenceBlock(u) {
     ? `<div class="exercise-list">${u.exercises.map(e => `
         <div class="exercise-row">
           <span class="exercise-name">${escapeHtml(e.name)}</span>
-          <span class="exercise-spec">${e.sets}×${e.reps} · ${escapeHtml(e.rest)} Pause</span>
+          <span class="exercise-spec">${e.sets}×${e.reps}${e.weightKg ? ` · ${e.weightKg} kg` : ""} · ${escapeHtml(e.rest)} Pause</span>
         </div>`).join("")}</div>`
     : `<div class="unit-detail">${escapeHtml(u.detail)}</div>`;
   return `
@@ -1474,6 +1498,7 @@ function renderKraft(data) {
       </div>
       ${kraftExtrasHtml(data)}
       ${referenceCard}
+      ${kraftWeightLogHtml()}
     </div>`;
   bindKraftLibrary();
 }

@@ -354,6 +354,29 @@ def load_plan_inputs(dek: bytes) -> dict:
     return inputs
 
 
+def compute_shoes(raw_shoes, activities, previous_shoes, window_start_iso):
+    """Laufkilometer je Schuhpaar (ab Starttag). Tageswerte werden gemerkt, damit Kilometer
+    aus der Zeit vor dem 8-Wochen-Fenster nicht verloren gehen."""
+    prev = {sh.get("id"): sh for sh in (previous_shoes or [])}
+    out = []
+    for sh in raw_shoes or []:
+        sid, start = sh.get("id"), sh.get("startDate")
+        if not sid or not start:
+            continue
+        daily = dict((prev.get(sid) or {}).get("daily") or {})
+        for d in [d for d in daily if d >= window_start_iso]:
+            del daily[d]                      # im Fenster zaehlt der frische Garmin-Stand
+        for a in activities:
+            d = (a.get("startTime") or "")[:10]
+            if a.get("type") != "lauf" or not d or d < start or (sh.get("endDate") and d > sh["endDate"]):
+                continue
+            daily[d] = round(daily.get(d, 0) + (a.get("distanceKm") or 0), 2)
+        km = round(float(sh.get("startKm") or 0) + sum(daily.values()), 1)
+        out.append({"id": sid, "name": sh.get("name") or "Laufschuh", "startDate": start, "retireKm": sh.get("retireKm") or 700,
+                    "startKm": sh.get("startKm") or 0, "retired": bool(sh.get("retired")), "km": km, "daily": daily})
+    return out
+
+
 def write_encrypted_if_changed(path: Path, obj, dek: bytes) -> bool:
     """Schreibt nur, wenn sich der Klartext geaendert hat - sonst wuerde jeder Lauf
     (zufaelliger IV) einen neuen, nutzlosen Commit erzeugen und das Repo aufblaehen."""
@@ -637,6 +660,7 @@ def main():
         "settings": {k: inputs_norm["settings"][k] for k in ("travelMin", "raceDate", "raceName", "raceDistanceKm", "runScalePct", "longRunMaxKm", "ftpW", "ref5kSec", "includeLongRide", "includeLegStabi", "includeLegSupersets")},
         "counts": {"shifts": len(inputs_norm["shifts"]), "events": len(inputs_norm["events"])},
         "externalEvents": ics_added,
+        "shoes": compute_shoes(plan_inputs.get("shoes"), activities, (previous.get("planState") or {}).get("shoes"), iso_date(window_start)),
         "metrics": {**metrics, "targets": planner.training_targets(inputs_norm)},
     }
 

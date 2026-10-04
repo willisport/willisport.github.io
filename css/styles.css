@@ -733,3 +733,4 @@ body.is-viewer .note-box { opacity: .7; cursor: not-allowed; }
 .agenda-kind.agenda-urlaub { background: var(--teal-dim); color: var(--teal); }
 .agenda-day { display: flex; gap: 10px; align-items: baseline; padding: 4px 0; font-size: 12.5px; color: var(--text-dim); }
 .agenda-day-label { font-weight: 700; color: var(--ice-300); min-width: 62px; }
+.agenda-kind.agenda-verletzung { background: #3a2a14; color: var(--amber); }

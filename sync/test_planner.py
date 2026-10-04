@@ -499,6 +499,63 @@ class TrainingTargets(unittest.TestCase):
         self.assertFalse(pl.training_targets(pl.normalize_inputs({"metrics": self.MET, "settings": {"ftpW": 250}}))["ftpStale"])
 
 
+class Injury(unittest.TestCase):
+    MON = date(2026, 11, 16)
+
+    def names(self, w):
+        return [u["name"] for u in all_units(w)]
+
+    def test_knee_means_no_running_no_legs_only_easy_bike(self):
+        raw = {"injury": {"area": "knie", "from": "2026-11-16", "to": "2026-11-22"}}
+        w = week(self.MON, raw)
+        names = self.names(w)
+        for forbidden in ("Langer Lauf", "VO2max-Intervalle", "Zone-2-Lauf", "Schwellentraining Rad", "Schweres Beintraining"):
+            self.assertNotIn(forbidden, names)
+        self.assertTrue(all(u["name"] != "Rad Zone 2" for u in all_units(w)))
+        self.assertIn("Rad Zone 1 (locker)", names)
+        self.assertIn("Knie", w["note"])
+        self.assertNotIn("keine Zeit", w["note"])
+
+    def test_knee_week_after_is_gentle_and_progress_pauses(self):
+        raw = {"injury": {"area": "knie", "from": "2026-11-16", "to": "2026-11-22"}}
+        nxt = date(2026, 11, 23)
+        w = week(nxt, raw)
+        d0 = w["days"]["Montag"]
+        self.assertFalse(any(u["type"] == "lauf" for u in d0["units"]))     # Wiedereinstieg: erst nur locker Rad
+        healthy = pl.week_params(date(2026, 12, 7), pl.normalize_inputs({}))
+        after = pl.week_params(date(2026, 12, 7), pl.normalize_inputs(raw))
+        self.assertEqual(after["p"], healthy["p"] - 1)
+
+    def test_muscle_soreness_skips_legs_and_hard_for_two_days_only(self):
+        raw = {"injury": {"area": "muskelkater", "from": "2026-11-16", "to": None}}
+        w = week(self.MON, raw)
+        for wd in ("Montag", "Dienstag"):
+            n = [u["name"] for u in units(w, wd)]
+            for forbidden in ("VO2max-Intervalle", "Schwellentraining Rad", "Langer Lauf", "Schweres Beintraining"):
+                self.assertNotIn(forbidden, n, wd)
+        later = self.names(w) 
+        self.assertIn("Zone-2-Lauf", later)       # leichte Laeufe bleiben moeglich
+
+    def test_back_pain_skips_legs_and_core_but_runs_remain(self):
+        raw = {"injury": {"area": "ruecken", "from": "2026-11-16", "to": "2026-11-22"}}
+        names = self.names(week(self.MON, raw))
+        self.assertNotIn("Schweres Beintraining", names)
+        self.assertNotIn("Core", names)
+        self.assertIn("Langer Lauf", names)
+
+    def test_open_ended_injury_extends_and_shows_in_agenda(self):
+        raw = {"injury": {"area": "wade", "from": "2026-11-16", "to": None}}
+        ag = pl.build_agenda(raw, date(2026, 11, 18), days_ahead=7)
+        kinds = {i["kind"] for a in ag for i in a["items"]}
+        self.assertIn("verletzung", kinds)
+        w = week(self.MON, raw, today=date(2026, 11, 18))
+        self.assertNotIn("Langer Lauf", self.names(w))
+
+    def test_bad_injury_inputs_are_ignored(self):
+        self.assertEqual(pl.normalize_inputs({"injury": {"area": "bogus"}})["injury"]["from"], None)
+        self.assertEqual(pl.normalize_inputs({"injury": {"area": "bogus", "from": "2026-11-16"}})["injury"]["area"], "sonstiges")
+
+
 class Sickness(unittest.TestCase):
     RAW = {"sick": {"from": "2026-11-03", "to": "2026-11-06"}}
 

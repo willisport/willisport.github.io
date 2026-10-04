@@ -209,6 +209,7 @@ function planStateCardHtml() {
         <button class="btn-small" type="button" data-plan-act="advance">Fortschritt +1 Woche</button>
         <button class="btn-small" type="button" data-plan-act="hold">Fortschritt −1 Woche</button>
       </div>
+      ${injuryRowHtml()}
       <div class="card-note" style="margin-top:8px;"><b>Schwerpunkt:</b> Laufen ist Prio 1. Rad bleibt Grundlage (max. 1 h pro Einheit), gesteigert wird beim Laufen. VO2max = ALL OUT, Schwelle läuft auf dem Rad.</div>
       <div class="card-note" style="margin-top:8px;">Oder einfach unten ins Coach-Feld schreiben: „ich bin krank“, „bin wieder gesund“, „fühlt sich gut, wir können hoch“, „stagniert, wir bleiben so“.</div>
     </div>`;
@@ -290,8 +291,11 @@ function renderDienstplan() {
             <label class="card-note"><input type="checkbox" id="dp-set-super" ${st.includeLegSupersets ? "checked" : ""} /> Bein-Supersätze wieder einplanen</label>
           </div>
         </div>
+        ${telegramSettingsHtml()}
         <button class="btn-small" type="button" id="dp-set-save" style="margin-top:10px;">Einstellungen speichern</button>
       </div>
+
+      ${backupCardHtml()}
     </div>`;
 
   dpBindDienstplan(panel);
@@ -334,6 +338,7 @@ function dpBindDienstplan(panel) {
   const discard = $("dp-discard");
   if (discard) discard.addEventListener("click", () => { DPUI.parsed = null; DPUI.status = ""; renderDienstplan(); });
 
+  bindBackup();
   $("dp-ics-export").addEventListener("click", () => downloadIcs(false));
   $("dp-ics-export-train").addEventListener("click", () => downloadIcs(true));
   $("dp-ev-add").addEventListener("click", async () => {
@@ -410,6 +415,7 @@ function dpBindDienstplan(panel) {
       travelMin: Math.max(0, parseInt($("dp-set-travel").value, 10) || 0),
       kuerzel: ($("dp-set-kz").value || "WL").trim().toUpperCase(),
       raceDate: $("dp-set-race").value || "2027-08-28",
+      telegram: readTelegramSettings(),
       raceName: ($("dp-set-rname").value || "Wettkampf").trim(),
       raceDistanceKm: Math.max(1, Number($("dp-set-rdist").value) || 100),
       runScalePct: Math.min(130, Math.max(50, Number($("dp-set-scale").value) || 100)),
@@ -426,6 +432,7 @@ function dpBindDienstplan(panel) {
 /** Buttons der Plan-Status-Karte (steht im Coach-Tab). */
 function bindPlanStatus(root) {
   if (!root) return;
+  bindInjury(root);
   root.querySelectorAll("[data-plan-act]").forEach(btn => btn.addEventListener("click", () => {
     const act = btn.dataset.planAct;
     const mut = {

@@ -100,6 +100,17 @@ DEFAULT_LIBRARY = {
 
 BIKE_TYPES = ["cycling", "indoor_cycling", "virtual_ride"]
 
+# Verletzung / Beschwerden: was fuer den Tag wegfaellt. run = betrifft das Laufen (dann auch
+# sanfter Wiedereinstieg und Fortschrittspause danach), auto_days = laeuft von selbst aus.
+INJURY = {
+    "knie":        {"label": "Knie", "run": True},
+    "fuss":        {"label": "Fuß/Achillessehne", "run": True},
+    "wade":        {"label": "Wade/Schienbein", "run": True},
+    "muskelkater": {"label": "Muskelkater", "run": False, "auto_days": 2},
+    "ruecken":     {"label": "Rücken", "run": False},
+    "sonstiges":   {"label": "Beschwerden", "run": False},
+}
+
 
 # ----------------------------------------------------------------------------
 # Hilfsfunktionen: Zeit
@@ -208,6 +219,11 @@ def normalize_inputs(raw: dict | None) -> dict:
         if clean:
             run_over[d[:10]] = clean
 
+    inj = raw.get("injury") or {}
+    injury = {"area": None, "from": None, "to": None}
+    if inj.get("from"):
+        injury = {"area": inj.get("area") if inj.get("area") in INJURY else "sonstiges", "from": inj["from"], "to": inj.get("to")}
+
     sick = raw.get("sick") or {}
     prog = raw.get("progression") or {}
     return {
@@ -216,6 +232,7 @@ def normalize_inputs(raw: dict | None) -> dict:
         "events": events,
         "dayStatus": day_status,
         "sick": {"from": sick.get("from"), "to": sick.get("to")},
+        "injury": injury,
         "progression": {"offsetWeeks": int(prog.get("offsetWeeks") or 0)},
         "library": merge_library(raw.get("library")),
         "deload": raw.get("deload") or {},
@@ -252,6 +269,8 @@ class DayCtx:
         self.return_: int | None = None
         self.focus_prefix = ""
         self.sick_return_level = None   # None | "rest" | "easy" | float Faktor
+        self.no_run = self.no_hard = self.no_legs = self.no_core = self.bike_easy = False
+        self.injury_label = None
         self.shift_start: int | None = None
         self.shift_end: int | None = None
         self.travel = 0
@@ -302,6 +321,16 @@ def build_day_contexts(monday: date, inputs: dict, today: date) -> list[DayCtx]:
     ongoing_until = None
     if sick_from and not sick_to:
         ongoing_until = max(today, sick_from) + timedelta(days=2)
+
+    inj = inputs["injury"]
+    inj_spec = INJURY.get(inj.get("area")) if inj.get("from") else None
+    inj_from = parse_date(inj["from"]) if inj_spec else None
+    inj_to = parse_date(inj["to"]) if inj_spec and inj.get("to") else None
+    if inj_spec and inj_to is None and inj_spec.get("auto_days"):
+        inj_to = inj_from + timedelta(days=inj_spec["auto_days"] - 1)
+    # ohne Enddatum: laufrelevante Beschwerden gelten rollierend 7 Tage ab heute (jeder Sync verlaengert), sonst 2 Tage
+    inj_until = inj_to or ((max(today, inj_from) + timedelta(days=7 if inj_spec['run'] else 2)) if inj_from else None)
+    ret_to = recovery_end(inputs)
 
     ctxs = []
     for i in range(7):
@@ -375,9 +404,26 @@ def build_day_contexts(monday: date, inputs: dict, today: date) -> list[DayCtx]:
             ctx.kind = "krank"
             ctx.agenda.append({"kind": "krank", "title": "Krank", "start": None, "end": None})
 
-        # Wiedereinstieg nach Krankheit
-        if sick_to is not None and d > sick_to:
-            delta = (d - sick_to).days
+        # Verletzung / Beschwerden
+        if inj_from and inj_from <= d <= inj_until and not is_sick:
+            ctx.injury_label = inj_spec["label"]
+            if inj_spec["run"]:
+                ctx.no_run = ctx.no_hard = ctx.no_legs = ctx.bike_easy = True
+            elif inj["area"] == "muskelkater":
+                ctx.no_hard = ctx.no_legs = True
+            elif inj["area"] == "ruecken":
+                ctx.no_legs = ctx.no_core = True
+            else:
+                ctx.no_hard = ctx.no_legs = True
+            hint = {"knie": "kein Lauf, nur lockeres Rad (wenn schmerzfrei)", "fuss": "kein Lauf, nur lockeres Rad (wenn schmerzfrei)",
+                    "wade": "kein Lauf, nur lockeres Rad (wenn schmerzfrei)", "muskelkater": "keine harten Einheiten, kein Beintraining",
+                    "ruecken": "kein Beintraining, kein Core"}.get(inj["area"], "keine harten Einheiten, kein Beintraining")
+            ctx.agenda.append({"kind": "verletzung", "title": f"Verletzung: {ctx.injury_label}", "start": None, "end": None, "note": hint})
+            ctx.focus_prefix += f"{ctx.injury_label}-Beschwerden ({hint}) · "
+
+        # Wiedereinstieg nach Krankheit bzw. laufrelevanter Verletzung
+        if ret_to is not None and d > ret_to:
+            delta = (d - ret_to).days
             if delta <= 3:
                 ctx.sick_return_level = "easy"
             elif delta <= 7:
@@ -427,19 +473,38 @@ def is_recovery(p: int) -> bool:
     return p % BLOCK == 3
 
 
-def sick_pause_weeks(inputs: dict) -> int:
-    sf, st_ = inputs["sick"].get("from"), inputs["sick"].get("to")
-    if not (sf and st_):
+def _range_weeks(frm, to) -> int:
+    if not (frm and to):
         return 0
-    days = (parse_date(st_) - parse_date(sf)).days + 1
+    days = (parse_date(to) - parse_date(frm)).days + 1
     return max(0, math.ceil(days / 7))
+
+
+def sick_pause_weeks(inputs: dict) -> int:
+    """Wochen, um die der Fortschritt nach Krankheit bzw. laufrelevanter Verletzung pausiert."""
+    weeks = _range_weeks(inputs["sick"].get("from"), inputs["sick"].get("to"))
+    inj = inputs["injury"]
+    if inj.get("from") and INJURY.get(inj.get("area"), {}).get("run"):
+        weeks += _range_weeks(inj["from"], inj.get("to"))
+    return weeks
+
+
+def recovery_end(inputs: dict):
+    """Letzter Tag der Krankheit / laufrelevanten Verletzung (danach Wiedereinstieg) oder None."""
+    ends = []
+    if inputs["sick"].get("to"):
+        ends.append(parse_date(inputs["sick"]["to"]))
+    inj = inputs["injury"]
+    if inj.get("from") and inj.get("to") and INJURY.get(inj.get("area"), {}).get("run"):
+        ends.append(parse_date(inj["to"]))
+    return max(ends) if ends else None
 
 
 def week_params(monday: date, inputs: dict, factor_override: float | None = None) -> dict:
     st = inputs["settings"]
     p = week_index(monday) + inputs["progression"]["offsetWeeks"]
-    sick_to = parse_date(inputs["sick"]["to"]) if inputs["sick"].get("to") else None
-    if sick_to and monday > sick_to:
+    rec_end = recovery_end(inputs)
+    if rec_end and monday > rec_end:
         p -= sick_pause_weeks(inputs)
     recovery = is_recovery(p)
     s = progression_step(p)
@@ -695,6 +760,9 @@ class Planner:
         level = [c.sick_return_level if isinstance(c.sick_return_level, float) else 1.0 for c in ctxs]
         pool = [i for i in range(n) if ctxs[i].kind != "krank" and not easy_only[i]]
         key_pool = [i for i in pool if level[i] >= 0.85]   # Schluesseleinheiten erst wieder bei fast voller Belastbarkeit
+        any_injury = any(c.injury_label for c in ctxs)
+        run_pool = [i for i in key_pool if not ctxs[i].no_hard and not ctxs[i].no_run]      # harte/lange Einheiten
+        leg_pool = [i for i in key_pool if not ctxs[i].no_legs]
         last_end = {i: None for i in range(n)}
 
         def commit(i, unit, start, dur):
@@ -726,8 +794,8 @@ class Planner:
         long_dur = run_minutes(long_km) + 10
         li = None
         if params["phase"] != "wettkampf":
-            li = choose("long_run", long_dur, self.slot_long, key_pool)
-            if li is None:
+            li = choose("long_run", long_dur, self.slot_long, run_pool)
+            if li is None and not any_injury:
                 missing.append("langer Lauf")
         if li is not None:
             roles[li].add("long_run")
@@ -736,10 +804,10 @@ class Planner:
         lr_dur = params["longRideMin"]
         ri = None
         if params["phase"] != "wettkampf" and st.get("includeLongRide"):
-            ri = choose("long_ride", lr_dur, self.slot_long, [i for i in key_pool if i != li])
+            ri = choose("long_ride", lr_dur, self.slot_long, [i for i in key_pool if i != li and not ctxs[i].no_hard])
             if ri is not None:
                 roles[ri].add("long_ride")
-            else:
+            elif not any_injury:
                 missing.append("langes Rad")
 
         # --- 3. Intervalle (nicht neben dem langen Lauf) ---
@@ -747,11 +815,11 @@ class Planner:
         ii = None
         if reps >= 3:
             iv_dur = interval_total_min(reps, params["vo2Min"])
-            ii = choose("intervals", iv_dur, self.slot_run, [i for i in key_pool if i not in (li, ri)],
+            ii = choose("intervals", iv_dur, self.slot_run, [i for i in run_pool if i not in (li, ri)],
                         penalty_fn=lambda i: 600 if (li is not None and abs(i - li) == 1) else 0)
             if ii is not None:
                 roles[ii].add("intervals")
-            else:
+            elif not any_injury:
                 missing.append("VO2max-Intervalle")
 
         # --- 3b. Schwellentraining auf dem Rad (nicht neben Intervallen/Langlauf) ---
@@ -766,10 +834,10 @@ class Planner:
                     pen += 400
                 return pen
             ti = choose("threshold", threshold_total_min(thr), self.slot_bike_pm,
-                        [i for i in key_pool if i not in (li, ri, ii)], thr_pen)
+                        [i for i in key_pool if i not in (li, ri, ii) and not ctxs[i].no_hard], thr_pen)
             if ti is not None:
                 roles[ti].add("threshold")
-            else:
+            elif not any_injury:
                 missing.append("Schwellentraining")
 
         # --- 4. schweres Beintraining (nicht vor Intervallen/Langlauf) ---
@@ -809,7 +877,7 @@ class Planner:
         hi = None
         gym_start = {}
         if not params.get("skipHeavy"):
-            hi = choose("heavy_legs", hl_dur, slot_hl, [i for i in key_pool if i not in taken and not is_late(i)],
+            hi = choose("heavy_legs", hl_dur, slot_hl, [i for i in leg_pool if i not in taken and not is_late(i)],
                         lambda i: hl_penalty(i) - (250 if at_work(i) else 0))
             if hi is not None:
                 roles[hi].add("heavy_legs")
@@ -820,7 +888,7 @@ class Planner:
                     extra = (gym_start[hi] + hl_dur + c.travel) - c.return_
                     if extra > 0:
                         c.allocate(c.return_, extra)
-            else:
+            elif not any_injury:
                 missing.append("schweres Beintraining")
 
         # --- 5. Ruhetage: die zwei am staerksten belegten Tage ohne Key-Einheit ---
@@ -830,6 +898,9 @@ class Planner:
         rest_days = rest_cands[:2]
         for i in rest_days:
             roles[i].add("rest")
+        for i in range(n):                  # Verletzung: nur lockeres Rad
+            if ctxs[i].bike_easy:
+                roles[i].add("rest")
 
         # --- 6. lockere Zone-2-Laeufe ---
         z2_km = params["z2Km"]
@@ -848,10 +919,10 @@ class Planner:
                 if z2_days and abs(i - z2_days[0]) == 1:
                     pen += 80
                 return pen
-            cands = [i for i in pool if i not in (li, ri, ii, ti, hi) and i not in rest_days and i not in z2_days]
+            cands = [i for i in pool if i not in (li, ri, ii, ti, hi) and i not in rest_days and i not in z2_days and not ctxs[i].no_run]
             ci = choose("z2_run", z2_dur, self.slot_run, cands, z2_pen)
             if ci is None and len(rest_days) >= 2:
-                ci = choose("z2_run", z2_dur, self.slot_run, [i for i in rest_days if i not in z2_days], z2_pen)
+                ci = choose("z2_run", z2_dur, self.slot_run, [i for i in rest_days if i not in z2_days and not ctxs[i].no_run and not ctxs[i].bike_easy], z2_pen)
                 if ci is not None:
                     rest_days.remove(ci)
                     roles[ci].discard("rest")
@@ -970,7 +1041,7 @@ f"15 min einrollen · 2×{w} min Zone 4 (Schwelle): {self.tg['thrLo']}–{self.t
         for i in sorted(range(n), key=lambda i: (-ctxs[i].largest_window(), i)):
             if len(core_days) >= (1 if recovery else 2):
                 break
-            if ctxs[i].kind == "krank" or easy_only[i] or level[i] < 0.7:
+            if ctxs[i].kind == "krank" or easy_only[i] or level[i] < 0.7 or ctxs[i].no_core:
                 continue
             if roles[i] & {"intervals", "long_run", "long_ride", "rest", "threshold"}:
                 continue
@@ -987,7 +1058,7 @@ f"15 min einrollen · 2×{w} min Zone 4 (Schwelle): {self.tg['thrLo']}–{self.t
         arm_day = None
         if not recovery:
             for i in sorted(range(n), key=lambda i: (-ctxs[i].largest_window(), i)):
-                if ctxs[i].kind == "krank" or easy_only[i] or level[i] < 0.85:
+                if ctxs[i].kind == "krank" or easy_only[i] or level[i] < 0.85 or ctxs[i].no_core:
                     continue
                 if roles[i] & {"heavy_legs", "long_run", "intervals", "rest", "threshold"} or i in core_days:
                     continue
@@ -1106,6 +1177,9 @@ def generate_week(monday: date, inputs: dict, today: date, template_library: dic
     note_bits = []
     if any(c.kind == "krank" for c in ctxs):
         note_bits.append("Krankheit – Plan pausiert")
+    inj_labels = sorted({c.injury_label for c in ctxs if c.injury_label})
+    if inj_labels:
+        note_bits.append("Beschwerden (" + ", ".join(inj_labels) + ") – Plan angepasst")
     if params["phase"] == "wettkampf":
         note_bits.append("Wettkampfwoche (Termin im Plan hinterlegt)")
     if missing:

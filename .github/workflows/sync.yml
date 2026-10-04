@@ -9,6 +9,10 @@ permissions:
   contents: write
   issues: write
 
+concurrency:
+  group: sync-data
+  cancel-in-progress: false
+
 jobs:
   sync:
     runs-on: ubuntu-latest
@@ -45,12 +49,22 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: python sync.py
 
+      - name: Telegram-Nachrichten (Zeiten stellt Willi auf der Website ein)
+        working-directory: sync
+        continue-on-error: true
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          DATA_ENCRYPTION_KEY: ${{ secrets.DATA_ENCRYPTION_KEY }}
+        run: python telegram_agenda.py auto
+
       - name: Verschluesselte Daten committen
         run: |
           git config user.name "basis-sync-bot"
           git config user.email "actions@users.noreply.github.com"
           git add data/training-data.enc.json
           if [ -f data/plan.enc.json ]; then git add data/plan.enc.json; fi
+          if [ -f data/telegram-state.json ]; then git add data/telegram-state.json; fi
           git diff --staged --quiet && exit 0
           git commit -m "Automatischer Trainingsdaten-Sync"
           for i in 1 2 3 4 5; do

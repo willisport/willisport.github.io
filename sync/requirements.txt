@@ -5,3 +5,4 @@ renpho-api
 python-dotenv
 cryptography
 tzdata
+requests

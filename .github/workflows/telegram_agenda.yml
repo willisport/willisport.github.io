@@ -1,13 +1,12 @@
 name: Telegram Tagesagenda
 
 on:
-  schedule:
-    - cron: "0 6 * * *"   # ~8 Uhr Berlin (Sommerzeit) / 7 Uhr (Winterzeit) - Morgen-Nachricht
-    - cron: "0 18 * * *"  # ~20 Uhr Berlin (Sommerzeit) / 19 Uhr (Winterzeit) - Abend-Nachricht
+  # Zeitgesteuerte Nachrichten laufen jetzt im Sync-Workflow (sync.yml, alle 10 Minuten);
+  # die Uhrzeiten stellt Willi auf der Website ein. Dieser Workflow ist nur fuer Sofort-Tests.
   workflow_dispatch:
     inputs:
       mode:
-        description: "morning oder evening"
+        description: "morning, evening oder weekly (sendet sofort)"
         default: "morning"
 
 jobs:
@@ -22,14 +21,7 @@ jobs:
 
       - name: Modus bestimmen
         id: mode
-        run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "mode=${{ inputs.mode }}" >> "$GITHUB_OUTPUT"
-          elif [ "${{ github.event.schedule }}" = "0 6 * * *" ]; then
-            echo "mode=morning" >> "$GITHUB_OUTPUT"
-          else
-            echo "mode=evening" >> "$GITHUB_OUTPUT"
-          fi
+        run: echo "mode=${{ inputs.mode }}" >> "$GITHUB_OUTPUT"
 
       - name: Nachricht senden
         working-directory: sync
