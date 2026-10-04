@@ -285,7 +285,7 @@ def format_weekly(data, generated, today):
     for shoe in ps.get("shoes") or []:
         if shoe.get("retired"):
             continue
-        warn = " ⚠️ bald ersetzen" if shoe.get("retireKm") and shoe["km"] >= 0.9 * shoe["retireKm"] else ""
+        warn = " ⚠️ Richtwert fast erreicht – auf Gefühl/Sohle achten" if shoe.get("retireKm") and shoe["km"] >= 0.9 * shoe["retireKm"] else ""
         lines.append(f"👟 {shoe['name']}: {de_num(shoe['km'])} / {de_num(shoe.get('retireKm', 0), 0)} km{warn}")
 
     tg = (ps.get("metrics") or {}).get("targets") or {}

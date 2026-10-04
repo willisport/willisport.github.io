@@ -127,7 +127,7 @@ class Weekly(unittest.TestCase):
         for needle in ("Wochenrückblick KW 41", "31,2 / 36 km (87 %)", "118 / 125 km", "9 h 12 min / 10 h 30 min",
                        "Pflichteinheiten: 1 von 2", "Do Schwellentraining Rad", "Nächste Woche (12.10.): Recovery-Woche",
                        "Di VO2max-Intervalle", "Vorschlag: eine Woche hochgehen", "Ultramarathon 100 km: noch 45 Wochen",
-                       "Ghost 18: 640,5 / 700 km", "bald ersetzen", "FTP-Wert ist alt"):
+                       "Ghost 18: 640,5 / 700 km", "Richtwert fast erreicht", "FTP-Wert ist alt"):
             self.assertIn(needle, self.txt)
 
     def test_works_with_minimal_data(self):

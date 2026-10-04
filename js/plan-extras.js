@@ -121,15 +121,17 @@ function shoesCardHtml(data) {
       <div class="shoe-row" data-id="${escapeHtml(s.id)}" style="${s.retired ? "opacity:.55;" : ""}">
         ${km !== null ? progressBar({ name: `${escapeHtml(s.name)}${s.retired ? " (ausgemustert)" : ""}`, value: km, target: retire, unit: " km", decimals: 0, variant: warn ? "low" : "" })
           : `<div class="bar-top"><span class="name">${escapeHtml(s.name)}</span><span class="value">wird beim nächsten Sync gezählt</span></div>`}
-        <div class="card-note" style="margin:2px 0 6px;">seit ${dpFmtDate(s.startDate)} ${escapeHtml(s.startDate.slice(0, 4))}${warn ? ' · <span style="color:var(--amber);">bald ersetzen</span>' : ""}</div>
-        ${edit ? `<div style="display:flex; gap:6px; margin-bottom:10px;">
+        <div class="card-note" style="margin:2px 0 6px;">seit ${dpFmtDate(s.startDate)} ${escapeHtml(s.startDate.slice(0, 4))}${warn ? ' · <span style="color:var(--amber);">Richtwert fast erreicht – auf Gefühl &amp; Sohle achten</span>' : ""}</div>
+        ${edit ? `<div style="display:flex; gap:6px; margin-bottom:10px; flex-wrap:wrap; align-items:center;">
+          <label class="card-note">Richtwert (km) <input type="number" class="text-input shoe-limit" value="${escapeHtml(retire)}" min="100" max="2000" style="max-width:90px;" /></label>
+          <button class="btn-small shoe-limit-save" type="button">Speichern</button>
           <button class="btn-small shoe-retire" type="button">${s.retired ? "Wieder aktiv" : "Ausmustern"}</button>
           <button class="btn-small shoe-del" type="button">Löschen</button></div>` : ""}
       </div>`;
   }).join("");
   return `
     <div class="card" id="shoes-card">
-      <div class="card-head"><span class="card-title">Laufschuhe</span><span class="card-note">Kilometer aus deinen Garmin-Läufen</span></div>
+      <div class="card-head"><span class="card-title">Laufschuhe</span><span class="card-note">Kilometer aus deinen Garmin-Läufen · Richtwert, keine harte Grenze</span></div>
       ${rows || '<div class="card-note">Noch kein Paar eingetragen.</div>'}
       ${edit ? `
       <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:flex-end; margin-top:6px;">
@@ -160,6 +162,11 @@ function bindShoes() {
   card.querySelectorAll(".shoe-row").forEach(row => {
     const id = row.dataset.id;
     const retire = row.querySelector(".shoe-retire"), del = row.querySelector(".shoe-del");
+    const limitSave = row.querySelector(".shoe-limit-save");
+    if (limitSave) limitSave.addEventListener("click", () => {
+      const v = Math.max(100, Number(row.querySelector(".shoe-limit").value) || 700);
+      applyPlanChange("Richtwert gespeichert", plan => { const s = (plan.shoes || []).find(x => x.id === id); if (s) s.retireKm = v; });
+    });
     if (retire) retire.addEventListener("click", () => applyPlanChange("Schuh aktualisiert", plan => {
       const s = (plan.shoes || []).find(x => x.id === id);
       if (s) s.retired = !s.retired;
