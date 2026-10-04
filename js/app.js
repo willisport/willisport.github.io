@@ -68,35 +68,46 @@ function computeRecoveryScore(sleep) {
 
 let CACHED_OVERRIDES = null;
 let overridesPushTimer = null;
+let OVERRIDES_SERVER_LOADED = false;   // erst pushen, wenn der Serverstand einmal geladen wurde - sonst koennte ein
+                                       // veralteter lokaler Stand (ohne Dienstplan/Termine) den Serverstand ueberschreiben
 
 function loadOverrides() {
   if (CACHED_OVERRIDES) return CACHED_OVERRIDES;
   try { return JSON.parse(localStorage.getItem(OVERRIDES_KEY) || "{}"); }
   catch { return {}; }
 }
-function saveOverrides(o) {
+function saveOverrides(o, opts = {}) {
   CACHED_OVERRIDES = o;
   try { localStorage.setItem(OVERRIDES_KEY, JSON.stringify(o)); } catch { /* ignore */ }
+  if (opts.push === false) return;
   clearTimeout(overridesPushTimer);
   overridesPushTimer = setTimeout(() => pushOverridesToServer(o), 1500);
 }
 
 async function initOverridesFromServer() {
   if (typeof IS_HOSTED === "undefined" || !IS_HOSTED || typeof CURRENT_DEK === "undefined" || !CURRENT_DEK) return;
+  let encFile = null, missing = false;
   try {
-    const encFile = await fetch(`${RAW_DATA_BASE}/data/overrides.enc.json`, { cache: "no-store" }).then(r => r.json());
-    CACHED_OVERRIDES = await decryptDataFile(CURRENT_DEK, encFile);
-  } catch {
-    // Datei existiert evtl. noch nicht (erste Nutzung) oder Abruf fehlgeschlagen -
-    // dann mit dem lokalen Stand weitermachen, bis der naechste Push klappt.
-    try { CACHED_OVERRIDES = JSON.parse(localStorage.getItem(OVERRIDES_KEY) || "{}"); }
-    catch { CACHED_OVERRIDES = {}; }
+    // frisch (Cache-Buster) - sonst koennte ein bis zu 5 Min alter Stand spaeter ueberschrieben werden
+    encFile = await fetchFreshFile("data/overrides.enc.json");
+  } catch (err) {
+    if (err && err.status === 404) missing = true;
   }
+  if (encFile) {
+    try {
+      CACHED_OVERRIDES = await decryptDataFile(CURRENT_DEK, encFile);
+      OVERRIDES_SERVER_LOADED = true;
+      return;
+    } catch { /* nicht entschluesselbar -> lokaler Stand, aber nicht pushen */ }
+  }
+  OVERRIDES_SERVER_LOADED = missing;
+  try { CACHED_OVERRIDES = JSON.parse(localStorage.getItem(OVERRIDES_KEY) || "{}"); }
+  catch { CACHED_OVERRIDES = {}; }
 }
 
 async function pushOverridesToServer(overrides) {
   if (typeof IS_HOSTED === "undefined" || !IS_HOSTED || typeof CURRENT_DEK === "undefined" || !CURRENT_DEK) return;
-  if (!canEdit()) return;
+  if (!canEdit() || !OVERRIDES_SERVER_LOADED) return;
   try {
     const encrypted = await encryptJson(CURRENT_DEK, overrides);
     await fetch(HOSTED_SYNC_WORKER_URL, {
@@ -122,19 +133,25 @@ function setNoteOverride(date, text) {
   overrides[date] = day;
   saveOverrides(overrides);
 }
-/* ---------- Coach-Rueckmeldung -> automatische Belastungsanpassung -----------
-   Feste Stichwoerter statt echter KI (gleiches Prinzip wie bei Airis): tippt
-   Willi im Coach-Feld z.B. "Beine fuehlen sich schwer an", wird die Woche
-   automatisch als Deload markiert und die Wochenziele (Lauf/Rad/Zeit) um 15%
-   reduziert - jederzeit mit "Beine sind wieder gut" rueckgaengig machbar. */
+/* ---------- Coach-Rueckmeldung -> Planaenderung ----------
+   Feste Stichwoerter statt KI. Alle Aktionen aendern nur die Plan-EINGABEN
+   (Krankheit, Fortschritt, Deload) - der Planer im Sync berechnet daraus den
+   neuen Plan. Jederzeit umkehrbar. */
 
-const FEEDBACK_DELOAD_RE = /beine.*(schwer|müde|kaputt)|müde beine|erschöpft|ausgelaugt|übertraining|zu viel training/i;
-const FEEDBACK_CLEAR_RE = /beine.*(gut|frisch|stark|erholt)|wieder fit|erholt heute/i;
-const DELOAD_FACTOR = 0.85;
+const FB_HEALTHY_RE = /wieder (gesund|fit)|bin gesund|nicht mehr krank|gesund geworden|krank(heit)? vorbei/i;
+const FB_SICK_RE = /\b(bin|ich bin|bin grad|bin gerade)\b.*\b(krank|erkältet|erkaeltet|verletzt)\b|krank(heit)?|erkältung|erkaeltung|grippe|fieber|infekt/i;
+const FB_ADVANCE_RE = /(hoch|steiger|mehr|aufstock|schneller)\w*.*(gehen|können|koennen|machen|werden)|können.*(hoch|steiger|mehr)|koennen.*(hoch|steiger|mehr)|fühlt sich (richtig |sehr |echt )?gut|fuehlt sich (richtig |sehr |echt )?gut|fühle mich (richtig |sehr |echt )?(gut|stark|fit)|läuft (richtig |sehr |echt )?gut/i;
+const FB_HOLD_RE = /stagnier|nicht (weiter )?(hoch|steiger)|gleich lassen|so lassen|pause.*fortschritt|fortschritt.*pause|nicht mehr steigern/i;
+const FB_DELOAD_RE = /beine.*(schwer|müde|kaputt)|müde beine|erschöpft|ausgelaugt|übertraining|zu viel training/i;
+const FB_CLEAR_RE = /beine.*(gut|frisch|stark|erholt)|erholt heute/i;
 
 function detectFeedbackAdjustment(text) {
-  if (FEEDBACK_DELOAD_RE.test(text)) return "deload";
-  if (FEEDBACK_CLEAR_RE.test(text)) return "clear";
+  if (FB_HEALTHY_RE.test(text)) return "healthy";
+  if (FB_HOLD_RE.test(text)) return "hold";
+  if (FB_SICK_RE.test(text) && !/nicht krank/i.test(text)) return "sick";
+  if (FB_DELOAD_RE.test(text)) return "deload";
+  if (FB_ADVANCE_RE.test(text)) return "advance";
+  if (FB_CLEAR_RE.test(text)) return "clear";
   return null;
 }
 
@@ -143,7 +160,7 @@ function setDeloadOverride(weekStart, active, reason) {
   overrides.__deload = overrides.__deload || {};
   if (active) overrides.__deload[weekStart] = { active: true, reason };
   else delete overrides.__deload[weekStart];
-  saveOverrides(overrides);
+  saveOverrides(overrides, { push: false });
 }
 
 function getDeloadOverride(weekStart) {
@@ -152,18 +169,10 @@ function getDeloadOverride(weekStart) {
 }
 
 function applyDeload(data) {
+  // Die Reduktion selbst rechnet der Planer (sync/planner.py) - hier nur Hinweis-Flags.
   const deload = getDeloadOverride(data.week.startDate);
   data.week.deloadActive = !!(deload && deload.active);
   data.week.deloadReason = deload ? deload.reason : null;
-  if (data.week.deloadActive) {
-    const f = DELOAD_FACTOR;
-    data.week.targets = {
-      ...data.week.targets,
-      runVolumeKm: Math.round(data.week.targets.runVolumeKm * f * 10) / 10,
-      bikeVolumeKm: Math.round(data.week.targets.bikeVolumeKm * f * 10) / 10,
-      timeMin: Math.round(data.week.targets.timeMin * f),
-    };
-  }
 }
 
 function applyOverrides(data) {
@@ -323,7 +332,8 @@ function autoRescheduleUnit(homeWeekday, unitName) {
     showToast(`<div class="title">Kein guter Tag gefunden</div><div>An den restlichen Tagen ist schon eine Pflicht-Einheit vom gleichen Typ geplant – „${escapeHtml(unitName)}" wurde für diese Woche als abgelehnt markiert, statt sie irgendwo reinzuquetschen.</div>`);
   } else {
     setMoveOverride(weekStart, homeWeekday, unitName, best.date);
-    showToast(`<div class="title">Automatisch verschoben</div><div>„${escapeHtml(unitName)}" → ${best.weekday} (${fmtDateShort(best.date)}) – dort war im Vergleich am wenigsten los.</div>`);
+    const time = retimeMovedUnit(weekStart, homeWeekday, unitName, best.date, false);
+    showToast(`<div class="title">Automatisch verschoben</div><div>„${escapeHtml(unitName)}" → ${best.weekday} (${fmtDateShort(best.date)})${time ? `, ${time} Uhr – passend zu Dienstplan &amp; Terminen` : " – dort war im Vergleich am wenigsten los"}.</div>`);
   }
   renderAll();
 }
@@ -595,27 +605,6 @@ function setupTabs() {
   });
 }
 
-/* ---------- Sport / Iris mode switch (owner only, see setupLoginsNavItem) ---------- */
-
-function setMode(mode) {
-  document.querySelectorAll(".mode-btn").forEach(b => b.classList.toggle("is-active", b.dataset.mode === mode));
-  const sportNav = document.getElementById("sport-nav");
-  const bottomRow = document.getElementById("bottomnav-row");
-  if (sportNav) sportNav.hidden = mode === "iris";
-  if (bottomRow) bottomRow.hidden = mode === "iris";
-  document.querySelectorAll(".tab-panel").forEach(p => {
-    p.classList.toggle("is-active", p.dataset.tabPanel === (mode === "iris" ? "iris" : LAST_SPORT_TAB));
-  });
-  window.scrollTo({ top: 0 });
-  if (mode === "iris") speakIrisGreeting();
-}
-
-function setupModeSwitch() {
-  document.querySelectorAll(".mode-btn").forEach(btn => {
-    btn.addEventListener("click", () => setMode(btn.dataset.mode));
-  });
-}
-
 function setupInteractions() {
   document.body.addEventListener("click", (e) => {
     const copyBtn = e.target.closest(".copy-cmd-btn");
@@ -659,8 +648,9 @@ function setupInteractions() {
     if (!sel) return;
     const targetDate = sel.value;
     const homeWeekday = sel.dataset.homeWeekday;
-    const isHome = APP_DATA && APP_DATA.week.days.find(d => d.weekday === homeWeekday)?.date === targetDate;
+    const isHome = isoAddDays(sel.dataset.weekStart, WD_NAMES.indexOf(homeWeekday)) === targetDate;
     setMoveOverride(sel.dataset.weekStart, homeWeekday, sel.dataset.moveUnit, isHome ? null : targetDate);
+    retimeMovedUnit(sel.dataset.weekStart, homeWeekday, sel.dataset.moveUnit, targetDate, isHome);
     if (PRISTINE_DATA) renderAll();
   });
 }
@@ -702,30 +692,37 @@ function setupSyncButton() {
 
 /* ---------- render: Heute ---------- */
 
-/* ---------- Heute: Kalender-Widget (liest denselben verschluesselten Status
-   wie der Airis-Tab, damit Termine nicht nur dort, sondern auch direkt auf
-   der Haupt-Startseite sichtbar sind) ---------- */
+/* ---------- Heute: Tagesagenda (Schichten, Schule, Termine) ----------
+   Kommt aus data.agenda (vom Sync aus Dienstplan + Terminen gebaut) - zeigt
+   unter "Heute" nur heutige Eintraege, darunter separat die naechsten Tage. */
 
-function renderHeuteCalendarBody(airisData) {
-  if (!airisData) {
-    return `<div class="card-head"><span class="card-title">Heute im Kalender</span></div><div class="card-note">Lade Kalenderdaten…</div>`;
-  }
-  const cal = airisData.calendar || {};
-  if (cal.error) {
-    return `<div class="card-head"><span class="card-title">Heute im Kalender</span></div><div class="card-note" style="color:var(--amber);">${escapeHtml(cal.error)}</div>`;
-  }
-  const events = cal.events || [];
-  if (!events.length) {
-    return `<div class="card-head"><span class="card-title">Heute im Kalender</span></div><div class="card-note">Keine anstehenden Termine gefunden.</div>`;
-  }
-  const items = events.slice(0, 4).map(e => `
-    <div class="day-mini-unit"><span style="flex:1;">${escapeHtml(e.summary)}<div class="unit-detail" style="margin-top:2px;">${escapeHtml(e.when)}${e.location ? " · " + escapeHtml(e.location) : ""}</div></span></div>`).join("");
-  return `<div class="card-head"><span class="card-title">Heute im Kalender</span><span class="card-note">nächste Termine</span></div>${items}`;
+const AGENDA_KIND_LABEL = {
+  arbeit: "Arbeit", schule: "Schule", termin: "Termin", frei: "Frei",
+  urlaub: "Urlaub", krank: "Krank", sonstiges: "Termin",
+};
+
+function agendaItemHtml(it) {
+  const time = it.start ? `${it.start}${it.end ? "–" + it.end : ""}` : "ganztägig";
+  return `<div class="day-mini-unit"><span class="agenda-kind agenda-${escapeHtml(it.kind)}">${escapeHtml(AGENDA_KIND_LABEL[it.kind] || it.kind)}</span>
+    <span style="flex:1;">${escapeHtml(it.title || "")}<div class="unit-detail" style="margin-top:2px;">${escapeHtml(time)}${it.note ? " · " + escapeHtml(it.note) : ""}</div></span></div>`;
 }
 
-function updateHeuteCalendarCard(airisData) {
-  const el = document.getElementById("heute-calendar-card");
-  if (el) el.innerHTML = renderHeuteCalendarBody(airisData);
+function renderHeuteAgendaBody(data) {
+  const agenda = data.agenda || [];
+  const todayStr = data.today.date;
+  const todayEntry = agenda.find(d => d.date === todayStr);
+  const todayItems = todayEntry ? todayEntry.items : [];
+  const upcoming = agenda.filter(d => d.date > todayStr && d.items.length).slice(0, 4);
+
+  const todayHtml = todayItems.length
+    ? todayItems.map(agendaItemHtml).join("")
+    : `<div class="card-note">Heute steht nichts im Kalender – frei.</div>`;
+  const upcomingHtml = upcoming.length ? `
+    <div class="card-note" style="margin:12px 0 6px; font-weight:700; text-transform:uppercase; letter-spacing:.05em;">Als Nächstes</div>
+    ${upcoming.map(d => `
+      <div class="agenda-day"><span class="agenda-day-label">${WEEKDAYS_SHORT[d.weekday] || d.weekday} ${fmtDateShort(d.date)}</span>
+        <span class="agenda-day-items">${d.items.map(it => `${AGENDA_KIND_LABEL[it.kind] || it.kind}${it.start ? " " + it.start + (it.end ? "–" + it.end : "") : ""}${it.title && it.kind !== "arbeit" ? " (" + escapeHtml(it.title) + ")" : ""}`).join(" · ")}</span></div>`).join("")}` : "";
+  return `<div class="card-head"><span class="card-title">Heute im Kalender</span><span class="card-note">Dienstplan &amp; Termine</span></div>${todayHtml}${upcomingHtml}`;
 }
 
 function renderHeute(data) {
@@ -772,7 +769,7 @@ function renderHeute(data) {
         <div class="unit-list">${unitsHtml}</div>
       </div>
 
-      <div class="card" id="heute-calendar-card">${renderHeuteCalendarBody(LAST_IRIS_DATA)}</div>
+      <div class="card" id="heute-agenda-card">${renderHeuteAgendaBody(data)}</div>
 
       <div class="grid grid-2">
         <div class="card">
@@ -925,6 +922,8 @@ function renderWoche(data) {
 
       <div class="week-grid">${buildWeekOverview(data)}</div>
 
+      ${wochePreviewHtml(data)}
+
       ${w.days.some(d => d.steps !== undefined && d.steps !== null) ? `
       <div class="card">
         <div class="card-head"><span class="card-title">Schritte diese Woche</span><span class="card-note">Ø ${Math.round(w.days.filter(d => d.steps != null).reduce((s, d) => s + d.steps, 0) / w.days.filter(d => d.steps != null).length).toLocaleString("de-DE")} / Tag</span></div>
@@ -948,6 +947,7 @@ function renderWoche(data) {
       </div>
     </div>`;
   setupWeekPlanClicks(data.upcomingPlan || []);
+  bindWochePreview(data);
 }
 
 /* ---------- render: Verlauf ---------- */
@@ -1083,6 +1083,8 @@ function renderPerformance(data) {
         </div>
       </div>
 
+      ${perfExtrasHtml(data)}
+
       ${data.performance.racePredictions && Object.keys(data.performance.racePredictions).length ? `
       <div class="card">
         <div class="card-head"><span class="card-title">Geschätzte Wettkampfzeit</span><span class="card-note">Von Garmin anhand deiner aktuellen Fitness geschätzt, kein echtes Rennen nötig</span></div>
@@ -1176,6 +1178,8 @@ function renderCoach(data) {
         <div class="card-note">Wegen deiner Rückmeldung „${escapeHtml(w.deloadReason || "")}" sind Lauf-/Rad-/Zeitziele diese Woche um 15% runtergesetzt. Tipp „Beine sind wieder gut" ins Feld unten, um das aufzuheben.</div>
       </div>` : ""}
 
+      ${planHintCardHtml(data)}
+
       <div class="card coach-hero">
         <div class="coach-headline">${rec.headline}</div>
         <ul class="coach-reasons">${rec.reasons.map(r => `<li>${r}</li>`).join("")}</ul>
@@ -1211,6 +1215,7 @@ function renderCoach(data) {
     </div>`;
 
   setupCoachQA(data);
+  bindPlanHint(data);
 }
 
 function answerCoachQuestion(question, data) {
@@ -1300,6 +1305,26 @@ function setupCoachQA(data) {
     const question = input.value.trim();
     if (!question) return;
     const adjustment = detectFeedbackAdjustment(question);
+    const planCmd = {
+      sick: ["Krank gemeldet", "Training pausiert, bis du „Ich bin wieder gesund“ sagst. Danach steigt die Belastung in ein paar Tagen wieder an.",
+        p => { p.sick = { from: isoToday(), to: null }; }],
+      healthy: ["Wieder gesund", "Der Plan fährt langsam wieder hoch (Tag 1–2 locker, dann 50 % / 70 % / 85 %).",
+        p => { const s = p.sick || {}; p.sick = { from: s.from || isoToday(), to: isoToday() }; }],
+      advance: ["Plan wird gesteigert", "Der Aufbau springt eine Woche weiter (mehr Umfang ab nächster Woche).",
+        p => { p.progression = { offsetWeeks: ((p.progression || {}).offsetWeeks || 0) + 1 }; }],
+      hold: ["Plan bleibt auf dem Niveau", "Der Aufbau wird eine Woche angehalten.",
+        p => { p.progression = { offsetWeeks: ((p.progression || {}).offsetWeeks || 0) - 1 }; }],
+    }[adjustment];
+    if (planCmd) {
+      if (!canEdit()) { showToast(`<div class="title">Nur der Besitzer kann den Plan ändern</div>`); return; }
+      input.value = "";
+      applyPlanChange(planCmd[0], planCmd[2]);
+      const item = document.createElement("div");
+      item.className = "qa-item";
+      item.innerHTML = `<div class="qa-question">${escapeHtml(question)}</div><div class="qa-answer">${escapeHtml(planCmd[0] + ": " + planCmd[1])}</div>`;
+      log.prepend(item);
+      return;
+    }
     if (adjustment === "deload") {
       setDeloadOverride(data.week.startDate, true, question);
       input.value = "";
@@ -1412,12 +1437,7 @@ function renderKraft(data) {
       if (!seenNames.has(u.name)) { seenNames.add(u.name); referenceUnits.push(u); }
     });
   });
-  const referenceCard = `
-    <div>
-      <div class="card-title" style="margin-bottom:10px;">Allgemeiner Plan</div>
-      <div class="card-note" style="margin-bottom:10px;">Deine Kraft-Übungen unabhängig vom Wochentag, zum Nachschlagen</div>
-      <div class="stack">${referenceUnits.map(strengthReferenceBlock).join("")}</div>
-    </div>`;
+  const referenceCard = kraftLibraryHtml(data);
 
   document.getElementById("tab-kraft").innerHTML = `
     <div class="page-head">
@@ -1432,8 +1452,10 @@ function renderKraft(data) {
         <div class="card-head"><span class="card-title">Diese Woche</span></div>
         <div class="week-grid">${weekDays}</div>
       </div>
+      ${kraftExtrasHtml(data)}
       ${referenceCard}
     </div>`;
+  bindKraftLibrary();
 }
 
 /* ---------- render: Planänderungen / Anfragen (ueber GitHub Issues) ---------- */
@@ -1716,307 +1738,6 @@ function renderPlanaenderungen() {
   }
 }
 
-/* ---------- Dienstplan-Generator ----------
-   Berechnet die Trainingszeiten fuer eine Schicht-Woche automatisch nach den
-   festen Regeln (statt dass ich - Claude - das jede Woche von Hand ausrechne):
-     Abfahrt   = Schichtbeginn - Fahrzeit - 15 min Puffer
-     Rueckkehr = Schichtende   + Fahrzeit
-     Rad-Start (nuechtern) = Abfahrt - Fahrraddauer - 30 min Vorbereitung,
-       sofern das nicht vor 6:00 liegt - sonst wandert das Rad auf
-       Rueckkehr + 30 min (dann nicht mehr nuechtern).
-   Diese Formel wurde aus den bisherigen, von Hand geschriebenen Wochen
-   rueckgerechnet und stimmt exakt mit der "-3h, nie vor 6 Uhr"-Faustregel
-   ueberein. Ergebnis ist ein fertiger weekOverrides-JSON-Block zum
-   Kopieren - kein automatisches Schreiben ins Repo (das braeuchte einen
-   serverseitigen Schluessel), aber der Rechenaufwand entfaellt komplett. */
-
-const DP_WEEKDAYS = ["Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag", "Sonntag"];
-const DP_TRAVEL_DEFAULT_MIN = 75;
-const DP_DEPART_BUFFER_MIN = 15;
-const DP_PREP_BUFFER_MIN = 30;
-const DP_AFTERNOON_BUFFER_MIN = 30;
-const DP_AFTERWORK_GAP_MIN = 120;
-const DP_OFFDAY_RAD_TIME = "07:00";
-const DP_OFFDAY_MAIN_TIME = "09:00";
-const DP_MORNING_FLOOR_MIN = 6 * 60;
-
-function dpTimeToMin(hhmm) {
-  const [h, m] = hhmm.split(":").map(Number);
-  return h * 60 + m;
-}
-function dpMinToTime(min) {
-  min = ((Math.round(min) % 1440) + 1440) % 1440;
-  return `${String(Math.floor(min / 60)).padStart(2, "0")}:${String(min % 60).padStart(2, "0")}`;
-}
-function dpNextMondayIso(fromDate = new Date()) {
-  const d = new Date(fromDate);
-  const day = d.getDay(); // 0=So, 1=Mo, ...
-  const diff = day === 1 ? 7 : (8 - day) % 7 || 7;
-  d.setDate(d.getDate() + diff);
-  return d.toISOString().slice(0, 10);
-}
-
-async function dpLoadPlanTemplate() {
-  const res = await fetch("data/plan-template.json?_=" + Date.now(), { cache: "no-store" });
-  if (!res.ok) throw new Error(`plan-template.json: HTTP ${res.status}`);
-  return res.json();
-}
-
-/** shiftsByWeekday: { [weekday]: {start:"HH:MM", end:"HH:MM"} | null } */
-function computeDienstplanWeek(weekPattern, shiftsByWeekday, travelMin) {
-  const days = {};
-  DP_WEEKDAYS.forEach((weekday, i) => {
-    const template = weekPattern[i];
-    const shift = shiftsByWeekday[weekday];
-    let radTime, radFasted, mainTime, focusPrefix = "";
-
-    if (shift && shift.start && shift.end) {
-      const shiftStartMin = dpTimeToMin(shift.start);
-      const shiftEndMin = dpTimeToMin(shift.end);
-      const departMin = shiftStartMin - travelMin - DP_DEPART_BUFFER_MIN;
-      const returnMin = shiftEndMin + travelMin;
-      const radUnit = template.units.find(u => u.type === "rad");
-      const rideDurMin = radUnit ? (radUnit.plannedDurationMin || 60) : 60;
-      const morningStartMin = departMin - rideDurMin - DP_PREP_BUFFER_MIN;
-      if (morningStartMin >= DP_MORNING_FLOOR_MIN) {
-        radTime = dpMinToTime(morningStartMin); radFasted = true;
-      } else {
-        radTime = dpMinToTime(returnMin + DP_AFTERNOON_BUFFER_MIN); radFasted = false;
-      }
-      mainTime = dpMinToTime(returnMin + DP_AFTERWORK_GAP_MIN);
-      const travelH = (travelMin / 60).toFixed(travelMin % 60 === 0 ? 0 : 2);
-      focusPrefix = `Arbeit ${shift.start}–${shift.end} · Abfahrt ${dpMinToTime(departMin)} · zurück ca. ${dpMinToTime(returnMin)} (Fahrt je ca. ${travelH} h) · `;
-    } else {
-      radTime = DP_OFFDAY_RAD_TIME; radFasted = true;
-      mainTime = DP_OFFDAY_MAIN_TIME;
-    }
-
-    const units = template.units.map(u => {
-      if (u.tag !== "pflicht") return { ...u };
-      if (u.type === "rad") {
-        return { ...u, detail: `${u.detail} · ${radTime} Uhr${radFasted ? ", nüchtern" : ""}` };
-      }
-      return { ...u, detail: `${u.detail} · ${mainTime} Uhr` };
-    });
-
-    days[weekday] = { focus: focusPrefix + template.focus, units };
-  });
-  return days;
-}
-
-/* ---------- Dienstplan-PDF-Upload: liest Text per PDF.js (komplett im
-   Browser, kein Server) und versucht, Uhrzeiten heuristisch den Wochentagen
-   zuzuordnen (per Datum "DD.MM." oder Wochentagsname in derselben Zeile wie
-   ein Zeitpaar "HH:MM-HH:MM"). Best-Effort: der Rohtext bleibt immer
-   einsehbar, und jedes erkannte Feld muss vor dem Generieren geprüft werden -
-   ohne ein echtes Beispiel von Willis Dienstplan kann das Layout abweichen. */
-
-const DP_WEEKDAY_LOOKUP = {
-  montag: "Montag", mo: "Montag",
-  dienstag: "Dienstag", di: "Dienstag",
-  mittwoch: "Mittwoch", mi: "Mittwoch",
-  donnerstag: "Donnerstag", do: "Donnerstag",
-  freitag: "Freitag", fr: "Freitag",
-  samstag: "Samstag", sa: "Samstag",
-  sonntag: "Sonntag", so: "Sonntag",
-};
-
-function dpNormalizeTime(raw) {
-  const [h, m] = raw.replace(".", ":").split(":");
-  return `${h.padStart(2, "0")}:${(m || "00").padStart(2, "0")}`;
-}
-
-function dpParseShiftsFromText(text, mondayIso) {
-  const monday = new Date(mondayIso + "T00:00:00");
-  const dateToWeekday = {};
-  for (let i = 0; i < 7; i++) {
-    const d = new Date(monday);
-    d.setDate(d.getDate() + i);
-    const key = `${String(d.getDate()).padStart(2, "0")}.${String(d.getMonth() + 1).padStart(2, "0")}`;
-    dateToWeekday[key] = DP_WEEKDAYS[i];
-  }
-
-  const found = {};
-  text.split(/\n+/).forEach(line => {
-    const timeMatch = line.match(/(\d{1,2}[:.]\d{2})\s*(?:-|–|bis)\s*(\d{1,2}[:.]\d{2})/);
-    if (!timeMatch) return;
-
-    let weekday = null;
-    const dateMatch = line.match(/\b(\d{1,2})\.(\d{1,2})\.?/);
-    if (dateMatch) {
-      const key = `${dateMatch[1].padStart(2, "0")}.${dateMatch[2].padStart(2, "0")}`;
-      weekday = dateToWeekday[key] || null;
-    }
-    if (!weekday) {
-      const wdMatch = line.match(/\b(Montag|Dienstag|Mittwoch|Donnerstag|Freitag|Samstag|Sonntag|Mo|Di|Mi|Do|Fr|Sa|So)\b/i);
-      if (wdMatch) weekday = DP_WEEKDAY_LOOKUP[wdMatch[1].toLowerCase()] || null;
-    }
-    if (weekday && !found[weekday]) {
-      found[weekday] = { start: dpNormalizeTime(timeMatch[1]), end: dpNormalizeTime(timeMatch[2]) };
-    }
-  });
-  return found;
-}
-
-async function dpExtractPdfText(file) {
-  if (typeof pdfjsLib === "undefined") throw new Error("PDF-Bibliothek nicht geladen (Internetverbindung prüfen)");
-  const buf = await file.arrayBuffer();
-  const pdf = await pdfjsLib.getDocument({ data: buf }).promise;
-  let text = "";
-  for (let i = 1; i <= pdf.numPages; i++) {
-    const page = await pdf.getPage(i);
-    const content = await page.getTextContent();
-    // getTextContent() liefert nur einzelne Textbloecke mit Position, keine
-    // Zeilenumbrueche - bei Tabellen-/Dienstplan-Layouts mit freier
-    // Positionierung braeuchte man sonst nur eine einzige riesige "Zeile" und
-    // die Wochentag-Zuordnung wuerde durcheinanderfallen. Zeilen deshalb
-    // anhand der Y-Koordinate (transform[5]) rekonstruieren.
-    let lastY = null, line = "";
-    content.items.forEach(item => {
-      const y = item.transform ? item.transform[5] : null;
-      if (lastY !== null && y !== null && Math.abs(y - lastY) > 2) {
-        text += line.trim() + "\n";
-        line = "";
-      }
-      line += item.str + " ";
-      lastY = y;
-    });
-    text += line.trim() + "\n";
-  }
-  return text;
-}
-
-async function dpHandlePdfUpload(file) {
-  const statusEl = document.getElementById("dp-upload-status");
-  const rawDetails = document.getElementById("dp-upload-raw");
-  const rawTextEl = document.getElementById("dp-upload-rawtext");
-  statusEl.textContent = "Lese PDF…";
-  try {
-    const text = await dpExtractPdfText(file);
-    rawTextEl.value = text;
-    rawDetails.hidden = false;
-
-    const monday = document.getElementById("dp-monday").value;
-    const shifts = dpParseShiftsFromText(text, monday);
-    const foundDays = Object.keys(shifts);
-    foundDays.forEach(wd => {
-      const s = document.querySelector(`.dp-start[data-weekday="${wd}"]`);
-      const e = document.querySelector(`.dp-end[data-weekday="${wd}"]`);
-      if (s) s.value = shifts[wd].start;
-      if (e) e.value = shifts[wd].end;
-    });
-    statusEl.textContent = foundDays.length
-      ? `${foundDays.length} von 7 Tagen automatisch erkannt (${foundDays.join(", ")}) - bitte unten prüfen und ggf. korrigieren!`
-      : "Konnte keine Uhrzeiten automatisch zuordnen - Rohtext unten ansehen und Zeiten selbst eintragen.";
-  } catch (err) {
-    statusEl.textContent = "Konnte die PDF nicht lesen: " + (err && err.message ? err.message : err);
-  }
-}
-
-function renderDienstplan() {
-  const panel = document.getElementById("tab-dienstplan");
-  if (!panel || typeof CURRENT_ROLE === "undefined" || CURRENT_ROLE !== "owner") return;
-
-  panel.innerHTML = `
-    <div class="page-head">
-      <div class="page-eyebrow">Dienstplan</div>
-      <div class="page-title">Wochenplan aus Schichten erzeugen</div>
-      <div class="page-sub">Schichten eintragen - die Zeiten für Rad/Lauf/Kraft werden automatisch nach den festen Regeln berechnet (Rad-Start = Abfahrt − Fahrraddauer − 30 min, nie vor 6 Uhr; sonst wandert es nach Feierabend).</div>
-    </div>
-    <div class="stack">
-      <div class="card">
-        <div class="card-head"><span class="card-title">Dienstplan hochladen</span><span class="card-note">PDF - erkennt Uhrzeiten automatisch, bitte danach prüfen</span></div>
-        <input type="file" id="dp-upload" accept=".pdf" class="text-input" style="padding:8px;" />
-        <div class="card-note" id="dp-upload-status" style="margin-top:8px;"></div>
-        <details id="dp-upload-raw" hidden style="margin-top:8px;">
-          <summary class="card-note" style="cursor:pointer;">Erkannten Rohtext anzeigen</summary>
-          <textarea class="note-box" readonly style="min-height:140px; font-family:monospace; font-size:11px; margin-top:6px;" id="dp-upload-rawtext"></textarea>
-        </details>
-      </div>
-      <div class="card">
-        <div class="card-head"><span class="card-title">Woche</span></div>
-        <div class="grid grid-2" style="gap:12px;">
-          <div>
-            <label class="card-note" style="display:block; margin-bottom:4px;">Montag der Woche</label>
-            <input type="date" id="dp-monday" class="text-input" />
-          </div>
-          <div>
-            <label class="card-note" style="display:block; margin-bottom:4px;">Fahrzeit je Strecke (Minuten)</label>
-            <input type="number" id="dp-travel" class="text-input" value="${DP_TRAVEL_DEFAULT_MIN}" min="0" max="240" />
-          </div>
-        </div>
-      </div>
-      <div class="card">
-        <div class="card-head"><span class="card-title">Schichten</span><span class="card-note">Leer lassen = frei</span></div>
-        <div id="dp-days" class="stack" style="gap:8px;"></div>
-      </div>
-      <button id="dp-generate" class="btn-small" type="button">Woche generieren</button>
-      <div class="card" id="dp-result" hidden>
-        <div class="card-head"><span class="card-title">Ergebnis</span><span class="card-note">Kopieren, mir schicken ("trag das ein") - oder selbst bei GitHub in data/plan-template.json unter "weekOverrides" einfügen</span></div>
-        <textarea id="dp-output" class="note-box" readonly style="min-height:260px; font-family:monospace; font-size:12px; white-space:pre;"></textarea>
-        <button id="dp-copy" class="btn-small" type="button" style="margin-top:8px;">📋 Kopieren</button>
-        <span class="card-note" id="dp-copy-status" style="margin-left:8px;"></span>
-      </div>
-    </div>`;
-
-  const mondayInput = document.getElementById("dp-monday");
-  mondayInput.value = dpNextMondayIso();
-
-  document.getElementById("dp-upload").addEventListener("change", (e) => {
-    const file = e.target.files[0];
-    if (file) dpHandlePdfUpload(file);
-  });
-
-  const daysHost = document.getElementById("dp-days");
-  daysHost.innerHTML = DP_WEEKDAYS.map(wd => `
-    <div class="unit" style="align-items:center; gap:10px;">
-      <div style="width:90px; font-weight:600; flex-shrink:0;">${wd}</div>
-      <input type="time" class="text-input dp-start" data-weekday="${escapeHtml(wd)}" style="max-width:120px;" />
-      <span class="card-note">bis</span>
-      <input type="time" class="text-input dp-end" data-weekday="${escapeHtml(wd)}" style="max-width:120px;" />
-    </div>`).join("");
-
-  document.getElementById("dp-generate").addEventListener("click", async () => {
-    const btn = document.getElementById("dp-generate");
-    btn.disabled = true;
-    const originalLabel = btn.textContent;
-    btn.textContent = "Lade Plan-Vorlage…";
-    try {
-      const plan = await dpLoadPlanTemplate();
-      const monday = mondayInput.value;
-      const travelMin = parseInt(document.getElementById("dp-travel").value, 10) || DP_TRAVEL_DEFAULT_MIN;
-      const shifts = {};
-      DP_WEEKDAYS.forEach(wd => {
-        const s = daysHost.querySelector(`.dp-start[data-weekday="${wd}"]`).value;
-        const e = daysHost.querySelector(`.dp-end[data-weekday="${wd}"]`).value;
-        shifts[wd] = (s && e) ? { start: s, end: e } : null;
-      });
-      const days = computeDienstplanWeek(plan.weekPattern, shifts, travelMin);
-      const block = { [monday]: { days } };
-      document.getElementById("dp-output").value = JSON.stringify(block, null, 2);
-      document.getElementById("dp-result").hidden = false;
-    } catch (err) {
-      alert("Konnte die Plan-Vorlage nicht laden: " + (err && err.message ? err.message : err));
-    } finally {
-      btn.disabled = false;
-      btn.textContent = originalLabel;
-    }
-  });
-
-  document.getElementById("dp-copy").addEventListener("click", async () => {
-    const ta = document.getElementById("dp-output");
-    const statusEl = document.getElementById("dp-copy-status");
-    try {
-      await navigator.clipboard.writeText(ta.value);
-    } catch {
-      ta.select();
-      document.execCommand("copy");
-    }
-    statusEl.textContent = "Kopiert!";
-    setTimeout(() => { statusEl.textContent = ""; }, 2500);
-  });
-}
-
 /* ---------- render: Logins (nur Owner) ---------- */
 
 let LOGIN_REQUESTS_CACHE = null;
@@ -2291,444 +2012,11 @@ async function logoutUser(username, statusEl, btn) {
 
 let PRISTINE_DATA = null;
 
-/* ---------- Iris: gesprochener Status-Hub (nur Owner) ---------- */
-
-let LAST_IRIS_DATA = null;
-
-const IRIS_ORB_SVG = `
-  <div class="iris-orb-wrap">
-    <svg class="iris-orb" viewBox="0 0 200 200">
-      <defs>
-        <radialGradient id="iris-core-grad" cx="50%" cy="50%" r="50%">
-          <stop offset="0%" stop-color="var(--ice-300)" />
-          <stop offset="55%" stop-color="var(--sky-400)" />
-          <stop offset="100%" stop-color="var(--ocean-600)" />
-        </radialGradient>
-      </defs>
-      <circle class="iris-ring iris-ring-0" cx="100" cy="100" r="98" />
-      <circle class="iris-ring iris-ring-1" cx="100" cy="100" r="92" />
-      <circle class="iris-ring iris-ring-2" cx="100" cy="100" r="74" />
-      <circle class="iris-ring iris-ring-3" cx="100" cy="100" r="58" />
-      <circle class="iris-core" cx="100" cy="100" r="34" />
-      <circle class="iris-core-dot" cx="100" cy="100" r="7" />
-    </svg>
-  </div>
-  <div class="iris-status-line" id="iris-status-line">BEREIT</div>`;
-
-function setIrisStatusLine(text) {
-  const el = document.getElementById("iris-status-line");
-  if (el) el.textContent = text;
-}
-
-function buildIrisBriefing(data) {
-  if (!data) return "Hallo, hier ist Airis. Ich hab noch keine aktuellen Daten - sobald der erste Sync durch ist, sag ich dir mehr.";
-  const parts = [];
-  const gmx = data.mail && data.mail.gmx;
-  const icloud = data.mail && data.mail.icloud;
-  if (gmx && !gmx.error) parts.push(`${gmx.unread} ungelesene Mails bei G-M-X`);
-  if (icloud && !icloud.error) parts.push(`${icloud.unread} bei iCloud`);
-  const cal = data.calendar || {};
-  if (!cal.error && (cal.events || []).length) {
-    const next = cal.events[0];
-    parts.push(`Nächster Termin: ${next.summary}, ${next.when}`);
-  }
-  if (!parts.length) return "Hallo, hier ist Airis. Aktuell nichts Dringendes, alles im grünen Bereich.";
-  return "Hallo, hier ist Airis. " + parts.join(". ") + ".";
-}
-
-function getIrisVolume() {
-  try {
-    const v = localStorage.getItem("irisVolume");
-    return v === null ? 1 : Math.max(0, Math.min(1, parseFloat(v)));
-  } catch { return 1; }
-}
-function setIrisVolume(v) {
-  try { localStorage.setItem("irisVolume", String(v)); } catch { /* ignore */ }
-}
-
-function appendIrisLog(role, text) {
-  const log = document.getElementById("iris-log");
-  if (!log || !text) return;
-  const line = document.createElement("div");
-  line.className = `iris-log-line iris-log-${role}`;
-  line.innerHTML = `<span class="iris-log-role">${role === "user" ? "Du" : "Airis"}</span> ${escapeHtml(text)}`;
-  log.appendChild(line);
-  log.scrollTop = log.scrollHeight;
-  while (log.children.length > 12) log.removeChild(log.firstChild);
-}
-
-function speakText(text) {
-  if (!text) return;
-  appendIrisLog("airis", text);
-  if (!("speechSynthesis" in window)) return;
-  const volume = getIrisVolume();
-  if (volume <= 0) return; // stummgeschaltet - gar nicht erst sprechen
-  const stage = document.getElementById("iris-stage");
-
-  const doSpeak = () => {
-    try {
-      window.speechSynthesis.cancel();
-      const utter = new SpeechSynthesisUtterance(text);
-      utter.lang = "de-DE";
-      utter.rate = 1.0;
-      utter.volume = volume;
-      utter.onstart = () => { if (stage) stage.classList.add("is-speaking"); setIrisStatusLine("ICH SPRECHE…"); };
-      utter.onend = () => { if (stage) stage.classList.remove("is-speaking"); setIrisStatusLine("BEREIT"); };
-      utter.onerror = () => { if (stage) stage.classList.remove("is-speaking"); setIrisStatusLine("BEREIT"); };
-      window.speechSynthesis.speak(utter);
-    } catch {
-      // Sprachausgabe im Browser evtl. nicht verfuegbar - Text bleibt trotzdem im Log sichtbar.
-    }
-  };
-
-  // Manche Chromium-Browser (u.a. teils Opera) laden die Stimmenliste erst asynchron nach -
-  // ohne diese Wartelogik bleibt der allererste speak()-Aufruf nach dem Laden manchmal stumm.
-  if (window.speechSynthesis.getVoices().length === 0) {
-    let spoken = false;
-    const once = () => { if (spoken) return; spoken = true; doSpeak(); };
-    window.speechSynthesis.addEventListener("voiceschanged", once, { once: true });
-    setTimeout(once, 500);
-  } else {
-    doSpeak();
-  }
-}
-
-function speakIrisGreeting() {
-  speakText(buildIrisBriefing(LAST_IRIS_DATA));
-}
-
-function renderIris(data) {
-  const panel = document.getElementById("tab-iris");
-  if (!panel || typeof CURRENT_ROLE === "undefined" || CURRENT_ROLE !== "owner") return;
-  if (data) LAST_IRIS_DATA = data;
-
-  if (!data) {
-    panel.innerHTML = `
-      <div class="iris-stage" id="iris-stage">
-        ${IRIS_ORB_SVG}
-        <div class="iris-greeting">Hallo, hier ist Airis.</div>
-        <div class="iris-sub">Lade deine aktuelle Übersicht…</div>
-      </div>`;
-    return;
-  }
-
-  const mailCard = (label, m) => {
-    if (!m) return "";
-    if (m.error) {
-      return `
-        <div class="card iris-card">
-          <div class="card-head"><span class="card-title">${escapeHtml(label)}</span></div>
-          <div class="card-note" style="color:var(--amber);">${escapeHtml(m.error)}</div>
-        </div>`;
-    }
-    const items = (m.important || []).map(i => `
-      <div class="qa-item" style="margin-bottom:6px;">
-        <div class="qa-question" style="font-size:13px;">${escapeHtml(i.from)}</div>
-        <div class="card-note">${escapeHtml(i.subject)}</div>
-      </div>`).join("");
-    return `
-      <div class="card iris-card">
-        <div class="card-head"><span class="card-title">${escapeHtml(label)}</span><span class="card-note">${m.unread} ungelesen</span></div>
-        ${items || `<div class="card-note">Nichts Wichtiges offen.</div>`}
-      </div>`;
-  };
-
-  const cal = data.calendar || {};
-  const calBody = cal.error
-    ? `<div class="card-note" style="color:var(--amber);">${escapeHtml(cal.error)}</div>`
-    : ((cal.events || []).length
-      ? cal.events.map(e => `
-        <div class="day-mini-unit"><span style="flex:1;">${escapeHtml(e.summary)}<div class="unit-detail" style="margin-top:2px;">${escapeHtml(e.when)}${e.location ? " · " + escapeHtml(e.location) : ""}</div></span></div>`).join("")
-      : `<div class="card-note">Keine anstehenden Termine gefunden.</div>`);
-
-  const updated = data.syncedAt ? new Date(data.syncedAt).toLocaleString("de-DE", { dateStyle: "short", timeStyle: "short" }) : "–";
-  const hasMic = "webkitSpeechRecognition" in window || "SpeechRecognition" in window;
-  const nowLabel = new Date().toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" });
-  panel.innerHTML = `
-    <div class="iris-stage" id="iris-stage">
-      <div class="iris-topbar">
-        <span>AIRIS</span><span class="iris-topbar-dot">●</span><span>ONLINE</span>
-        <span class="iris-topbar-sep">|</span><span>${escapeHtml(nowLabel)}</span>
-      </div>
-      ${IRIS_ORB_SVG}
-      <div class="iris-greeting">Hallo, hier ist Airis.</div>
-      <div class="iris-sub">Zuletzt aktualisiert: ${escapeHtml(updated)}</div>
-      <button class="iris-speak-btn" id="iris-speak-btn" type="button">🔊 Briefing vorlesen</button>
-      <div class="iris-controls-row">
-        <div class="iris-volume-row">
-          <button class="iris-volume-btn" id="iris-volume-btn" type="button" title="Stumm/laut">🔊</button>
-          <input type="range" id="iris-volume-slider" class="iris-volume-slider" min="0" max="100" step="5" />
-        </div>
-        ${hasMic ? `
-        <div class="iris-mic-row">
-          <button class="iris-mic-toggle" id="iris-mic-toggle" type="button" title="Mikrofon an/aus">🎙️</button>
-          <span class="iris-mic-viz" id="iris-mic-viz" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span></span>
-        </div>` : `<div class="card-note" style="color:var(--amber);">Spracheingabe wird von diesem Browser nicht unterstützt.</div>`}
-      </div>
-      ${hasMic ? `<button class="iris-mic-unlock" id="iris-mic-unlock" type="button">🔓 Mikrofon freischalten</button>` : ""}
-      <div class="iris-cmd-row">
-        <input type="text" id="iris-cmd-input" class="iris-cmd-input" placeholder="z. B. 'Weg nach Hause' oder 'Wie ist mein Training heute'" />
-        ${hasMic ? `<button class="iris-cmd-mic" id="iris-cmd-mic" type="button" title="Sprechen">🎤</button>` : ""}
-        <button class="iris-cmd-send" id="iris-cmd-send" type="button">Los</button>
-      </div>
-      <div class="iris-cmd-hint">Probier: "Weg nach Hause" · "Wie ist mein Training heute" · "Lies meine Mails vor"</div>
-    </div>
-    <div class="card iris-card iris-log-card">
-      <div class="card-head"><span class="card-title">Agent-Log</span><span class="card-note">Gespräch mit Airis</span></div>
-      <div class="iris-log" id="iris-log"><div class="iris-log-line iris-log-airis"><span class="iris-log-role">Airis</span> Sag etwas, oder tippʼ eine Frage oben ein.</div></div>
-    </div>
-    <div class="stack">
-      ${mailCard("GMX", data.mail && data.mail.gmx)}
-      ${mailCard("iCloud", data.mail && data.mail.icloud)}
-      <div class="card iris-card">
-        <div class="card-head"><span class="card-title">Nächste Termine</span></div>
-        ${calBody}
-      </div>
-    </div>`;
-
-  const speakBtn = document.getElementById("iris-speak-btn");
-  if (speakBtn) speakBtn.addEventListener("click", () => speakText(buildIrisBriefing(data)));
-  setupIrisCommandBox(data);
-  setupIrisVolumeControl();
-  setupIrisMicToggle();
-  setupIrisMicUnlock();
-}
-
-/* ---------- Mikrofon: eigener Ein/Aus-Schalter + echte Lautstaerke-Anzeige ---------- */
-
-function getIrisMicEnabled() {
-  try { return localStorage.getItem("irisMicEnabled") !== "0"; } catch { return true; }
-}
-function setIrisMicEnabled(v) {
-  try { localStorage.setItem("irisMicEnabled", v ? "1" : "0"); } catch { /* ignore */ }
-}
-
-let irisAudioCtx = null, irisAnalyser = null, irisMicStream = null, irisVizRaf = null;
-
-async function startMicVisualizer() {
-  const viz = document.getElementById("iris-mic-viz");
-  try {
-    irisMicStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    irisAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    const source = irisAudioCtx.createMediaStreamSource(irisMicStream);
-    irisAnalyser = irisAudioCtx.createAnalyser();
-    irisAnalyser.fftSize = 256;
-    source.connect(irisAnalyser);
-    const buf = new Uint8Array(irisAnalyser.frequencyBinCount);
-    const tick = () => {
-      irisAnalyser.getByteFrequencyData(buf);
-      const avg = buf.reduce((a, b) => a + b, 0) / buf.length / 255;
-      if (viz) viz.style.setProperty("--lvl", avg.toFixed(3));
-      irisVizRaf = requestAnimationFrame(tick);
-    };
-    tick();
-  } catch {
-    // Mikrofonzugriff verweigert oder nicht verfuegbar - Diktat laeuft trotzdem ueber SpeechRecognition weiter,
-    // nur ohne die zusaetzliche Pegelanzeige.
-  }
-}
-
-function stopMicVisualizer() {
-  if (irisVizRaf) cancelAnimationFrame(irisVizRaf);
-  if (irisMicStream) irisMicStream.getTracks().forEach(t => t.stop());
-  if (irisAudioCtx) irisAudioCtx.close();
-  irisVizRaf = null; irisMicStream = null; irisAudioCtx = null; irisAnalyser = null;
-  const viz = document.getElementById("iris-mic-viz");
-  if (viz) viz.style.setProperty("--lvl", "0");
-}
-
-function setupIrisMicUnlock() {
-  const btn = document.getElementById("iris-mic-unlock");
-  if (!btn) return;
-  btn.addEventListener("click", async () => {
-    btn.disabled = true;
-    const original = btn.textContent;
-    btn.textContent = "Frage Berechtigung ab…";
-    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-      appendIrisLog("airis", "Dieser Browser unterstützt keinen Mikrofonzugriff über die Website.");
-      btn.textContent = original;
-      btn.disabled = false;
-      return;
-    }
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      stream.getTracks().forEach(t => t.stop());
-      appendIrisLog("airis", "Mikrofonzugriff erteilt. Du kannst jetzt auf 🎤 tippen und sprechen.");
-      btn.textContent = "✓ Mikrofon freigeschaltet";
-    } catch (err) {
-      const name = err && err.name ? err.name : "unbekannt";
-      let hint = "Bitte in den Browser-Einstellungen für diese Seite freigeben.";
-      if (name === "NotFoundError") hint = "Es wurde kein Mikrofon gefunden.";
-      if (name === "NotAllowedError") hint = "Zugriff wurde blockiert - in Opera meist über das Schloss-/Kamera-Symbol links neben der Adresse freigeben, dann Seite neu laden.";
-      appendIrisLog("airis", `Mikrofonzugriff nicht möglich (${name}). ${hint}`);
-      btn.textContent = original;
-      btn.disabled = false;
-    }
-  });
-}
-
-function setupIrisMicToggle() {
-  const toggle = document.getElementById("iris-mic-toggle");
-  const cmdMic = document.getElementById("iris-cmd-mic");
-  if (!toggle) return;
-
-  const apply = (enabled) => {
-    setIrisMicEnabled(enabled);
-    toggle.classList.toggle("is-off", !enabled);
-    toggle.textContent = enabled ? "🎙️" : "🎙️🚫";
-    if (cmdMic) cmdMic.disabled = !enabled;
-    if (!enabled) stopMicVisualizer();
-  };
-  apply(getIrisMicEnabled());
-  toggle.addEventListener("click", () => apply(!getIrisMicEnabled()));
-}
-
-function setupIrisVolumeControl() {
-  const slider = document.getElementById("iris-volume-slider");
-  const btn = document.getElementById("iris-volume-btn");
-  if (!slider || !btn) return;
-
-  let lastNonZero = getIrisVolume() || 1;
-  const icon = (v) => (v <= 0 ? "🔇" : v < 0.5 ? "🔉" : "🔊");
-  const apply = (v) => {
-    setIrisVolume(v);
-    slider.value = Math.round(v * 100);
-    slider.style.setProperty("--fill", `${Math.round(v * 100)}%`);
-    btn.textContent = icon(v);
-    if (v > 0) lastNonZero = v;
-  };
-  apply(getIrisVolume());
-
-  slider.addEventListener("input", () => apply(slider.value / 100));
-  btn.addEventListener("click", () => apply(getIrisVolume() > 0 ? 0 : lastNonZero));
-}
-
-/* Echte, sofort ausfuehrbare Befehle - kein KI-Rätselraten, feste Muster.
-   Kostenlos, laeuft direkt im Browser, auch auf dem Handy. */
-const HOME_ADDRESS = "Otto-Franke-Straße 53, 12489 Berlin";
-
-function handleIrisCommand(text, airisData) {
-  const t = text.toLowerCase();
-  const stage = document.getElementById("iris-stage");
-
-  if (/nach ?hause|weg nach hause|route|maps|navigation/.test(t)) {
-    speakText("Ich öffne die Route nach Hause.");
-    window.open(`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(HOME_ADDRESS)}`, "_blank");
-    return;
-  }
-  if (/mail|posteingang|postfach/.test(t)) {
-    const gmx = airisData && airisData.mail && airisData.mail.gmx;
-    const ic = airisData && airisData.mail && airisData.mail.icloud;
-    const parts = [];
-    if (gmx && !gmx.error) parts.push(`${gmx.unread} ungelesene bei G-M-X`);
-    if (ic && !ic.error) parts.push(`${ic.unread} bei iCloud`);
-    speakText(parts.length ? "Du hast " + parts.join(" und ") + "." : "Ich habe gerade keinen Mail-Status.");
-    return;
-  }
-  if (/training|heute|plan|sport/.test(t) && typeof APP_DATA !== "undefined" && APP_DATA && APP_DATA.today) {
-    const today = APP_DATA.today;
-    const units = (today.units || []).map(u => u.name).join(", ");
-    speakText(units ? `Heute: ${today.dayFocus || ""}. Einheiten: ${units}.` : "Heute steht laut Plan nichts Festes an.");
-    return;
-  }
-  if (/termin|kalender/.test(t)) {
-    const events = airisData && airisData.calendar && airisData.calendar.events;
-    if (events && events.length) {
-      speakText(`Nächster Termin: ${events[0].summary}, ${events[0].when}.`);
-    } else {
-      speakText("Ich sehe aktuell keinen anstehenden Termin.");
-    }
-    return;
-  }
-  speakText("Das kenne ich noch nicht. Frag mich nach dem Weg nach Hause, deinem Training heute, Mails oder Terminen.");
-}
-
-function setupIrisCommandBox(airisData) {
-  const input = document.getElementById("iris-cmd-input");
-  const sendBtn = document.getElementById("iris-cmd-send");
-  const micBtn = document.getElementById("iris-cmd-mic");
-  if (!input || !sendBtn) return;
-
-  const run = () => {
-    const text = input.value.trim();
-    if (!text) return;
-    appendIrisLog("user", text);
-    handleIrisCommand(text, airisData);
-    input.value = "";
-  };
-  sendBtn.addEventListener("click", run);
-  input.addEventListener("keydown", (e) => { if (e.key === "Enter") run(); });
-
-  if (micBtn) {
-    const SpeechRecognitionImpl = window.SpeechRecognition || window.webkitSpeechRecognition;
-    const NO_RESPONSE_HINT = "Ich habe nichts zurückbekommen. Manche Browser (z. B. Opera, Brave, Vivaldi) haben zwar den Mikrofon-Knopf, aber keine funktionierende Spracherkennung im Hintergrund - das kann ich von der Website aus nicht reparieren. Bitte in Chrome oder Edge ausprobieren, oder einfach oben eintippen.";
-
-    let recTimeoutId = null;
-    let activeRec = null; // aktuell laufende Instanz - wird bei jedem Klick frisch erzeugt,
-                           // statt ein evtl. verklemmtes altes Objekt wiederzuverwenden.
-
-    const resetUi = () => {
-      clearTimeout(recTimeoutId);
-      micBtn.classList.remove("is-listening"); setIrisStatusLine("BEREIT"); stopMicVisualizer();
-    };
-
-    const startNewRecognition = () => {
-      const rec = new SpeechRecognitionImpl();
-      rec.lang = "de-DE";
-      rec.continuous = false;
-      rec.interimResults = false;
-
-      rec.onresult = (e) => {
-        clearTimeout(recTimeoutId);
-        const text = e.results[0][0].transcript;
-        input.value = text;
-        appendIrisLog("user", text);
-        handleIrisCommand(text, airisData);
-        input.value = "";
-      };
-      rec.onstart = () => {
-        micBtn.classList.add("is-listening"); setIrisStatusLine("ICH HÖRE ZU…"); startMicVisualizer();
-        clearTimeout(recTimeoutId);
-        recTimeoutId = setTimeout(() => {
-          try { rec.abort(); } catch { /* schon beendet */ }
-          activeRec = null;
-          resetUi();
-          appendIrisLog("airis", NO_RESPONSE_HINT);
-        }, 8000);
-      };
-      rec.onend = () => { activeRec = null; resetUi(); };
-      rec.onerror = (e) => {
-        activeRec = null;
-        resetUi();
-        appendIrisLog("airis", `(Mikrofon-Fehler: ${e.error || "unbekannt"} - prüf die Mikrofon-Freigabe im Browser)`);
-      };
-
-      activeRec = rec;
-      try {
-        rec.start();
-      } catch (err) {
-        activeRec = null;
-        resetUi();
-        appendIrisLog("airis", `Mikrofon konnte nicht gestartet werden (${err && err.message ? err.message : err}).`);
-      }
-    };
-
-    micBtn.disabled = !getIrisMicEnabled();
-    micBtn.addEventListener("click", () => {
-      if (!getIrisMicEnabled()) return;
-      if (activeRec) {
-        try { activeRec.abort(); } catch { /* ignore */ }
-        activeRec = null;
-      }
-      startNewRecognition();
-    });
-  }
-}
-
 function renderAll(freshData) {
   if (freshData) PRISTINE_DATA = freshData;
   const data = structuredClone(PRISTINE_DATA);
   applyMoves(data);
+  applyExtras(data);
   applyOverrides(data);
   applyDeload(data);
   APP_DATA = data;
@@ -2743,12 +2031,10 @@ function renderAll(freshData) {
   renderPlanaenderungen(data);
   renderDienstplan();
   renderLogins();
-  renderIris();
 }
 
 document.addEventListener("DOMContentLoaded", () => {
   setupTabs();
-  setupModeSwitch();
   setupInteractions();
   setupSyncButton();
   bootWithAuth(renderAll);

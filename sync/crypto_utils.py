@@ -8,6 +8,8 @@ Browser entschluesseln.
 """
 
 import base64
+import gzip
+import json
 import os
 
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
@@ -47,3 +49,13 @@ def encrypt_json_bytes(dek: bytes, plaintext_bytes: bytes) -> dict:
     iv = os.urandom(12)
     ciphertext = AESGCM(dek).encrypt(iv, plaintext_bytes, None)
     return {"iv": b64(iv), "ciphertext": b64(ciphertext)}
+
+
+def decrypt_json(dek: bytes, enc: dict):
+    """Gegenstueck zu encrypt_json_bytes; entpackt gzip-komprimierte Nutzlast
+    (der Browser komprimiert groessere Overrides, um das Workflow-Limit von
+    65.535 Zeichen einzuhalten)."""
+    plain = AESGCM(dek).decrypt(unb64(enc["iv"]), unb64(enc["ciphertext"]), None)
+    if plain[:2] == b"\x1f\x8b":
+        plain = gzip.decompress(plain)
+    return json.loads(plain.decode("utf-8"))

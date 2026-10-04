@@ -14,7 +14,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/styles.css?v=20260930f">
+<link rel="stylesheet" href="css/styles.css?v=20261004c">
 <script type="module">
   import * as pdfjsLib from "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/6.3.289/pdf.min.mjs";
   pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/6.3.289/pdf.worker.min.mjs";
@@ -28,11 +28,6 @@
   <nav class="sidenav" aria-label="Hauptnavigation">
     <div class="brand">
       <span class="brand-name">Willis Dashboard</span>
-    </div>
-
-    <div class="mode-switch" id="mode-switch" hidden>
-      <button class="mode-btn is-active" data-mode="sport">Sport</button>
-      <button class="mode-btn" data-mode="iris">✺ Airis</button>
     </div>
 
     <div class="sport-nav" id="sport-nav">
@@ -82,15 +77,10 @@
     <section class="tab-panel" id="tab-planaenderungen" data-tab-panel="planaenderungen"></section>
     <section class="tab-panel" id="tab-dienstplan" data-tab-panel="dienstplan"></section>
     <section class="tab-panel" id="tab-logins" data-tab-panel="logins"></section>
-    <section class="tab-panel" id="tab-iris" data-tab-panel="iris"></section>
 
   </main>
 
   <nav class="bottomnav" aria-label="Hauptnavigation mobil">
-    <div class="mode-switch mode-switch-mobile" id="mode-switch-mobile" hidden>
-      <button class="mode-btn is-active" data-mode="sport">Sport</button>
-      <button class="mode-btn" data-mode="iris">✺ Airis</button>
-    </div>
     <div class="bottomnav-row" id="bottomnav-row">
       <button class="bn-item is-active" data-tab="heute"><span class="nav-icon" aria-hidden="true">◐</span><span>Heute</span></button>
       <button class="bn-item" data-tab="woche"><span class="nav-icon" aria-hidden="true">▦</span><span>Woche</span></button>
@@ -115,7 +105,10 @@
 <div id="sync-panel" class="sync-panel" hidden></div>
 <div id="sync-status" class="sync-status" hidden></div>
 
-<script src="js/auth.js?v=20260930f"></script>
-<script src="js/app.js?v=20260930f"></script>
+<script src="js/auth.js?v=20261004c"></script>
+<script src="js/app.js?v=20261004c"></script>
+<script src="js/plan.js?v=20261004c"></script>
+<script src="js/plan-ui.js?v=20261004c"></script>
+<script src="js/plan-views.js?v=20261004c"></script>
 </body>
 </html>

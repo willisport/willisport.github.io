@@ -1,8 +1,10 @@
 """Schickt Willi per Telegram, was heute (morgens) bzw. morgen (abends) anliegt.
 
-Liest nur data/plan-template.json (oeffentlich, keine Verschluesselung noetig) -
-Fokus-Text pro Tag enthaelt bereits Arbeit/Fahrt/Schulung, dazu die geplanten
-Trainingseinheiten. Laeuft in GitHub Actions, kein lokaler PC noetig.
+Liest den vom Planer erzeugten Langzeitplan (data/plan.enc.json, entschluesselt
+mit DATA_ENCRYPTION_KEY) - der Fokus-Text pro Tag enthaelt Arbeit/Fahrt/Schulung,
+dazu die geplanten Trainingseinheiten mit Uhrzeit. Faellt auf die statische
+Vorlage data/plan-template.json zurueck, falls der Langzeitplan fehlt.
+Laeuft in GitHub Actions, kein lokaler PC noetig.
 """
 
 import json
@@ -16,6 +18,7 @@ import mail_check
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PLAN_PATH = os.path.join(ROOT, "data", "plan-template.json")
+GENERATED_PLAN_PATH = os.path.join(ROOT, "data", "plan.enc.json")
 WEEKDAYS = ["Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag", "Sonntag"]
 
 # Berlin-Adlershof - kein API-Key noetig (Open-Meteo ist komplett kostenlos).
@@ -60,8 +63,26 @@ def monday_of(d):
     return d - timedelta(days=d.weekday())
 
 
-def day_for_date(plan, d):
+def load_generated_plan():
+    """Entschluesselter Langzeitplan oder None (kein Key / Datei fehlt / kaputt)."""
+    key = os.environ.get("DATA_ENCRYPTION_KEY")
+    if not key or not os.path.exists(GENERATED_PLAN_PATH):
+        return None
+    try:
+        import crypto_utils
+        with open(GENERATED_PLAN_PATH, encoding="utf-8") as f:
+            return crypto_utils.decrypt_json(crypto_utils.unb64(key), json.load(f))
+    except Exception as e:
+        print("Langzeitplan nicht lesbar, nutze Vorlage:", e)
+        return None
+
+
+def day_for_date(plan, d, generated=None):
     wd = WEEKDAYS[d.weekday()]
+    if generated:
+        week = generated.get("weeks", {}).get(monday_of(d).strftime("%Y-%m-%d"))
+        if week and wd in week.get("days", {}):
+            return week["days"][wd]
     mon = monday_of(d).strftime("%Y-%m-%d")
     override = plan.get("weekOverrides", {}).get(mon, {}).get("days", {}).get(wd)
     if override:
@@ -117,8 +138,9 @@ def send(text):
 def main():
     mode = sys.argv[1] if len(sys.argv) > 1 else "morning"
     plan = load_plan()
+    generated = load_generated_plan()
     target = datetime.now() + (timedelta(days=1) if mode == "evening" else timedelta(days=0))
-    day = day_for_date(plan, target)
+    day = day_for_date(plan, target, generated)
 
     prefix = "☀️ Guten Morgen! Heute steht an:\n\n" if mode == "morning" else "🌙 Für morgen:\n\n"
     body = format_message(target, day)

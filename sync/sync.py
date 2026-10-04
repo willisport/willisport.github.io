@@ -29,18 +29,21 @@ import garmin_source
 import renpho_source
 import health_bridge_source
 import crypto_utils
+import planner
 from plan_match import activities_on_date, unit_matches_activity
 from common import weekday_de, monday_of, iso_date, fmt_short, month_name_de
 
 PLAN_PATH = ROOT / "data" / "plan-template.json"
 OUTPUT_PATH = ROOT / "data" / "training-data.json"
 ENCRYPTED_OUTPUT_PATH = ROOT / "data" / "training-data.enc.json"
+OVERRIDES_PATH = ROOT / "data" / "overrides.enc.json"
+PLAN_OUT_PATH = ROOT / "data" / "plan.enc.json"
 
 LOCAL_TZ = ZoneInfo("Europe/Berlin")  # GitHub-Actions-Runner laufen in UTC - ohne das
 # faellt "heute" naeher an Mitternacht (v.a. 22-24 Uhr deutscher Zeit) faelschlich noch
 # auf gestern, weil UTC dann noch den Vortag zeigt.
 WINDOW_WEEKS = 9  # 8 Wochen Performance-Verlauf + aktuelle Woche
-MACRO_GOAL_DATE = datetime(2027, 8, 31)  # Zielmonat des Ultramarathons - Makro-Uebersicht laeuft bis hierhin
+MACRO_GOAL_DATE = datetime(2027, 9, 30)  # Plan laeuft bis September 2027 (Wettkampf im August + Erholung danach)
 GITHUB_REPO_FULL = "willisport/willisport.github.io"
 NEXT_WEEK_PATTERN = re.compile(r"n[aä]chste[nrm]?\s*woche", re.IGNORECASE)
 
@@ -109,6 +112,9 @@ def save_json(path: Path, data: dict):
 
 
 def week_type_and_label(plan: dict, monday: datetime):
+    meta = (plan.get("weekOverrides", {}).get(iso_date(monday)) or {}).get("meta")
+    if meta:
+        return meta["weekType"], meta["label"]
     rotation = plan["rotation"]
     cycle_start = datetime.strptime(rotation["cycleStartMonday"], "%Y-%m-%d")
     pattern = rotation["pattern"]
@@ -172,8 +178,12 @@ def build_upcoming_plan(
     for i in range(weeks_ahead):
         wk_monday = this_monday + timedelta(weeks=i)
         week_type, _ = week_type_and_label(plan, wk_monday)
-        run_h, bike_h, strength_h = estimate_week_hours(plan, week_type)
         override = week_overrides.get(iso_date(wk_monday))
+        hours = ((override or {}).get("meta") or {}).get("hours")
+        if hours:
+            run_h, bike_h, strength_h = hours["run"], hours["bike"], hours["strength"]
+        else:
+            run_h, bike_h, strength_h = estimate_week_hours(plan, week_type)
         out.append({
             "label": fmt_short(iso_date(wk_monday)),
             "weekType": week_type,
@@ -328,6 +338,36 @@ def weight_avg_in_week(weights: list, monday_str: str, sunday_str: str, fallback
     return round(sum(vals) / len(vals), 1) if vals else fallback
 
 
+def load_plan_inputs(dek: bytes) -> dict:
+    """Plan-Eingaben (Dienstplan, Termine, Krankheit, Fortschritt, Uebungen), die der
+    Browser verschluesselt in overrides.enc.json ablegt."""
+    if not (dek and OVERRIDES_PATH.exists()):
+        return {}
+    try:
+        overrides = crypto_utils.decrypt_json(dek, load_json(OVERRIDES_PATH))
+    except Exception as e:
+        print(f"  [warn] Overrides nicht lesbar, Plan laeuft ohne Eingaben: {e}")
+        return {}
+    inputs = dict(overrides.get("__plan") or {})
+    inputs["deload"] = overrides.get("__deload") or {}
+    return inputs
+
+
+def write_encrypted_if_changed(path: Path, obj, dek: bytes) -> bool:
+    """Schreibt nur, wenn sich der Klartext geaendert hat - sonst wuerde jeder Lauf
+    (zufaelliger IV) einen neuen, nutzlosen Commit erzeugen und das Repo aufblaehen."""
+    new_json = json.dumps(obj, ensure_ascii=False, sort_keys=True)
+    if path.exists():
+        try:
+            prev = crypto_utils.decrypt_json(dek, load_json(path))
+            if json.dumps(prev, ensure_ascii=False, sort_keys=True) == new_json:
+                return False
+        except Exception:
+            pass
+    save_json(path, crypto_utils.encrypt_json_bytes(dek, new_json.encode("utf-8")))
+    return True
+
+
 def main():
     print(f"[{datetime.now().isoformat(timespec='seconds')}] Sync startet...")
     plan = load_json(PLAN_PATH)
@@ -336,6 +376,16 @@ def main():
     today = datetime.now(LOCAL_TZ).replace(tzinfo=None)
     this_monday = monday_of(today)
     window_start = this_monday - timedelta(weeks=WINDOW_WEEKS - 1)
+
+    dek_b64 = os.environ.get("DATA_ENCRYPTION_KEY")
+    dek = crypto_utils.unb64(dek_b64) if dek_b64 else None
+    plan_inputs = load_plan_inputs(dek)
+    today_d = today.date()
+    gen_from = max(this_monday.date(), planner.PROGRAM_START_MONDAY)
+    generated = planner.generate_plan(plan_inputs, gen_from, MACRO_GOAL_DATE.date(), today_d, plan.get("library"))
+    plan["weekOverrides"] = {**plan.get("weekOverrides", {}), **generated}
+    print(f"  Plan: {len(generated)} Wochen generiert ab {gen_from} "
+          f"({len(plan_inputs.get('shifts') or {})} Schichten, {len(plan_inputs.get('events') or [])} Termine)")
 
     try:
         cleanup_stale_requests(this_monday)
@@ -391,7 +441,8 @@ def main():
 
     # --- Woche bauen ---
     week_type, week_label = week_type_and_label(plan, this_monday)
-    targets = plan["targetsByType"][week_type]
+    this_meta = (plan["weekOverrides"].get(iso_date(this_monday)) or {}).get("meta")
+    targets = (this_meta or {}).get("targets") or plan["targetsByType"][week_type]
     weeks_to_goal = max(1, (MACRO_GOAL_DATE - this_monday).days // 7)
     upcoming_plan = build_upcoming_plan(plan, this_monday, activities, today, steps_history, weeks_ahead=weeks_to_goal)
 
@@ -439,7 +490,7 @@ def main():
     today_plan_units = week_days[today_idx]["units"]
     today_obj = {
         "date": iso_date(today), "weekday": weekday_de(today),
-        "dayFocus": plan["weekPattern"][today_idx]["focus"],
+        "dayFocus": week_days[today_idx]["focus"],
         "units": today_plan_units,
         "sleep": {**sleep_today, "hrvBaseline": hrv_baseline},
         "body": {
@@ -507,6 +558,7 @@ def main():
         ]
         wk_days_detail = build_week_days(plan, wk_monday, activities, today, steps_history)
         perf_weeks.append({
+            "monday": iso_date(wk_monday),
             "label": fmt_short(iso_date(wk_monday)),
             "vo2max": value_on_or_before(vo2max_history, iso_date(wk_sunday)),
             "zone2PaceSecPerKm": pace,
@@ -515,6 +567,11 @@ def main():
             "weightKg": weight_avg_in_week(weights, iso_date(wk_monday), iso_date(wk_sunday)),
             "avgSteps": round(sum(wk_steps) / len(wk_steps)) if wk_steps else None,
             "completionPct": pflicht_completion_pct(wk_days_detail, today),
+            "timeMin": round(sum(a["durationMin"] for a in wk_acts)),
+            "sessions": len(wk_acts),
+            "elevationGainM": round(sum(a.get("elevationGainM") or 0 for a in wk_acts)),
+            "plannedRunKm": ((((plan.get("weekOverrides") or {}).get(iso_date(wk_monday)) or {}).get("meta") or {}).get("targets") or {}).get("runVolumeKm"),
+            "plannedBikeKm": ((((plan.get("weekOverrides") or {}).get(iso_date(wk_monday)) or {}).get("meta") or {}).get("targets") or {}).get("bikeVolumeKm"),
         })
     # Luecken bei vo2max/weightKg mit letztem bekannten Wert auffuellen
     last_v, last_w = None, None
@@ -546,6 +603,20 @@ def main():
         "racePredictions": race_predictions,
     }
 
+    inputs_norm = planner.normalize_inputs(plan_inputs)
+    agenda = planner.build_agenda(plan_inputs, today_d, days_ahead=60)
+    hint = planner.progression_hint(
+        [pw["completionPct"] for pw in perf_weeks[:-1] if pw["monday"] >= iso_date(datetime.combine(planner.PROGRAM_START_MONDAY, datetime.min.time()))],
+        bool(today_obj["overloadWarning"]),
+    )
+    plan_state = {
+        "progression": {"offsetWeeks": inputs_norm["progression"]["offsetWeeks"],
+                        "step": (this_meta or {}).get("step"), "phase": (this_meta or {}).get("phase")},
+        "sick": inputs_norm["sick"], "hint": hint,
+        "settings": {k: inputs_norm["settings"][k] for k in ("travelMin", "raceDate", "includeLegStabi", "includeLegSupersets")},
+        "counts": {"shifts": len(inputs_norm["shifts"]), "events": len(inputs_norm["events"])},
+    }
+
     output = {
         "syncedAt": datetime.now(timezone.utc).isoformat(timespec="minutes"),
         "profile": {**plan["profile"], "vo2max": today_obj["body"]["vo2max"]},
@@ -554,18 +625,26 @@ def main():
         "history": history,
         "performance": performance,
         "upcomingPlan": upcoming_plan,
+        "agenda": agenda,
+        "library": inputs_norm["library"],
+        "planState": plan_state,
     }
 
     save_json(OUTPUT_PATH, output)
     print(f"[{datetime.now().isoformat(timespec='seconds')}] Fertig -> {OUTPUT_PATH}")
 
-    dek_b64 = os.environ.get("DATA_ENCRYPTION_KEY")
-    if dek_b64:
-        dek = crypto_utils.unb64(dek_b64)
+    if dek:
         plaintext_bytes = json.dumps(output, ensure_ascii=False).encode("utf-8")
         encrypted = crypto_utils.encrypt_json_bytes(dek, plaintext_bytes)
         save_json(ENCRYPTED_OUTPUT_PATH, encrypted)
         print(f"  Verschluesselte Fassung -> {ENCRYPTED_OUTPUT_PATH}")
+
+        plan_out = {
+            "weeks": {m: planner.compact_week(w) for m, w in generated.items()},
+            "agenda": planner.build_agenda_all(plan_inputs),
+        }
+        if write_encrypted_if_changed(PLAN_OUT_PATH, plan_out, dek):
+            print(f"  Langzeitplan aktualisiert -> {PLAN_OUT_PATH}")
 
 
 if __name__ == "__main__":

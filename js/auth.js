@@ -54,18 +54,35 @@ async function tryUnwrapDek(password, entry, iterations) {
   }
 }
 
+async function streamToBytes(stream) {
+  return new Uint8Array(await new Response(stream).arrayBuffer());
+}
+async function gzipBytes(bytes) {
+  return streamToBytes(new Blob([bytes]).stream().pipeThrough(new CompressionStream("gzip")));
+}
+async function gunzipBytes(bytes) {
+  return streamToBytes(new Blob([bytes]).stream().pipeThrough(new DecompressionStream("gzip")));
+}
+
 async function decryptDataFile(dekRawBytes, encFile) {
   const dekKey = await crypto.subtle.importKey("raw", dekRawBytes, "AES-GCM", false, ["decrypt"]);
   const iv = b64ToBytes(encFile.iv);
   const ct = b64ToBytes(encFile.ciphertext);
-  const plainBuf = await crypto.subtle.decrypt({ name: "AES-GCM", iv }, dekKey, ct);
-  return JSON.parse(new TextDecoder().decode(plainBuf));
+  let plain = new Uint8Array(await crypto.subtle.decrypt({ name: "AES-GCM", iv }, dekKey, ct));
+  // gzip-komprimierte Nutzlast (grosse Overrides) erkennt man am Magic-Header 1f 8b
+  if (plain[0] === 0x1f && plain[1] === 0x8b) plain = await gunzipBytes(plain);
+  return JSON.parse(new TextDecoder().decode(plain));
 }
 
+/** Overrides ueber ~20.000 Zeichen werden vor dem Verschluesseln gzip-komprimiert:
+    der Speicher-Workflow nimmt die Nutzlast als workflow_dispatch-Input und der ist
+    auf 65.535 Zeichen begrenzt - Dienstplan + Termine eines Jahres wuerden das sonst sprengen. */
 async function encryptJson(dekRawBytes, obj) {
   const dekKey = await crypto.subtle.importKey("raw", dekRawBytes, "AES-GCM", false, ["encrypt"]);
   const iv = crypto.getRandomValues(new Uint8Array(12));
-  const plainBytes = new TextEncoder().encode(JSON.stringify(obj));
+  const json = JSON.stringify(obj);
+  let plainBytes = new TextEncoder().encode(json);
+  if (json.length > 20000 && typeof CompressionStream !== "undefined") plainBytes = await gzipBytes(plainBytes);
   const ctBuf = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, dekKey, plainBytes);
   return { iv: bytesToB64(iv), ciphertext: bytesToB64(new Uint8Array(ctBuf)) };
 }
@@ -228,6 +245,29 @@ function setupLogoutControl() {
   });
 }
 
+/** Startet den Sync beim Worker und wartet, bis frische Daten da sind (auch der
+    Langzeitplan). Gibt true zurueck, wenn neue Daten uebernommen wurden. */
+async function runHostedSync(onData, setStatus) {
+  const say = (title, text) => { if (setStatus) setStatus(title, text); };
+  say("Sync wird gestartet…", "");
+  const res = await fetch(HOSTED_SYNC_WORKER_URL, { method: "POST" });
+  const result = await res.json();
+  if (!result.ok) throw new Error(result.error || "Unbekannter Fehler");
+
+  say("Sync gestartet", "Läuft im Hintergrund, dauert ca. 1–2 Minuten…");
+  const prevSyncedAt = (typeof APP_DATA !== "undefined" && APP_DATA) ? APP_DATA.syncedAt : undefined;
+  const gotFreshData = await pollForFreshSync(prevSyncedAt);
+  if (!gotFreshData) {
+    say("Sync läuft noch", "Dauert diesmal ungewöhnlich lang – lad die Seite in ein paar Minuten neu.");
+    return false;
+  }
+  try { await reloadPlanData(true); } catch { /* Plan bleibt beim alten Stand */ }
+  onData(gotFreshData);
+  showSyncStatus(gotFreshData.syncedAt);
+  say("Sync erfolgreich", "Daten sind aktuell.");
+  return true;
+}
+
 function setupHostedSyncButton(onData) {
   const btn = document.getElementById("hosted-sync-btn");
   const panel = document.getElementById("sync-panel");
@@ -237,39 +277,34 @@ function setupHostedSyncButton(onData) {
   btn.addEventListener("click", async () => {
     btn.disabled = true;
     btn.classList.add("is-syncing");
-    if (panel) {
-      panel.innerHTML = `<div class="title">Sync wird gestartet…</div>`;
+    const setStatus = (title, text) => {
+      if (!panel) return;
+      panel.innerHTML = `<div class="title">${title}</div>${text ? `<div>${text}</div>` : ""}`;
       panel.hidden = false;
-    }
-
+    };
     try {
-      const res = await fetch(HOSTED_SYNC_WORKER_URL, { method: "POST" });
-      const result = await res.json();
-      if (!result.ok) throw new Error(result.error || "Unbekannter Fehler");
-
-      if (panel) panel.innerHTML = `<div class="title">Sync gestartet</div><div>Läuft im Hintergrund, dauert ca. 1–2 Minuten…</div>`;
-
-      const prevSyncedAt = (typeof APP_DATA !== "undefined" && APP_DATA) ? APP_DATA.syncedAt : undefined;
-      const gotFreshData = await pollForFreshSync(prevSyncedAt);
-
-      if (gotFreshData) {
-        if (panel) panel.innerHTML = `<div class="title">Sync erfolgreich</div><div>Daten sind aktuell.</div>`;
-        onData(gotFreshData);
-        showSyncStatus(gotFreshData.syncedAt);
-      } else if (panel) {
-        panel.innerHTML = `<div class="title">Sync läuft noch</div><div>Dauert diesmal ungewöhnlich lang – lad die Seite in ein paar Minuten neu.</div>`;
-      }
+      await runHostedSync(onData, setStatus);
     } catch (err) {
-      if (panel) {
-        panel.innerHTML = `<div class="title">Fehler beim Sync</div><div>${escapeHtml(String(err.message || err))}</div>`;
-        panel.hidden = false;
-      }
+      setStatus("Fehler beim Sync", escapeHtml(String(err.message || err)));
     } finally {
       btn.disabled = false;
       btn.classList.remove("is-syncing");
       setTimeout(() => { if (panel) panel.hidden = true; }, 12000);
     }
   });
+}
+
+/** Frische Dateiversion holen: raw.githubusercontent mit Cache-Buster (kein Rate-Limit),
+    erst danach die GitHub-API (60 Anfragen/Stunde ohne Login - deshalb nur als Reserve). */
+async function fetchFreshFile(path) {
+  try {
+    const res = await fetch(`${RAW_DATA_BASE}/${path}?cb=${Date.now()}`, { cache: "no-store" });
+    if (res.ok) return await res.json();
+    if (res.status === 404) { const e = new Error("Datei fehlt (404)"); e.status = 404; throw e; }
+  } catch (err) {
+    if (err && err.status === 404) throw err;
+  }
+  return fetchFileViaGithubApi(path);
 }
 
 async function fetchFileViaGithubApi(path) {
@@ -281,12 +316,28 @@ async function fetchFileViaGithubApi(path) {
   return res.json();
 }
 
-async function pollForFreshSync(prevSyncedAt, maxWaitMs = 150000, intervalMs = 6000) {
+/** Langzeitplan (data/plan.enc.json) laden. fresh=true holt ueber die GitHub-API
+    (ohne den bis zu 5 Minuten alten Raw-CDN-Cache). */
+async function reloadPlanData(fresh) {
+  if (!CURRENT_DEK) return;
+  let encFile;
+  if (fresh) {
+    encFile = await fetchFreshFile("data/plan.enc.json");
+  } else {
+    const res = await fetch(`${RAW_DATA_BASE}/data/plan.enc.json`, { cache: "no-store" });
+    if (!res.ok) throw new Error("plan.enc.json fehlt noch");
+    encFile = await res.json();
+  }
+  const plan = await decryptDataFile(CURRENT_DEK, encFile);
+  if (typeof setPlanData === "function") setPlanData(plan);
+}
+
+async function pollForFreshSync(prevSyncedAt, maxWaitMs = 240000, intervalMs = 8000) {
   const start = Date.now();
   while (Date.now() - start < maxWaitMs) {
     await new Promise(r => setTimeout(r, intervalMs));
     try {
-      const encFile = await fetchFileViaGithubApi("data/training-data.enc.json");
+      const encFile = await fetchFreshFile("data/training-data.enc.json");
       const data = await decryptDataFile(CURRENT_DEK, encFile);
       if (data.syncedAt && data.syncedAt !== prevSyncedAt) return data;
     } catch { /* naechster Versuch */ }
@@ -294,32 +345,9 @@ async function pollForFreshSync(prevSyncedAt, maxWaitMs = 150000, intervalMs = 6
   return null;
 }
 
-/* Iris ist live. */
-const IRIS_ENABLED = true;
-
 function setupLoginsNavItem() {
   document.querySelectorAll('[data-tab="logins"]').forEach(el => { el.hidden = CURRENT_ROLE !== "owner"; });
   document.querySelectorAll('[data-tab="dienstplan"]').forEach(el => { el.hidden = CURRENT_ROLE !== "owner"; });
-  document.querySelectorAll('#mode-switch, #mode-switch-mobile').forEach(el => { el.hidden = !(IRIS_ENABLED && CURRENT_ROLE === "owner"); });
-}
-
-/* Iris: separater, nur fuer den Owner sichtbarer Bereich (Mail-/Kalenderuebersicht).
-   Eigene verschluesselte Datei statt in training-data.enc.json, damit ein Viewer-Zugriff
-   (auch versehentlich) diese Datei nie anfragt, geschweige denn entschluesseln koennte -
-   Verteidigung in der Tiefe zusaetzlich zum reinen UI-Ausblenden oben.
-   Dateiname/Backend bewusst noch "airis-status" (Sync-Task laeuft bereits darauf),
-   nur die sichtbare Oberflaeche heisst jetzt "Iris". */
-async function loadIrisStatus() {
-  if (!IRIS_ENABLED || CURRENT_ROLE !== "owner" || !CURRENT_DEK) return;
-  try {
-    const encFile = await fetch(`${RAW_DATA_BASE}/data/airis-status.enc.json`, { cache: "no-store" }).then(r => r.json());
-    const data = await decryptDataFile(CURRENT_DEK, encFile);
-    if (typeof renderIris === "function") renderIris(data);
-    if (typeof updateHeuteCalendarCard === "function") updateHeuteCalendarCard(data);
-  } catch {
-    // Datei existiert evtl. noch nicht (erster Sync steht noch aus) oder Abruf fehlgeschlagen -
-    // Tab zeigt dann seinen eigenen "noch keine Daten"-Zustand.
-  }
 }
 
 /**
@@ -375,8 +403,8 @@ async function bootWithAuth(onData) {
       setupLogoutControl();
       setupHostedSyncButton(onData);
       setupLoginsNavItem();
-      loadIrisStatus();
       showSyncStatus(data.syncedAt);
+      reloadPlanData(false).catch(() => { /* erster Sync mit Planer steht evtl. noch aus */ });
     } catch (err) {
       document.getElementById("tab-heute").innerHTML =
         `<div class="card accent-amber"><b>Konnte Daten nicht entschlüsseln.</b><br>${err}</div>`;
