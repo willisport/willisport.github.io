@@ -600,7 +600,7 @@ def training_targets(inputs: dict) -> dict:
         ftp = pos(met["ftpW"])
         ftp_src = "Garmin" + (" (Wert veraltet – Test empfohlen)" if met.get("ftpStale") else "")
     if not ftp:
-        ftp, ftp_src = 230.0, "Standardwert"
+        ftp, ftp_src = 260.0, "Standardwert (Zwift-Test)"
     ref5 = pos(st.get("ref5kSec"))
     pace5 = ref5 / 5 if ref5 else None
     pace_src = "deiner eingetragenen 5-km-Zeit" if ref5 else None
@@ -613,7 +613,7 @@ def training_targets(inputs: dict) -> dict:
 
     out = {
         "ftpW": int(ftp), "ftpSource": ftp_src, "ftpStale": bool(met.get("ftpStale")) and not pos(st.get("ftpW")),
-        "z2Watt": r5(ftp * 0.72), "thrLo": r5(ftp * 0.92), "thrHi": r5(ftp * 1.00),
+        "z2Watt": r5(ftp * 0.635), "thrLo": r5(ftp * 0.92), "thrHi": r5(ftp * 1.00),
         "thrHr": (int(lthr - 10), int(lthr - 3)) if lthr else None,
         "pace5kSec": pace5, "paceSource": pace_src, "lthr": int(lthr) if lthr else None,
     }

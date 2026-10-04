@@ -473,9 +473,10 @@ class TrainingTargets(unittest.TestCase):
 
     def test_manual_ftp_overrides_garmin(self):
         thr = self.unit({"metrics": self.MET, "settings": {"ftpW": 260}}, date(2026, 11, 16), "Schwellentraining Rad")
+        self.assertIn("240–260 W", thr["detail"])
         self.assertIn("FTP von 260 W", thr["detail"])
-        z2 = self.unit({"metrics": self.MET, "settings": {"ftpW": 260}}, date(2026, 11, 16), "Rad Zone 2")
-        self.assertIn("185 W", z2["detail"])              # 72 % von 260 W
+        z2 = self.unit({"metrics": self.MET, "settings": {"ftpW": 300}}, date(2026, 11, 16), "Rad Zone 2")
+        self.assertIn("190 W", z2["detail"])              # 63,5 % von 300 W
 
     def test_vo2_pace_from_5k_prediction_and_shorter_reps_are_faster(self):
         short = self.unit({"metrics": self.MET}, date(2026, 10, 5), "VO2max-Intervalle")           # 5x2 min
