@@ -197,6 +197,7 @@ function planStateCardHtml() {
         <button class="btn-small" type="button" data-plan-act="advance">Fortschritt +1 Woche</button>
         <button class="btn-small" type="button" data-plan-act="hold">Fortschritt −1 Woche</button>
       </div>
+      <div class="card-note" style="margin-top:8px;"><b>Schwerpunkt:</b> Laufen ist Prio 1. Rad bleibt Grundlage (max. 1 h pro Einheit), gesteigert wird beim Laufen. VO2max = ALL OUT, Schwelle läuft auf dem Rad.</div>
       <div class="card-note" style="margin-top:8px;">Oder einfach unten ins Coach-Feld schreiben: „ich bin krank“, „bin wieder gesund“, „fühlt sich gut, wir können hoch“, „stagniert, wir bleiben so“.</div>
     </div>`;
 }

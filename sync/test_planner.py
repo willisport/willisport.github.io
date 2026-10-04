@@ -360,7 +360,7 @@ class NewTrainingStructure(unittest.TestCase):
             if z and w["meta"]["phase"] == "aufbau":
                 durs.append(max(z))
         self.assertEqual(durs, sorted(durs))
-        self.assertLessEqual(max(durs), 75)
+        self.assertLessEqual(max(durs), 60)
         self.assertGreater(max(durs), 45)
 
     def test_threshold_ramps_to_two_times_twenty(self):
@@ -371,7 +371,7 @@ class NewTrainingStructure(unittest.TestCase):
 
     def test_vo2_intervals_ramp_and_are_not_fasted(self):
         a = next(u for u in all_units(week(self.START)) if u["name"] == "VO2max-Intervalle")
-        self.assertIn("5×2 min", a["detail"])
+        self.assertIn("5×2 min ALL OUT", a["detail"])
         b = next(u for u in all_units(week(self.START + timedelta(days=7 * 40))) if u["name"] == "VO2max-Intervalle")
         self.assertRegex(b["detail"], r"[56]×4 min")
         self.assertNotIn("nüchtern Uhr", a["detail"])

@@ -5,7 +5,7 @@ ohne KI, laeuft in GitHub Actions (sync.py) und braucht kein Claude-Abo.
 
 Regeln (Willis "Master", siehe Memory/Notizen):
   * Rad Zone 2 fast jeden Morgen, moeglichst nuechtern (Start 45 min, wird Schritt fuer
-    Schritt laenger bis 75 min)
+    Schritt laenger bis max. 60 min - gesteigert wird vor allem beim Laufen)
       Rad-Start = Abfahrt - Raddauer - 30 min, nie vor 06:00; passt es nicht in
       den Morgen, wandert es nach Feierabend (dann nicht mehr nuechtern)
   * 2 Ruhetage (nur lockeres Rad + EMOM) - gewaehlt nach dem Dienstplan
@@ -48,6 +48,7 @@ DEFAULT_SETTINGS = {
     "runScalePct": 100,         # Regler fuer den Laufumfang (Z2- und langer Lauf), 50-130 %
     "longRunMaxKm": 36,         # Obergrenze fuer den langen Lauf
     "includeLongRide": False,   # langes Rad: zum Start aus, per Coach wieder einschaltbar
+    "bikeMaxMin": 60,           # taegliches Rad Zone 2 maximal (Laufen hat Prioritaet)
     "includeLegStabi": False,   # aktuell wegen Knie raus, per Schalter wieder reinholbar
     "includeLegSupersets": False,
 }
@@ -475,15 +476,15 @@ def week_params(monday: date, inputs: dict, factor_override: float | None = None
 
     scale = num("runScalePct", 100, 50, 130) / 100.0
     long_cap = num("longRunMaxKm", 36, 10, 60)
-    z2_km = min(10.0, 6.0 + 0.5 * (s // 4))
-    long_km = half(min(long_cap, 10.0 + 0.75 * s))
+    z2_km = min(10.0, 6.0 + 0.5 * (s // 3))
+    long_km = half(min(long_cap, 10.0 + 1.0 * s))   # Laufen ist Prio 1: schnellerer Aufbau als beim Rad
     long_ride = int(round(min(240, 120 + 7.5 * s) / 5) * 5)
     # VO2max-Intervalle: (Wiederholungen, Minuten je Intervall) je Fortschrittsschritt
     vo2_table = [(0, 5, 2), (2, 6, 2), (4, 5, 3), (6, 6, 3), (8, 5, 4), (12, 6, 4)]
     reps, vo2_min = next((r, m) for st0, r, m in reversed(vo2_table) if s >= st0)
     # Schwelle auf dem Rad: 2 x N min, ab dem zweiten Aufbauschritt
     thr_min = 0 if s < 1 else (10 if s < 2 else 12 if s < 4 else 15 if s < 6 else 18 if s < 8 else 20)
-    bike_min = min(75, 45 + 5 * (s // 2))
+    bike_min = min(num("bikeMaxMin", 60, 30, 120), 45 + 5 * (s // 2))   # Rad bleibt Grundlage: max. 1 h, gesteigert wird beim Laufen
     run_days = 3 if s < 3 else 4
 
     z2_km = max(4.0, half(z2_km * scale * (0.85 if phase == "recovery" else 1.0) * min(1.0, taper_factor + 0.1)))
@@ -833,8 +834,8 @@ class Planner:
                 dur = interval_total_min(rp, vm)
                 start = self.slot_run(ctx, dur, after=(last_end[i] + 10) if last_end[i] else None)
                 commit(i, mk_unit("VO2max-Intervalle", "lauf", "pflicht",
-                                  f"15 min einlaufen · {rp}×{vm} min sehr hart (ca. 5-km-Tempo, grob 4:05–4:20 min/km, gleichmäßig, HF steigt Richtung 180) "
-                                  f"mit je {vo2_rest_min(vm)} min lockerem Traben · 10 min auslaufen{tsuf(start)}, nicht nüchtern",
+                                  f"{rp}×{vm} min ALL OUT (deutlich schneller als dein Schwellentempo ~4:00/km – so hart, wie du es bis zum Ende durchhältst) "
+                                  f"· je {vo2_rest_min(vm)} min locker traben · davor 15 min einlaufen, danach 10 min auslaufen{tsuf(start)}, nicht nüchtern",
                                   dur - 10, keySession=True, matchHint={"activityTypes": ["running"]}), start, dur)
             # --- Zone-2-Lauf ---
             if "z2_run" in r:
