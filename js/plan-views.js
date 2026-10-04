@@ -230,6 +230,38 @@ function futureUnitRowHtml(u, dateStr, days, monday) {
     </div>`;
 }
 
+/** Laufkilometer einer Woche von Hand setzen (überschreibt die Automatik nur für diese Woche). */
+function weekRunControlHtml(monday) {
+  const wk = PLAN_DATA && PLAN_DATA.weeks && PLAN_DATA.weeks[monday];
+  const km = wk && wk.meta && wk.meta.runKm;
+  if (!km || !canEdit()) return "";
+  const manual = (planInputs().runOverrides || {})[monday];
+  return `
+    <div class="run-ctl" data-monday="${monday}" style="display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-bottom:10px;">
+      <span class="card-note">Laufen diese Woche${manual ? " (von dir gesetzt)" : ""}:</span>
+      <label class="card-note">langer Lauf <input type="number" class="text-input rc-long" step="0.5" min="3" max="99" value="${escapeHtml(km.long)}" style="max-width:84px;" /> km</label>
+      <label class="card-note">Z2-Lauf <input type="number" class="text-input rc-z2" step="0.5" min="3" max="99" value="${escapeHtml(km.z2)}" style="max-width:84px;" /> km</label>
+      <button class="btn-small rc-save" type="button">Setzen</button>
+      ${manual ? '<button class="btn-small rc-reset" type="button">Automatik</button>' : ""}
+    </div>`;
+}
+
+function bindRunControls(root) {
+  if (!root) return;
+  root.querySelectorAll(".run-ctl").forEach(el => {
+    const monday = el.dataset.monday;
+    el.querySelector(".rc-save").addEventListener("click", () => {
+      const longKm = Number(el.querySelector(".rc-long").value), z2Km = Number(el.querySelector(".rc-z2").value);
+      if (!(longKm > 0) || !(z2Km > 0)) return;
+      applyPlanChange("Laufumfang gesetzt", plan => { plan.runOverrides = plan.runOverrides || {}; plan.runOverrides[monday] = { longKm, z2Km }; });
+    });
+    const reset = el.querySelector(".rc-reset");
+    if (reset) reset.addEventListener("click", () => {
+      applyPlanChange("Automatik wieder aktiv", plan => { if (plan.runOverrides) delete plan.runOverrides[monday]; });
+    });
+  });
+}
+
 function wochePreviewHtml(data) {
   const thisMonday = data.week.startDate;
   const weeks = PLAN_DATA && PLAN_DATA.weeks;
@@ -269,6 +301,7 @@ function wochePreviewHtml(data) {
         </div>
         <button class="btn-small" type="button" id="wp-next" ${idx === keys.length - 1 ? "disabled" : ""}>▶</button>
       </div>
+      ${weekRunControlHtml(monday)}
       <div style="display:flex; gap:8px; align-items:center; margin-bottom:10px;">
         <span class="card-note">Springen zu:</span><input type="date" id="wp-jump" class="text-input" style="max-width:160px;" />
       </div>
@@ -277,6 +310,7 @@ function wochePreviewHtml(data) {
 }
 
 function bindWochePreview(data) {
+  bindRunControls(document.getElementById("tab-woche"));
   const card = document.getElementById("woche-preview");
   if (!card || !PLAN_DATA) return;
   const keys = Object.keys(PLAN_DATA.weeks).sort().filter(m => m > data.week.startDate);

@@ -40,6 +40,10 @@ DEFAULT_SETTINGS = {
     "longSessionStartMin": 9 * 60,
     "afternoonStartMin": 16 * 60 + 30,
     "raceDate": "2027-08-28",   # Annahme (Zielmonat August 2027) - in der Website aenderbar
+    "raceName": "Ultramarathon",
+    "raceDistanceKm": 100,
+    "runScalePct": 100,         # Regler fuer den Laufumfang (Z2- und langer Lauf), 50-130 %
+    "longRunMaxKm": 36,         # Obergrenze fuer den langen Lauf
     "includeLegStabi": False,   # aktuell wegen Knie raus, per Schalter wieder reinholbar
     "includeLegSupersets": False,
 }
@@ -181,6 +185,21 @@ def normalize_inputs(raw: dict | None) -> dict:
         if isinstance(st, dict) and st.get("kind") in ("uni", "frei", "urlaub", "krank"):
             day_status[d] = st
 
+    run_over = {}
+    for d, ov in (raw.get("runOverrides") or {}).items():
+        if not isinstance(ov, dict):
+            continue
+        clean = {}
+        for k in ("longKm", "z2Km"):
+            try:
+                v = float(ov[k])
+                if 0 < v < 100:
+                    clean[k] = v
+            except Exception:
+                pass
+        if clean:
+            run_over[d[:10]] = clean
+
     sick = raw.get("sick") or {}
     prog = raw.get("progression") or {}
     return {
@@ -192,6 +211,7 @@ def normalize_inputs(raw: dict | None) -> dict:
         "progression": {"offsetWeeks": int(prog.get("offsetWeeks") or 0)},
         "library": merge_library(raw.get("library")),
         "deload": raw.get("deload") or {},
+        "runOverrides": run_over,
     }
 
 
@@ -443,13 +463,26 @@ def week_params(monday: date, inputs: dict, factor_override: float | None = None
     def half(x):
         return round(x * 2) / 2
 
+    def num(key, default, lo, hi):
+        try:
+            return max(lo, min(hi, float(st.get(key, default))))
+        except Exception:
+            return default
+
+    scale = num("runScalePct", 100, 50, 130) / 100.0
+    long_cap = num("longRunMaxKm", 36, 10, 60)
     z2_km = min(10.0, 6.0 + 0.5 * (s // 4))
-    long_km = half(min(36.0, 12.0 + 0.75 * s))
+    long_km = half(min(long_cap, 12.0 + 0.75 * s))
     reps = 4 if s < 8 else (5 if s < 18 else 6)
     long_ride = int(round(min(240, 120 + 7.5 * s) / 5) * 5)
 
-    z2_km = max(4.0, half(z2_km * (0.85 if phase == "recovery" else 1.0) * min(1.0, taper_factor + 0.1)))
-    long_km = max(6.0, half(long_km * factor))
+    z2_km = max(4.0, half(z2_km * scale * (0.85 if phase == "recovery" else 1.0) * min(1.0, taper_factor + 0.1)))
+    long_km = max(6.0, half(long_km * factor * scale))
+    manual = inputs["runOverrides"].get(iso(monday)) or {}
+    if "longKm" in manual:
+        long_km = half(manual["longKm"])
+    if "z2Km" in manual:
+        z2_km = half(manual["z2Km"])
     long_ride = max(60, int(round(long_ride * factor / 5) * 5))
     reps = max(3, int(round(reps * (0.7 if phase == "recovery" else 1.0) * min(1.0, taper_factor + 0.1))))
     if phase == "wettkampf" or (phase == "erholung" and factor < 0.6):
@@ -859,7 +892,9 @@ def generate_week(monday: date, inputs: dict, today: date, template_library: dic
     race_date = parse_date(inputs["settings"]["raceDate"])
     for i, ctx in enumerate(ctxs):
         if ctx.date == race_date:
-            placed[i] = [{"unit": mk_unit("Wettkampf: Ultramarathon", "lauf", "pflicht",
+            rname = (inputs["settings"].get("raceName") or "Wettkampf").strip()
+            rdist = inputs["settings"].get("raceDistanceKm")
+            placed[i] = [{"unit": mk_unit(f"Wettkampf: {rname}" + (f" {rdist:g} km" if isinstance(rdist, (int, float)) and rdist else ""), "lauf", "pflicht",
                                           "Zielwettkampf – Termin ist eine Annahme, im Dienstplan-Tab unter Einstellungen anpassbar",
                                           0, keySession=True, matchHint={"activityTypes": ["running"], "minDistanceKm": 20}),
                           "start": None, "dur": 0}]
@@ -942,6 +977,7 @@ def generate_week(monday: date, inputs: dict, today: date, template_library: dic
             "weekType": "recovery" if params["recovery"] else "aufbau",
             "p": params["p"], "step": params["step"], "factor": params["factor"],
             "targets": targets, "label": label, "scheduleKnown": known,
+            "runKm": {"long": params["longKm"], "z2": params["z2Km"]},
             "hours": {"run": round(run_h, 1), "bike": round(bike_h, 1), "strength": round(strength_h, 1)},
         },
     }

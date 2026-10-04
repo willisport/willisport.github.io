@@ -13,7 +13,10 @@ function dpFmtDate(iso) {
 
 function dpSettings() {
   const p = planInputs();
-  return { travelMin: 75, kuerzel: "WL", raceDate: "2027-08-28", includeLegStabi: false, includeLegSupersets: false, ...(p.settings || {}) };
+  return {
+    travelMin: 75, kuerzel: "WL", raceDate: "2027-08-28", raceName: "Ultramarathon", raceDistanceKm: 100,
+    runScalePct: 100, longRunMaxKm: 36, includeLegStabi: false, includeLegSupersets: false, ...(p.settings || {}),
+  };
 }
 
 /** Änderung nur lokal vormerken (Tippen in Listen) - gespeichert wird per Button. */
@@ -186,6 +189,7 @@ function planStateCardHtml() {
     <div class="card">
       <div class="card-head"><span class="card-title">Plan-Status</span><span class="card-note">${escapeHtml(phase || "")}</span></div>
       <div class="card-note" style="margin-bottom:8px;">${escapeHtml(stateTxt)} · Fortschritt ${offset === 0 ? "wie geplant" : (offset > 0 ? "+" : "") + offset + " Wochen"}</div>
+      <div class="card-note" style="margin-bottom:8px;">${escapeHtml(dpSettings().raceName)} ${escapeHtml(dpSettings().raceDistanceKm)} km am ${dpFmtDate(dpSettings().raceDate)} ${dpSettings().raceDate.slice(0, 4)} – noch ${Math.max(0, Math.ceil((new Date(dpSettings().raceDate + "T12:00:00") - new Date()) / 604800000))} Wochen · Laufumfang ${escapeHtml(dpSettings().runScalePct)} %</div>
       <div style="display:flex; gap:8px; flex-wrap:wrap;">
         ${sick.from && !sick.to
           ? '<button class="btn-small" type="button" data-plan-act="healthy">Ich bin wieder gesund</button>'
@@ -193,7 +197,7 @@ function planStateCardHtml() {
         <button class="btn-small" type="button" data-plan-act="advance">Fortschritt +1 Woche</button>
         <button class="btn-small" type="button" data-plan-act="hold">Fortschritt −1 Woche</button>
       </div>
-      <div class="card-note" style="margin-top:8px;">Das geht auch im Coach-Tab, z. B. „ich bin krank“, „bin wieder gesund“, „fühlt sich gut, wir können hoch“.</div>
+      <div class="card-note" style="margin-top:8px;">Oder einfach unten ins Coach-Feld schreiben: „ich bin krank“, „bin wieder gesund“, „fühlt sich gut, wir können hoch“, „stagniert, wir bleiben so“.</div>
     </div>`;
 }
 
@@ -215,8 +219,6 @@ function renderDienstplan() {
         <div class="card-head"><span class="card-title">Ungespeicherte Änderungen</span></div>
         <button class="btn-small" type="button" id="dp-save-all">Speichern &amp; Plan neu berechnen</button>
       </div>
-
-      ${planStateCardHtml()}
 
       <div class="card">
         <div class="card-head"><span class="card-title">Dienstplan hochladen (PDF)</span><span class="card-note">Schichten (${escapeHtml(st.kuerzel)}) &amp; Notizen werden automatisch gelesen</span></div>
@@ -254,6 +256,10 @@ function renderDienstplan() {
           <label class="card-note">Fahrzeit je Strecke (Min)<input type="number" id="dp-set-travel" class="text-input" min="0" max="240" value="${st.travelMin}" /></label>
           <label class="card-note">Kürzel im Dienstplan<input type="text" id="dp-set-kz" class="text-input" maxlength="4" value="${escapeHtml(st.kuerzel)}" /></label>
           <label class="card-note">Wettkampf-/Zieltermin<input type="date" id="dp-set-race" class="text-input" value="${escapeHtml(st.raceDate)}" /></label>
+          <label class="card-note">Wettkampf (Name)<input type="text" id="dp-set-rname" class="text-input" maxlength="40" value="${escapeHtml(st.raceName)}" /></label>
+          <label class="card-note">Wettkampfstrecke (km)<input type="number" id="dp-set-rdist" class="text-input" min="1" max="500" value="${escapeHtml(st.raceDistanceKm)}" /></label>
+          <label class="card-note">Laufumfang insgesamt: <b id="dp-set-scale-val">${escapeHtml(st.runScalePct)}</b> %<input type="range" id="dp-set-scale" min="50" max="130" step="5" value="${escapeHtml(st.runScalePct)}" style="width:100%;" /></label>
+          <label class="card-note">Langer Lauf maximal (km)<input type="number" id="dp-set-longmax" class="text-input" min="10" max="60" value="${escapeHtml(st.longRunMaxKm)}" /></label>
           <div class="stack" style="gap:6px;">
             <label class="card-note"><input type="checkbox" id="dp-set-stabi" ${st.includeLegStabi ? "checked" : ""} /> Bein-Stabi wieder einplanen</label>
             <label class="card-note"><input type="checkbox" id="dp-set-super" ${st.includeLegSupersets ? "checked" : ""} /> Bein-Supersätze wieder einplanen</label>
@@ -371,17 +377,27 @@ function dpBindDienstplan(panel) {
   const saveAll = $("dp-save-all");
   if (saveAll) saveAll.addEventListener("click", () => dpCommit("Änderungen gespeichert"));
 
+  $("dp-set-scale").addEventListener("input", (e) => { $("dp-set-scale-val").textContent = e.target.value; });
   $("dp-set-save").addEventListener("click", async () => {
     const settings = {
       travelMin: Math.max(0, parseInt($("dp-set-travel").value, 10) || 0),
       kuerzel: ($("dp-set-kz").value || "WL").trim().toUpperCase(),
       raceDate: $("dp-set-race").value || "2027-08-28",
+      raceName: ($("dp-set-rname").value || "Wettkampf").trim(),
+      raceDistanceKm: Math.max(1, Number($("dp-set-rdist").value) || 100),
+      runScalePct: Math.min(130, Math.max(50, Number($("dp-set-scale").value) || 100)),
+      longRunMaxKm: Math.min(60, Math.max(10, Number($("dp-set-longmax").value) || 36)),
       includeLegStabi: $("dp-set-stabi").checked, includeLegSupersets: $("dp-set-super").checked,
     };
     await applyPlanChange("Einstellungen gespeichert", plan => { plan.settings = { ...(plan.settings || {}), ...settings }; });
   });
 
-  panel.querySelectorAll("[data-plan-act]").forEach(btn => btn.addEventListener("click", () => {
+}
+
+/** Buttons der Plan-Status-Karte (steht im Coach-Tab). */
+function bindPlanStatus(root) {
+  if (!root) return;
+  root.querySelectorAll("[data-plan-act]").forEach(btn => btn.addEventListener("click", () => {
     const act = btn.dataset.planAct;
     const mut = {
       sick: plan => { plan.sick = { from: isoToday(), to: null }; },

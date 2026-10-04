@@ -281,7 +281,7 @@ class Progression(unittest.TestCase):
 
     def test_race_day_unit(self):
         w = self.plan()["2027-08-23"]
-        self.assertEqual(w["days"]["Samstag"]["units"][0]["name"], "Wettkampf: Ultramarathon")
+        self.assertEqual(w["days"]["Samstag"]["units"][0]["name"], "Wettkampf: Ultramarathon 100 km")
 
     def test_offset_weeks_moves_progression(self):
         base = pl.generate_plan({}, date(2026, 11, 9), date(2026, 11, 9), TODAY)["2026-11-09"]
@@ -297,6 +297,36 @@ class Progression(unittest.TestCase):
         low = week(mon, {"deload": {"2026-11-02": {"active": True}}})
         self.assertLess(low["meta"]["targets"]["runVolumeKm"], base["meta"]["targets"]["runVolumeKm"])
         self.assertLess(self.long_km(low), self.long_km(base))
+
+
+class RunSettings(unittest.TestCase):
+    MON = date(2027, 3, 1)
+
+    def long_km(self, raw):
+        w = week(self.MON, raw)
+        u = find(w, next(d for d in w["days"] if find(w, d, "Langer Lauf")), "Langer Lauf")
+        return float(u["detail"].split(" km")[0].replace(",", "."))
+
+    def test_scale_reduces_and_increases(self):
+        base = self.long_km({})
+        self.assertLess(self.long_km({"settings": {"runScalePct": 70}}), base)
+        self.assertGreater(self.long_km({"settings": {"runScalePct": 120}}), base)
+
+    def test_scale_is_clamped(self):
+        self.assertEqual(self.long_km({"settings": {"runScalePct": 5}}), self.long_km({"settings": {"runScalePct": 50}}))
+
+    def test_long_run_cap_setting(self):
+        self.assertLessEqual(self.long_km({"settings": {"longRunMaxKm": 20}}), 20)
+
+    def test_manual_override_for_one_week(self):
+        raw = {"runOverrides": {pl.iso(self.MON): {"longKm": 18.5}}}
+        self.assertEqual(self.long_km(raw), 18.5)
+        self.assertNotEqual(float(week(self.MON + timedelta(days=7), raw)["meta"]["runKm"]["long"]), 18.5)
+
+    def test_meta_exposes_run_km_and_bad_overrides_ignored(self):
+        w = week(self.MON, {"runOverrides": {pl.iso(self.MON): {"longKm": "abc", "z2Km": -3}}})
+        self.assertGreater(w["meta"]["runKm"]["long"], 10)
+        self.assertEqual(pl.normalize_inputs({"runOverrides": {"2027-03-01": {"longKm": 500}}})["runOverrides"], {})
 
 
 class Sickness(unittest.TestCase):

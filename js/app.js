@@ -920,6 +920,8 @@ function renderWoche(data) {
         <div class="card-note" style="margin-top:10px;">Höhenmeter diese Woche: <b>${(w.actuals.elevationGainM ?? 0).toLocaleString("de-DE")} hm</b></div>
       </div>
 
+      ${weekRunControlHtml(w.startDate) ? `<div class="card">${weekRunControlHtml(w.startDate)}</div>` : ""}
+
       <div class="week-grid">${buildWeekOverview(data)}</div>
 
       ${wochePreviewHtml(data)}
@@ -1178,6 +1180,8 @@ function renderCoach(data) {
         <div class="card-note">Wegen deiner Rückmeldung „${escapeHtml(w.deloadReason || "")}" sind Lauf-/Rad-/Zeitziele diese Woche um 15% runtergesetzt. Tipp „Beine sind wieder gut" ins Feld unten, um das aufzuheben.</div>
       </div>` : ""}
 
+      ${canEdit() ? planStateCardHtml() : ""}
+
       ${planHintCardHtml(data)}
 
       <div class="card coach-hero">
@@ -1216,6 +1220,7 @@ function renderCoach(data) {
 
   setupCoachQA(data);
   bindPlanHint(data);
+  bindPlanStatus(document.getElementById("tab-coach"));
 }
 
 function answerCoachQuestion(question, data) {

@@ -613,7 +613,7 @@ def main():
         "progression": {"offsetWeeks": inputs_norm["progression"]["offsetWeeks"],
                         "step": (this_meta or {}).get("step"), "phase": (this_meta or {}).get("phase")},
         "sick": inputs_norm["sick"], "hint": hint,
-        "settings": {k: inputs_norm["settings"][k] for k in ("travelMin", "raceDate", "includeLegStabi", "includeLegSupersets")},
+        "settings": {k: inputs_norm["settings"][k] for k in ("travelMin", "raceDate", "raceName", "raceDistanceKm", "runScalePct", "longRunMaxKm", "includeLegStabi", "includeLegSupersets")},
         "counts": {"shifts": len(inputs_norm["shifts"]), "events": len(inputs_norm["events"])},
     }
 
