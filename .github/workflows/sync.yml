@@ -50,6 +50,7 @@ jobs:
         run: python sync.py
 
       - name: Telegram-Nachrichten (Zeiten stellt Willi auf der Website ein)
+        if: ${{ !cancelled() }}   # auch senden, wenn Garmin gerade streikt
         working-directory: sync
         continue-on-error: true
         env:
@@ -59,6 +60,7 @@ jobs:
         run: python telegram_agenda.py auto
 
       - name: Verschluesselte Daten committen
+        if: ${{ !cancelled() }}
         run: |
           git config user.name "basis-sync-bot"
           git config user.email "actions@users.noreply.github.com"
