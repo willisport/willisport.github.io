@@ -1089,6 +1089,8 @@ function renderPerformance(data) {
         </div>
       </div>
 
+      ${perfFtpCardHtml(data)}
+
       ${perfExtrasHtml(data)}
 
       ${data.performance.racePredictions && Object.keys(data.performance.racePredictions).length ? `
@@ -1102,6 +1104,7 @@ function renderPerformance(data) {
         </div>
       </div>` : ""}
     </div>`;
+  bindPerfFtp();
 }
 
 /* ---------- coach rule engine ---------- */

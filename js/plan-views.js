@@ -577,3 +577,57 @@ function downloadIcs(includeTraining) {
   setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
   planToast("Kalender-Datei erstellt", `${count} Einträge – Datei öffnen/importieren, dann sind sie im Kalender.`, 6000);
 }
+
+/* ---------------------------------------------------------------------------
+   Performance: FTP & 5-km-Zeit eintragen (Verlauf, W/kg, Test-Erinnerung)
+   --------------------------------------------------------------------------- */
+
+function perfFtpCardHtml(data) {
+  const st = dpSettings();
+  const hist = (planInputs().ftpHistory || []).slice().sort((a, b) => a.date.localeCompare(b.date));
+  const tg = data.planState && data.planState.metrics && data.planState.metrics.targets;
+  const ftp = st.ftpW || (tg && tg.ftpW) || null;
+  const kg = data.today && data.today.body && data.today.body.weightKg;
+  const last = hist.length ? hist[hist.length - 1] : null;
+  const weeksAgo = last ? Math.floor((Date.now() - new Date(last.date + "T12:00:00")) / 604800000) : null;
+  const edit = canEdit();
+  const fmt5k = st.ref5kSec ? `${Math.floor(st.ref5kSec / 60)}:${String(Math.round(st.ref5kSec % 60)).padStart(2, "0")}` : "";
+  return `
+    <div class="card" id="perf-ftp-card">
+      <div class="card-head"><span class="card-title">FTP &amp; Testwerte</span><span class="card-note">Zonen und Vorgaben im Plan rechnen damit</span></div>
+      <div class="stat-row">
+        <div class="stat"><span class="stat-value">${ftp || "–"}<span class="unit">W</span></span><span class="stat-label">FTP${st.ftpW ? " (von dir)" : tg ? " (Garmin)" : ""}</span></div>
+        <div class="stat"><span class="stat-value">${ftp && kg ? (ftp / kg).toFixed(2) : "–"}<span class="unit">W/kg</span></span><span class="stat-label">${kg ? `bei ${kg} kg` : "Gewicht fehlt"}</span></div>
+        <div class="stat"><span class="stat-value">${tg ? tg.z2Watt : "–"}<span class="unit">W</span></span><span class="stat-label">Zone 2</span></div>
+        <div class="stat"><span class="stat-value">${tg ? `${tg.thrLo}–${tg.thrHi}` : "–"}<span class="unit">W</span></span><span class="stat-label">Schwelle (Zone 4)</span></div>
+      </div>
+      ${hist.length > 1 ? `<div style="margin:10px 0;">${lineChartSVG(hist.map(h => ({ value: h.w, label: fmtDateShort(h.date) })))}</div>` : ""}
+      ${weeksAgo !== null && weeksAgo >= 8 ? `<div class="card-note" style="color:var(--amber); margin:8px 0;">Dein letzter FTP-Test ist ${weeksAgo} Wochen her – Zeit für einen neuen (alle 6–8 Wochen).</div>` : ""}
+      ${edit ? `
+      <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:flex-end; margin-top:10px;">
+        <label class="card-note">Neue FTP (Watt)<input type="number" id="pf-ftp" class="text-input" min="80" max="500" value="${st.ftpW || ""}" style="max-width:110px;" /></label>
+        <label class="card-note">Test am<input type="date" id="pf-ftp-date" class="text-input" value="${isoToday()}" style="max-width:160px;" /></label>
+        <label class="card-note">5-km-Zeit (mm:ss)<input type="text" id="pf-5k" class="text-input" placeholder="auto" value="${escapeHtml(fmt5k)}" style="max-width:110px;" /></label>
+        <button class="btn-small" type="button" id="pf-save">Speichern</button>
+      </div>
+      <div class="card-note" style="margin-top:6px;">FTP-Test (Zwift o. ä.) eintragen – der Plan passt Zone 2 und Schwelle an. 5-km-Zeit leer lassen = Garmin-Prognose.</div>` : ""}
+    </div>`;
+}
+
+function bindPerfFtp() {
+  const btn = document.getElementById("pf-save");
+  if (!btn) return;
+  btn.addEventListener("click", () => {
+    const w = Number(document.getElementById("pf-ftp").value);
+    const date = document.getElementById("pf-ftp-date").value || isoToday();
+    const m = (document.getElementById("pf-5k").value || "").trim().match(/^(\d{1,2}):(\d{2})$/);
+    const ref5kSec = m ? Number(m[1]) * 60 + Number(m[2]) : null;
+    if (!(w >= 80 && w <= 500)) { planToast("Bitte eine FTP zwischen 80 und 500 Watt eintragen", "", 4000); return; }
+    applyPlanChange(`FTP ${w} W gespeichert`, plan => {
+      plan.settings = { ...(plan.settings || {}), ftpW: w, ref5kSec };
+      const hist = (plan.ftpHistory || []).filter(h => h.date !== date);
+      hist.push({ date, w });
+      plan.ftpHistory = hist.sort((a, b) => a.date.localeCompare(b.date));
+    });
+  });
+}
