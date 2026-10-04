@@ -15,7 +15,7 @@ function dpSettings() {
   const p = planInputs();
   return {
     travelMin: 75, kuerzel: "WL", raceDate: "2027-08-28", raceName: "Ultramarathon", raceDistanceKm: 100,
-    runScalePct: 100, longRunMaxKm: 36, includeLegStabi: false, includeLegSupersets: false, ...(p.settings || {}),
+    runScalePct: 100, longRunMaxKm: 36, includeLongRide: false, includeLegStabi: false, includeLegSupersets: false, ...(p.settings || {}),
   };
 }
 
@@ -246,6 +246,15 @@ function renderDienstplan() {
       </div>
 
       <div class="card">
+        <div class="card-head"><span class="card-title">Kalender</span><span class="card-note">Plan in dein Handy-/Google-Kalender bringen</span></div>
+        <div class="card-note" style="margin-bottom:8px;">${(APP_DATA && APP_DATA.planState && APP_DATA.planState.externalEvents) ? `${APP_DATA.planState.externalEvents} Termine kommen automatisch aus deinem Google-Kalender.` : "Google-Kalender-Anbindung: noch nicht eingerichtet (geheime iCal-Adresse fehlt) – dann übernimmt die Seite deine Termine automatisch."}</div>
+        <div style="display:flex; gap:8px; flex-wrap:wrap;">
+          <button class="btn-small" type="button" id="dp-ics-export">Schichten &amp; Termine als .ics</button>
+          <button class="btn-small" type="button" id="dp-ics-export-train">… mit Training als .ics</button>
+        </div>
+      </div>
+
+      <div class="card">
         <div class="card-head"><span class="card-title">Gespeicherte Schichten &amp; Termine</span><span class="card-note">Zeiten direkt ändern, dann speichern</span></div>
         ${dpOverviewHtml()}
       </div>
@@ -261,6 +270,7 @@ function renderDienstplan() {
           <label class="card-note">Laufumfang insgesamt: <b id="dp-set-scale-val">${escapeHtml(st.runScalePct)}</b> %<input type="range" id="dp-set-scale" min="50" max="130" step="5" value="${escapeHtml(st.runScalePct)}" style="width:100%;" /></label>
           <label class="card-note">Langer Lauf maximal (km)<input type="number" id="dp-set-longmax" class="text-input" min="10" max="60" value="${escapeHtml(st.longRunMaxKm)}" /></label>
           <div class="stack" style="gap:6px;">
+            <label class="card-note"><input type="checkbox" id="dp-set-longride" ${st.includeLongRide ? "checked" : ""} /> Langes Rad einplanen (1× pro Woche)</label>
             <label class="card-note"><input type="checkbox" id="dp-set-stabi" ${st.includeLegStabi ? "checked" : ""} /> Bein-Stabi wieder einplanen</label>
             <label class="card-note"><input type="checkbox" id="dp-set-super" ${st.includeLegSupersets ? "checked" : ""} /> Bein-Supersätze wieder einplanen</label>
           </div>
@@ -309,6 +319,8 @@ function dpBindDienstplan(panel) {
   const discard = $("dp-discard");
   if (discard) discard.addEventListener("click", () => { DPUI.parsed = null; DPUI.status = ""; renderDienstplan(); });
 
+  $("dp-ics-export").addEventListener("click", () => downloadIcs(false));
+  $("dp-ics-export-train").addEventListener("click", () => downloadIcs(true));
   $("dp-ev-add").addEventListener("click", async () => {
     const date = $("dp-ev-date").value, title = $("dp-ev-title").value.trim();
     if (!date || !title) { planToast("Bitte Titel und Datum angeben", ""); return; }
@@ -387,7 +399,7 @@ function dpBindDienstplan(panel) {
       raceDistanceKm: Math.max(1, Number($("dp-set-rdist").value) || 100),
       runScalePct: Math.min(130, Math.max(50, Number($("dp-set-scale").value) || 100)),
       longRunMaxKm: Math.min(60, Math.max(10, Number($("dp-set-longmax").value) || 36)),
-      includeLegStabi: $("dp-set-stabi").checked, includeLegSupersets: $("dp-set-super").checked,
+      includeLongRide: $("dp-set-longride").checked, includeLegStabi: $("dp-set-stabi").checked, includeLegSupersets: $("dp-set-super").checked,
     };
     await applyPlanChange("Einstellungen gespeichert", plan => { plan.settings = { ...(plan.settings || {}), ...settings }; });
   });

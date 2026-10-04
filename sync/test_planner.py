@@ -155,7 +155,7 @@ class WeekInvariants(unittest.TestCase):
                 m = __import__("re").search(r"(\d{2}):(\d{2}) Uhr", u["detail"])
                 if m and u["type"] != "emom":
                     start = int(m.group(1)) * 60 + int(m.group(2))
-                    dur = u["plannedDurationMin"] + (10 if u["name"] in ("Zone-2-Lauf", "Langer Lauf") else 0)
+                    dur = u["plannedDurationMin"] + (10 if u["name"] in ("Zone-2-Lauf", "Langer Lauf", "VO2max-Intervalle") else 0)
                     timed.append((start, start + dur, u["name"]))
             timed.sort()
             for (s1, e1, n1), (s2, e2, n2) in zip(timed, timed[1:]):
@@ -191,8 +191,9 @@ class WeekInvariants(unittest.TestCase):
         w = week(date(2026, 11, 2))
         names = [u["name"] for u in all_units(w)]
         self.assertIn("Langer Lauf", names)
-        self.assertIn("Intervalle", names)
-        self.assertIn("Langes Rad Zone 2", names)
+        self.assertIn("VO2max-Intervalle", names)
+        self.assertIn("Schwellentraining Rad", names)
+        self.assertNotIn("Langes Rad Zone 2", names)   # standardmaessig aus
         self.assertIn("Schweres Beintraining", names)
         rest_days = [wd for wd, d in w["days"].items() if "Ruhetag" in d["focus"]]
         self.assertGreaterEqual(len(rest_days), 1)
@@ -201,8 +202,8 @@ class WeekInvariants(unittest.TestCase):
         for mon in [date(2026, 11, 2) + timedelta(days=7 * k) for k in range(12)]:
             w = week(mon)
             idx = {u["name"]: i for i, (wd, d) in enumerate(w["days"].items()) for u in d["units"]}
-            if "Langer Lauf" in idx and "Intervalle" in idx:
-                self.assertGreater(abs(idx["Langer Lauf"] - idx["Intervalle"]), 1, mon)
+            if "Langer Lauf" in idx and "VO2max-Intervalle" in idx:
+                self.assertGreater(abs(idx["Langer Lauf"] - idx["VO2max-Intervalle"]), 1, mon)
 
     def test_heavy_legs_not_day_before_long_run(self):
         for mon in [date(2026, 11, 2) + timedelta(days=7 * k) for k in range(12)]:
@@ -251,7 +252,7 @@ class Progression(unittest.TestCase):
 
     def test_first_week_matches_start_values(self):
         w = self.plan()["2026-10-05"]
-        self.assertEqual(self.long_km(w), 12.0)
+        self.assertEqual(self.long_km(w), 10.0)
         self.assertEqual(w["meta"]["step"], 0)
 
     def test_build_weeks_increase_and_recovery_drops(self):
@@ -329,6 +330,72 @@ class RunSettings(unittest.TestCase):
         self.assertEqual(pl.normalize_inputs({"runOverrides": {"2027-03-01": {"longKm": 500}}})["runOverrides"], {})
 
 
+class NewTrainingStructure(unittest.TestCase):
+    """Rad fast taeglich, VO2max-Laeufe, Schwelle auf dem Rad, sanfter Start."""
+    START = date(2026, 10, 5)   # Fortschrittsschritt 0
+
+    def names(self, w):
+        return [u["name"] for u in all_units(w)]
+
+    def test_first_week_is_gentle(self):
+        w = week(self.START)
+        z2 = [u for u in all_units(w) if u["name"] == "Rad Zone 2"]
+        self.assertTrue(z2)
+        self.assertTrue(all(u["plannedDurationMin"] == 45 for u in z2))
+        self.assertNotIn("Schwellentraining Rad", self.names(w))     # erst ab dem 2. Aufbauschritt
+        runs = {wd for wd, d in w["days"].items() if any(u["type"] == "lauf" for u in d["units"])}
+        self.assertEqual(len(runs), 3)
+
+    def test_threshold_and_four_run_days_come_later(self):
+        w = week(date(2026, 11, 16))
+        self.assertIn("Schwellentraining Rad", self.names(w))
+        runs = {wd for wd, d in w["days"].items() if any(u["type"] == "lauf" for u in d["units"])}
+        self.assertEqual(len(runs), 4)
+
+    def test_bike_duration_grows_to_cap(self):
+        durs = []
+        for k in range(0, 44, 4):   # bis vor den Taper
+            w = week(self.START + timedelta(days=7 * k))
+            z = [u["plannedDurationMin"] for u in all_units(w) if u["name"] == "Rad Zone 2"]
+            if z and w["meta"]["phase"] == "aufbau":
+                durs.append(max(z))
+        self.assertEqual(durs, sorted(durs))
+        self.assertLessEqual(max(durs), 75)
+        self.assertGreater(max(durs), 45)
+
+    def test_threshold_ramps_to_two_times_twenty(self):
+        w = week(self.START + timedelta(days=7 * 40))
+        thr = next(u for u in all_units(w) if u["name"] == "Schwellentraining Rad")
+        self.assertIn("2×20 min", thr["detail"])
+        self.assertTrue(thr["keySession"])
+
+    def test_vo2_intervals_ramp_and_are_not_fasted(self):
+        a = next(u for u in all_units(week(self.START)) if u["name"] == "VO2max-Intervalle")
+        self.assertIn("5×2 min", a["detail"])
+        b = next(u for u in all_units(week(self.START + timedelta(days=7 * 40))) if u["name"] == "VO2max-Intervalle")
+        self.assertRegex(b["detail"], r"[56]×4 min")
+        self.assertNotIn("nüchtern Uhr", a["detail"])
+        self.assertIn("nicht nüchtern", a["detail"])
+
+    def test_long_ride_off_by_default_and_switchable(self):
+        for k in range(8):
+            self.assertNotIn("Langes Rad Zone 2", self.names(week(self.START + timedelta(days=7 * k))))
+        w = week(date(2026, 11, 16), {"settings": {"includeLongRide": True}})
+        self.assertIn("Langes Rad Zone 2", self.names(w))
+
+    def test_hard_bike_not_next_to_vo2(self):
+        for k in range(1, 30):
+            w = week(self.START + timedelta(days=7 * k))
+            idx = {u["name"]: i for i, (wd, d) in enumerate(w["days"].items()) for u in d["units"]}
+            if "VO2max-Intervalle" in idx and "Schwellentraining Rad" in idx:
+                self.assertGreater(abs(idx["VO2max-Intervalle"] - idx["Schwellentraining Rad"]), 1, k)
+
+    def test_bike_nearly_every_day(self):
+        w = week(date(2026, 11, 16))
+        bike_days = sum(1 for d in w["days"].values() if any(u["type"] == "rad" for u in d["units"]))
+        self.assertGreaterEqual(bike_days, 5)
+
+
 class Sickness(unittest.TestCase):
     RAW = {"sick": {"from": "2026-11-03", "to": "2026-11-06"}}
 
@@ -348,7 +415,7 @@ class Sickness(unittest.TestCase):
         self.assertEqual([u["name"] for u in units(w, "Montag")], ["Rad Zone 1 (locker)"])
         # Tag 4 nach der Krankheit: noch keine Schluesseleinheiten
         names = [u["name"] for u in units(w, "Dienstag")]
-        for forbidden in ("Intervalle", "Langer Lauf", "Langes Rad Zone 2", "Schweres Beintraining"):
+        for forbidden in ("VO2max-Intervalle", "Langer Lauf", "Langes Rad Zone 2", "Schweres Beintraining", "Schwellentraining Rad"):
             self.assertNotIn(forbidden, names)
 
     def test_ramp_back_to_normal(self):

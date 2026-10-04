@@ -41,6 +41,7 @@ jobs:
           HEALTH_BRIDGE_URL: ${{ secrets.HEALTH_BRIDGE_URL }}
           HEALTH_BRIDGE_TOKEN: ${{ secrets.HEALTH_BRIDGE_TOKEN }}
           DATA_ENCRYPTION_KEY: ${{ secrets.DATA_ENCRYPTION_KEY }}
+          CALENDAR_ICS_URL: ${{ secrets.CALENDAR_ICS_URL }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: python sync.py
 

@@ -4,14 +4,17 @@ Fortschrittsstand einen kompletten Wochenplan (bis Zielmonat) - deterministisch,
 ohne KI, laeuft in GitHub Actions (sync.py) und braucht kein Claude-Abo.
 
 Regeln (Willis "Master", siehe Memory/Notizen):
-  * 5x/Woche Rad Zone 2, immer 60 min, moeglichst nuechtern am Morgen
+  * Rad Zone 2 fast jeden Morgen, moeglichst nuechtern (Start 45 min, wird Schritt fuer
+    Schritt laenger bis 75 min)
       Rad-Start = Abfahrt - Raddauer - 30 min, nie vor 06:00; passt es nicht in
       den Morgen, wandert es nach Feierabend (dann nicht mehr nuechtern)
-  * 2 Ruhetage (nur lockeres Rad + EMOM)
-  * 1x schweres Beintraining, 1x Intervalle, 1x langer Lauf, 1x langes Rad,
-    2x lockerer Zone-2-Lauf, 2x Core, 1x Arme/Schultern, EMOM als Bonus
+  * 2 Ruhetage (nur lockeres Rad + EMOM) - gewaehlt nach dem Dienstplan
+  * 1x VO2max-Intervalle (Lauf), 1x Schwellentraining auf dem Rad (2 x 20 min am Ende),
+    1x schweres Beintraining, 1x langer Lauf, 1-2x lockerer Zone-2-Lauf
+    (3 Lauftage am Anfang, danach 4), 2x Core, 1x Arme/Schultern, EMOM als Bonus
+  * Langes Rad ist standardmaessig AUS (Einstellung includeLongRide, per Coach/Einstellungen)
   * Aufbau: 3 Aufbauwochen + 1 Recovery-Woche, jede Aufbauwoche etwas mehr
-    (langer Lauf, Intervall-Wiederholungen, langes Rad), vor dem Wettkampf Taper
+    (Raddauer, langer Lauf, Intervalle, Schwelle), vor dem Wettkampf Taper
   * Krankheit: Pause, danach sanfter Wiedereinstieg, Fortschritt pausiert
 
 Alle Zeiten sind lokale Minuten seit Mitternacht. Keine Netzwerk-/IO-Zugriffe.
@@ -44,6 +47,7 @@ DEFAULT_SETTINGS = {
     "raceDistanceKm": 100,
     "runScalePct": 100,         # Regler fuer den Laufumfang (Z2- und langer Lauf), 50-130 %
     "longRunMaxKm": 36,         # Obergrenze fuer den langen Lauf
+    "includeLongRide": False,   # langes Rad: zum Start aus, per Coach wieder einschaltbar
     "includeLegStabi": False,   # aktuell wegen Knie raus, per Schalter wieder reinholbar
     "includeLegSupersets": False,
 }
@@ -472,9 +476,15 @@ def week_params(monday: date, inputs: dict, factor_override: float | None = None
     scale = num("runScalePct", 100, 50, 130) / 100.0
     long_cap = num("longRunMaxKm", 36, 10, 60)
     z2_km = min(10.0, 6.0 + 0.5 * (s // 4))
-    long_km = half(min(long_cap, 12.0 + 0.75 * s))
-    reps = 4 if s < 8 else (5 if s < 18 else 6)
+    long_km = half(min(long_cap, 10.0 + 0.75 * s))
     long_ride = int(round(min(240, 120 + 7.5 * s) / 5) * 5)
+    # VO2max-Intervalle: (Wiederholungen, Minuten je Intervall) je Fortschrittsschritt
+    vo2_table = [(0, 5, 2), (2, 6, 2), (4, 5, 3), (6, 6, 3), (8, 5, 4), (12, 6, 4)]
+    reps, vo2_min = next((r, m) for st0, r, m in reversed(vo2_table) if s >= st0)
+    # Schwelle auf dem Rad: 2 x N min, ab dem zweiten Aufbauschritt
+    thr_min = 0 if s < 1 else (10 if s < 2 else 12 if s < 4 else 15 if s < 6 else 18 if s < 8 else 20)
+    bike_min = min(75, 45 + 5 * (s // 2))
+    run_days = 3 if s < 3 else 4
 
     z2_km = max(4.0, half(z2_km * scale * (0.85 if phase == "recovery" else 1.0) * min(1.0, taper_factor + 0.1)))
     long_km = max(6.0, half(long_km * factor * scale))
@@ -485,13 +495,20 @@ def week_params(monday: date, inputs: dict, factor_override: float | None = None
         z2_km = half(manual["z2Km"])
     long_ride = max(60, int(round(long_ride * factor / 5) * 5))
     reps = max(3, int(round(reps * (0.7 if phase == "recovery" else 1.0) * min(1.0, taper_factor + 0.1))))
+    thr_min = int(round(thr_min * (0.7 if phase == "recovery" else 1.0) * min(1.0, taper_factor + 0.1)))
+    thr_min = thr_min if thr_min >= 8 else 0
+    bike_min = int(round(bike_min * (0.85 if phase == "recovery" else 1.0) / 5) * 5)
+    if phase in ("taper", "wettkampf", "erholung"):
+        bike_min = min(bike_min, 45)
     if phase == "wettkampf" or (phase == "erholung" and factor < 0.6):
         reps = 0
+        thr_min = 0
 
     return {
         "p": p, "step": s, "phase": phase, "recovery": phase == "recovery",
         "factor": round(factor, 3), "z2Km": z2_km, "longKm": long_km, "longRideMin": long_ride,
-        "intervalReps": reps, "skipHeavy": phase == "wettkampf" or (phase == "erholung" and factor < 0.6), "weeksToRace": weeks_to_race, "taper": phase in ("taper", "wettkampf"),
+        "intervalReps": reps, "vo2Min": vo2_min, "thresholdMin": thr_min, "bikeMin": bike_min, "runDays": run_days,
+        "skipHeavy": phase == "wettkampf" or (phase == "erholung" and factor < 0.6), "weeksToRace": weeks_to_race, "taper": phase in ("taper", "wettkampf"),
     }
 
 
@@ -517,18 +534,27 @@ def run_minutes(km: float) -> int:
     return int(round(km * 6.1))
 
 
-def interval_total_min(reps: int) -> int:
-    return reps * 7 + 12   # Intervalle + Traben + Ein-/Auslaufen (ohne Dusche)
+def vo2_rest_min(m: int) -> int:
+    return min(m, 3)
 
 
-def interval_km(reps: int) -> float:
-    return round((reps * 7 + 20) / 5.6, 1)
+def interval_total_min(reps: int, m: int = 3) -> int:
+    return 25 + reps * (m + vo2_rest_min(m))   # 15 min Einlaufen + 10 min Auslaufen + Intervalle/Traben
+
+
+def interval_km(reps: int, m: int = 3) -> float:
+    return round(4.2 + reps * (m / 4.2 + vo2_rest_min(m) / 7.0), 1)
+
+
+def threshold_total_min(w: int) -> int:
+    return 15 + 2 * w + 5 + 10   # einrollen + 2 x Schwelle + Pause + ausrollen
 
 
 PREF = {
     "long_run":   [5, 6, 2, 3, 4, 0, 1],
     "long_ride":  [6, 5, 3, 2, 4, 0, 1],
     "intervals":  [1, 3, 4, 2, 0, 5, 6],
+    "threshold":  [2, 0, 4, 3, 1, 5, 6],
     "heavy_legs": [0, 2, 1, 3, 4, 5, 6],
     "z2_run":     [2, 0, 3, 4, 1, 5, 6],
     "rest":       [4, 0, 2, 1, 3, 6, 5],
@@ -644,28 +670,46 @@ class Planner:
         # --- 2. langes Rad (nicht in der Wettkampfwoche) ---
         lr_dur = params["longRideMin"]
         ri = None
-        if params["phase"] != "wettkampf":
+        if params["phase"] != "wettkampf" and st.get("includeLongRide"):
             ri = choose("long_ride", lr_dur, self.slot_long, [i for i in key_pool if i != li])
-        if ri is not None:
-            roles[ri].add("long_ride")
-        elif params["phase"] != "wettkampf":
-            missing.append("langes Rad")
+            if ri is not None:
+                roles[ri].add("long_ride")
+            else:
+                missing.append("langes Rad")
 
         # --- 3. Intervalle (nicht neben dem langen Lauf) ---
         reps = params["intervalReps"]
         ii = None
         if reps >= 3:
-            iv_dur = interval_total_min(reps)
+            iv_dur = interval_total_min(reps, params["vo2Min"])
             ii = choose("intervals", iv_dur, self.slot_run, [i for i in key_pool if i not in (li, ri)],
                         penalty_fn=lambda i: 600 if (li is not None and abs(i - li) == 1) else 0)
             if ii is not None:
                 roles[ii].add("intervals")
             else:
-                missing.append("Intervalle")
+                missing.append("VO2max-Intervalle")
+
+        # --- 3b. Schwellentraining auf dem Rad (nicht neben Intervallen/Langlauf) ---
+        ti = None
+        thr = params["thresholdMin"]
+        if thr:
+            def thr_pen(i):
+                pen = 0
+                if ii is not None and abs(i - ii) == 1:
+                    pen += 600
+                if li is not None and abs(i - li) == 1:
+                    pen += 400
+                return pen
+            ti = choose("threshold", threshold_total_min(thr), self.slot_bike_pm,
+                        [i for i in key_pool if i not in (li, ri, ii)], thr_pen)
+            if ti is not None:
+                roles[ti].add("threshold")
+            else:
+                missing.append("Schwellentraining")
 
         # --- 4. schweres Beintraining (nicht vor Intervallen/Langlauf) ---
         hl_dur = int((lib.get("heavyLegs") or {}).get("durationMin") or 65)
-        taken = {d for d in (li, ri, ii) if d is not None}
+        taken = {d for d in (li, ri, ii, ti) if d is not None}
 
         def hl_penalty(i):
             pen = 0
@@ -673,6 +717,8 @@ class Planner:
                 pen += 600
             if ii is not None and i + 1 == ii:
                 pen += 600
+            if ti is not None and i + 1 == ti:
+                pen += 300
             if ii is not None and i == ii + 1:
                 pen += 150
             if li is not None and abs(i - li) == 1:
@@ -688,7 +734,7 @@ class Planner:
                 missing.append("schweres Beintraining")
 
         # --- 5. Ruhetage: die zwei am staerksten belegten Tage ohne Key-Einheit ---
-        keyed = {d for d in (li, ri, ii, hi) if d is not None}
+        keyed = {d for d in (li, ri, ii, ti, hi) if d is not None}
         rest_cands = [i for i in pool if i not in keyed]
         rest_cands.sort(key=lambda i: (ctxs[i].free_minutes() // 90, PREF["rest"].index(i)))
         rest_days = rest_cands[:2]
@@ -698,7 +744,7 @@ class Planner:
         # --- 6. lockere Zone-2-Laeufe ---
         z2_km = params["z2Km"]
         z2_dur = run_minutes(z2_km) + 10
-        run_target = 1 if params["phase"] == "wettkampf" else 2
+        run_target = 1 if params["phase"] == "wettkampf" else max(1, params["runDays"] - 2)
         z2_days = []
         for _ in range(run_target):
             def z2_pen(i):
@@ -712,7 +758,7 @@ class Planner:
                 if z2_days and abs(i - z2_days[0]) == 1:
                     pen += 80
                 return pen
-            cands = [i for i in pool if i not in (li, ri, ii, hi) and i not in rest_days and i not in z2_days]
+            cands = [i for i in pool if i not in (li, ri, ii, ti, hi) and i not in rest_days and i not in z2_days]
             ci = choose("z2_run", z2_dur, self.slot_run, cands, z2_pen)
             if ci is None and len(rest_days) >= 2:
                 ci = choose("z2_run", z2_dur, self.slot_run, [i for i in rest_days if i not in z2_days], z2_pen)
@@ -756,7 +802,15 @@ class Planner:
                                   keySession=True,
                                   matchHint={"activityTypes": ["running"], "minDistanceKm": int(max(4, round(km * 0.8)))}), start, dur)
             # --- taegliches Rad (nicht am Langlauf-/Langrad-Tag) ---
-            if "long_ride" not in r and "long_run" not in r:
+            if "threshold" in r:
+                w = thr if lvl >= 0.85 else max(8, int(round(thr * 0.7)))
+                dur = threshold_total_min(w)
+                start = self.slot_bike_pm(ctx, dur) or self.slot_fasted(ctx, dur)
+                commit(i, mk_unit("Schwellentraining Rad", "rad", "pflicht",
+                                  f"15 min einrollen · 2×{w} min Schwelle (hart, aber gleichmäßig – ca. 90–95 % deiner Schwellenleistung, "
+                                  f"HF ~165–172 bpm, „kontrolliert unbequem“) · 5 min locker dazwischen · 10 min ausrollen{tsuf(start)}, nicht nüchtern",
+                                  dur, keySession=True, matchHint=hint_bike()), start, dur)
+            if "long_ride" not in r and "long_run" not in r and "threshold" not in r:
                 if "rest" in r:
                     dur = 45 if ctx.kind == "free" else 30
                     start = self.slot_fasted(ctx, dur) or self.slot_bike_pm(ctx, dur)
@@ -764,7 +818,7 @@ class Planner:
                     commit(i, mk_unit("Rad Zone 1 (locker)", "rad", "ergaenzung",
                                       f"{dur} min, ganz entspannt{tsuf(start, fasted)}", dur, matchHint=hint_bike()), start, dur)
                 else:
-                    dur = 60 if (lvl >= 0.7 and params["phase"] != "wettkampf") else 45
+                    dur = params["bikeMin"] if lvl >= 0.7 else min(45, params["bikeMin"])
                     start = self.slot_fasted(ctx, dur)
                     fasted = start is not None
                     if start is None:
@@ -775,11 +829,13 @@ class Planner:
             # --- Intervalle ---
             if "intervals" in r:
                 rp = reps if lvl >= 0.85 else max(3, reps - 1)
-                dur = interval_total_min(rp)
+                vm = params["vo2Min"]
+                dur = interval_total_min(rp, vm)
                 start = self.slot_run(ctx, dur, after=(last_end[i] + 10) if last_end[i] else None)
-                commit(i, mk_unit("Intervalle", "lauf", "pflicht",
-                                  f"{rp}×4 min hart (Zielpace ~4:15–4:30 min/km, nahe Schwellen-HF 175 bpm) / 3 min locker traben{tsuf(start)}, nicht nüchtern",
-                                  rp * 7 + 4, keySession=True, matchHint={"activityTypes": ["running"]}), start, dur)
+                commit(i, mk_unit("VO2max-Intervalle", "lauf", "pflicht",
+                                  f"15 min einlaufen · {rp}×{vm} min sehr hart (ca. 5-km-Tempo, grob 4:05–4:20 min/km, gleichmäßig, HF steigt Richtung 180) "
+                                  f"mit je {vo2_rest_min(vm)} min lockerem Traben · 10 min auslaufen{tsuf(start)}, nicht nüchtern",
+                                  dur - 10, keySession=True, matchHint={"activityTypes": ["running"]}), start, dur)
             # --- Zone-2-Lauf ---
             if "z2_run" in r:
                 km = z2_km if lvl >= 1 else max(4.0, round(z2_km * lvl * 2) / 2)
@@ -820,7 +876,7 @@ class Planner:
                 break
             if ctxs[i].kind == "krank" or easy_only[i] or level[i] < 0.7:
                 continue
-            if roles[i] & {"intervals", "long_run", "long_ride", "rest"}:
+            if roles[i] & {"intervals", "long_run", "long_ride", "rest", "threshold"}:
                 continue
             if any(abs(i - c) < 2 for c in core_days):
                 continue
@@ -837,7 +893,7 @@ class Planner:
             for i in sorted(range(n), key=lambda i: (-ctxs[i].largest_window(), i)):
                 if ctxs[i].kind == "krank" or easy_only[i] or level[i] < 0.85:
                     continue
-                if roles[i] & {"heavy_legs", "long_run", "intervals", "rest"} or i in core_days:
+                if roles[i] & {"heavy_legs", "long_run", "intervals", "rest", "threshold"} or i in core_days:
                     continue
                 start = self.slot_core(ctxs[i], arm_dur, after=(last_end[i] + 10) if last_end[i] else None)
                 if start is None:
@@ -876,6 +932,7 @@ ORDER = {"rad": 0, "lauf": 1, "kraft": 2, "core": 3, "emom": 4}
 def short_label(unit: dict) -> str:
     n = unit["name"]
     return {"Rad Zone 2": "Rad", "Rad Zone 1 (locker)": "lockeres Rad", "Langes Rad Zone 2": "langes Rad",
+            "VO2max-Intervalle": "VO2max-Intervalle", "Schwellentraining Rad": "Schwelle (Rad)",
             "Zone-2-Lauf": "Lauf", "Langer Lauf": "langer Lauf", "Schweres Beintraining": "schwere Beine",
             "Arme/Schultern": "Arme/Schultern"}.get(n, n)
 
@@ -924,16 +981,17 @@ def generate_week(monday: date, inputs: dict, today: date, template_library: dic
             focus += " + ".join(dict.fromkeys(parts)) if parts else "Training"
         day = {"focus": focus.rstrip(" ·").strip(), "units": units}
         notes = [u for u in units if u.get("keySession")]
-        if notes and any(u["name"] in ("Langer Lauf", "Intervalle", "Langes Rad Zone 2") for u in notes):
-            day["fallbackNote"] = "Schlüsseleinheit – nicht durchs Rad ersetzen." if any(u["name"] != "Langes Rad Zone 2" for u in notes) else None
+        if notes and any(u["name"] in ("Langer Lauf", "VO2max-Intervalle", "Langes Rad Zone 2", "Schwellentraining Rad") for u in notes):
+            run_key = any(u["name"] in ("Langer Lauf", "VO2max-Intervalle") for u in notes)
+            day["fallbackNote"] = "Schlüsseleinheit – nicht durchs Rad ersetzen." if run_key else None
         days[ctx.weekday] = day
 
         for u in units:
             total_min += u.get("plannedDurationMin", 0)
             if u["type"] == "lauf":
-                if u["name"] == "Intervalle":
+                if u["name"] == "VO2max-Intervalle":
                     reps = params["intervalReps"] if params["intervalReps"] else 4
-                    run_km += interval_km(reps)
+                    run_km += interval_km(reps, params["vo2Min"])
                 else:
                     try:
                         run_km += float(u["detail"].split(" km")[0].replace(",", "."))

@@ -14,6 +14,7 @@ from pathlib import Path
 from unittest import mock
 
 sys.path.insert(0, str(Path(__file__).parent))
+import calendar_source  # noqa: E402
 import crypto_utils  # noqa: E402
 import sync  # noqa: E402
 
@@ -128,6 +129,26 @@ class SyncIntegration(unittest.TestCase):
         (self.tmp / "data" / "overrides.enc.json").write_text("{kaputt", encoding="utf-8")
         sync.main()
         self.assertTrue((self.tmp / "data" / "training-data.enc.json").exists())
+
+
+    def test_google_calendar_events_flow_into_agenda(self):
+        ics = chr(10).join(["BEGIN:VCALENDAR", "BEGIN:VEVENT", "UID:z1", "DTSTART;TZID=Europe/Berlin:20261015T081500",
+                         "DTEND;TZID=Europe/Berlin:20261015T091500", "SUMMARY:Zahnarzt", "END:VEVENT", "END:VCALENDAR"])
+        env = {"CALENDAR_ICS_URL": "http://example.invalid/cal.ics"}
+        with mock.patch.dict(os.environ, env), mock.patch.object(calendar_source, "fetch_text", lambda url, timeout=20: ics):
+            sync.main()
+        data = self.read("training-data.enc.json")
+        self.assertEqual(data["planState"]["externalEvents"], 1)
+        items = {(a["date"], i["title"]) for a in data["agenda"] for i in a["items"]}
+        self.assertIn(("2026-10-15", "Zahnarzt"), items)
+
+    def test_calendar_failure_does_not_break_sync(self):
+        def boom(url, timeout=20):
+            raise OSError("offline")
+        env = {"CALENDAR_ICS_URL": "http://example.invalid/cal.ics"}
+        with mock.patch.dict(os.environ, env), mock.patch.object(calendar_source, "fetch_text", boom):
+            sync.main()
+        self.assertEqual(self.read("training-data.enc.json")["planState"]["externalEvents"], 0)
 
 
 if __name__ == "__main__":

@@ -507,3 +507,73 @@ function retimeMovedUnit(weekStart, homeWeekday, unitName, targetDate, isHome) {
   setTimeOverride(targetDate, unitName, time || "");
   return time;
 }
+
+/* ---------------------------------------------------------------------------
+   Kalender-Export (.ics) - Import in Google/Apple/Outlook Kalender per Tipp
+   --------------------------------------------------------------------------- */
+
+function icsEscape(s) {
+  return String(s || "").replace(/\\/g, "\\\\").replace(/;/g, "\\;").replace(/,/g, "\\,").replace(/\r?\n/g, "\\n");
+}
+function icsStamp(dateIso, hm) { return dateIso.replace(/-/g, "") + "T" + hm.replace(":", "") + "00"; }
+
+/** Alle Einträge (Arbeit, Termine, optional Training) als iCalendar-Text. */
+function buildIcsText(includeTraining) {
+  const today = isoToday();
+  const events = [];
+  const add = (date, start, end, title, desc, uidBase) => {
+    if (date < today || !start) return;
+    events.push({ date, start, end, title, desc, uid: `${date}-${uidBase}-${start.replace(":", "")}@willisport.github.io` });
+  };
+  const agenda = (PLAN_DATA && PLAN_DATA.agenda) || (APP_DATA && APP_DATA.agenda) || [];
+  agenda.forEach(a => a.items.forEach(it => {
+    if (!["arbeit", "schule", "termin"].includes(it.kind) || !it.start) return;
+    const label = it.kind === "arbeit" ? "Arbeit" : it.title || "Termin";
+    add(a.date, it.start, it.end || minToHm(hmToMin(it.start) + 60), label, it.note || "", it.kind);
+  }));
+  if (includeTraining) {
+    const weeks = {};
+    if (PLAN_DATA && PLAN_DATA.weeks) Object.entries(PLAN_DATA.weeks).forEach(([m, w]) => { weeks[m] = w.days; });
+    if (APP_DATA) {
+      const d = {};
+      APP_DATA.week.days.forEach(day => { d[day.weekday] = { units: day.units }; });
+      weeks[APP_DATA.week.startDate] = d;
+    }
+    Object.entries(weeks).forEach(([monday, days]) => {
+      WD_NAMES.forEach((wd, i) => {
+        const date = isoAddDays(monday, i);
+        if (date > isoAddDays(today, 56)) return;   // Training: nur die nächsten 8 Wochen
+        ((days[wd] || {}).units || []).forEach((u, k) => {
+          if (u.type === "emom") return;
+          const m = (u.detail || "").match(/(\d{2}:\d{2}) Uhr/);
+          if (!m) return;
+          const dur = u.plannedDurationMin || 45;
+          add(date, m[1], minToHm(Math.min(23 * 60 + 59, hmToMin(m[1]) + dur)), `Training: ${u.name}`, u.detail || "", "t" + k);
+        });
+      });
+    });
+  }
+  const lines = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Willis Dashboard//DE", "CALSCALE:GREGORIAN", "X-WR-CALNAME:Willis Plan"];
+  const stamp = new Date().toISOString().replace(/[-:]/g, "").slice(0, 15) + "Z";
+  events.sort((a, b) => (a.date + a.start).localeCompare(b.date + b.start)).forEach(e => {
+    lines.push("BEGIN:VEVENT", `UID:${e.uid}`, `DTSTAMP:${stamp}`, `DTSTART:${icsStamp(e.date, e.start)}`,
+      `DTEND:${icsStamp(e.date, e.end)}`, `SUMMARY:${icsEscape(e.title)}`);
+    if (e.desc) lines.push(`DESCRIPTION:${icsEscape(e.desc)}`);
+    lines.push("END:VEVENT");
+  });
+  lines.push("END:VCALENDAR");
+  return { text: lines.join("\r\n") + "\r\n", count: events.length };
+}
+
+function downloadIcs(includeTraining) {
+  const { text, count } = buildIcsText(includeTraining);
+  if (!count) { planToast("Nichts zu exportieren", "Es gibt noch keine zukünftigen Schichten oder Termine.", 5000); return; }
+  const blob = new Blob([text], { type: "text/calendar;charset=utf-8" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = includeTraining ? "willi-plan-mit-training.ics" : "willi-schichten-termine.ics";
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+  planToast("Kalender-Datei erstellt", `${count} Einträge – Datei öffnen/importieren, dann sind sie im Kalender.`, 6000);
+}

@@ -138,6 +138,8 @@ function setNoteOverride(date, text) {
    (Krankheit, Fortschritt, Deload) - der Planer im Sync berechnet daraus den
    neuen Plan. Jederzeit umkehrbar. */
 
+const FB_LONGRIDE_ON_RE = /langes rad.*(rein|wieder|einbauen|dazu|einplanen|aktivier)|(rein|wieder|einbauen|dazu|einplanen).*langes rad/i;
+const FB_LONGRIDE_OFF_RE = /langes rad.*(raus|weg|streichen|nicht mehr|ohne)|(kein|ohne) langes rad/i;
 const FB_HEALTHY_RE = /wieder (gesund|fit)|bin gesund|nicht mehr krank|gesund geworden|krank(heit)? vorbei/i;
 const FB_SICK_RE = /\b(bin|ich bin|bin grad|bin gerade)\b.*\b(krank|erkältet|erkaeltet|verletzt)\b|krank(heit)?|erkältung|erkaeltung|grippe|fieber|infekt/i;
 const FB_ADVANCE_RE = /(hoch|steiger|mehr|aufstock|schneller)\w*.*(gehen|können|koennen|machen|werden)|können.*(hoch|steiger|mehr)|koennen.*(hoch|steiger|mehr)|fühlt sich (richtig |sehr |echt )?gut|fuehlt sich (richtig |sehr |echt )?gut|fühle mich (richtig |sehr |echt )?(gut|stark|fit)|läuft (richtig |sehr |echt )?gut/i;
@@ -146,6 +148,8 @@ const FB_DELOAD_RE = /beine.*(schwer|müde|kaputt)|müde beine|erschöpft|ausgel
 const FB_CLEAR_RE = /beine.*(gut|frisch|stark|erholt)|erholt heute/i;
 
 function detectFeedbackAdjustment(text) {
+  if (FB_LONGRIDE_OFF_RE.test(text)) return "longride_off";
+  if (FB_LONGRIDE_ON_RE.test(text)) return "longride_on";
   if (FB_HEALTHY_RE.test(text)) return "healthy";
   if (FB_HOLD_RE.test(text)) return "hold";
   if (FB_SICK_RE.test(text) && !/nicht krank/i.test(text)) return "sick";
@@ -1262,9 +1266,13 @@ function answerCoachQuestion(question, data) {
     const u = findUnit("Langer Lauf");
     return u ? `Langer Lauf: ${u.detail}` : "Kein langer Lauf in dieser Woche gefunden.";
   }
-  if (/intervall|freitag/.test(q)) {
-    const u = findUnit("Intervalle");
-    return u ? `Intervalle: ${u.detail}` : "Keine Intervalle in dieser Woche gefunden.";
+  if (/intervall|freitag|vo2/.test(q)) {
+    const u = findUnit("VO2max-Intervalle") || findUnit("Intervalle");
+    return u ? `VO2max-Intervalle: ${u.detail}` : "Keine Intervalle in dieser Woche gefunden.";
+  }
+  if (/schwelle/.test(q)) {
+    const u = findUnit("Schwellentraining Rad");
+    return u ? `Schwellentraining: ${u.detail}` : "Kein Schwellentraining in dieser Woche gefunden.";
   }
   if (/emom/.test(q)) {
     const u = t.units.find(x => x.type === "emom");
@@ -1315,6 +1323,10 @@ function setupCoachQA(data) {
         p => { p.sick = { from: isoToday(), to: null }; }],
       healthy: ["Wieder gesund", "Der Plan fährt langsam wieder hoch (Tag 1–2 locker, dann 50 % / 70 % / 85 %).",
         p => { const s = p.sick || {}; p.sick = { from: s.from || isoToday(), to: isoToday() }; }],
+      longride_on: ["Langes Rad eingeplant", "Ab der nächsten Berechnung steht einmal pro Woche ein langes Rad (Zone 2) im Plan.",
+        p => { p.settings = { ...(p.settings || {}), includeLongRide: true }; }],
+      longride_off: ["Langes Rad entfernt", "Das lange Rad ist wieder aus dem Plan raus.",
+        p => { p.settings = { ...(p.settings || {}), includeLongRide: false }; }],
       advance: ["Plan wird gesteigert", "Der Aufbau springt eine Woche weiter (mehr Umfang ab nächster Woche).",
         p => { p.progression = { offsetWeeks: ((p.progression || {}).offsetWeeks || 0) + 1 }; }],
       hold: ["Plan bleibt auf dem Niveau", "Der Aufbau wird eine Woche angehalten.",

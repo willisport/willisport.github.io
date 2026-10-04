@@ -30,6 +30,7 @@ import renpho_source
 import health_bridge_source
 import crypto_utils
 import planner
+import calendar_source
 from plan_match import activities_on_date, unit_matches_activity
 from common import weekday_de, monday_of, iso_date, fmt_short, month_name_de
 
@@ -381,6 +382,10 @@ def main():
     dek = crypto_utils.unb64(dek_b64) if dek_b64 else None
     plan_inputs = load_plan_inputs(dek)
     today_d = today.date()
+    ics_added = calendar_source.merge_into_inputs(
+        plan_inputs, calendar_source.load_events(os.environ.get("CALENDAR_ICS_URL"), this_monday.date()))
+    if ics_added:
+        print(f"  Kalender: {ics_added} Termine aus dem Google-Kalender uebernommen")
     gen_from = max(this_monday.date(), planner.PROGRAM_START_MONDAY)
     generated = planner.generate_plan(plan_inputs, gen_from, MACRO_GOAL_DATE.date(), today_d, plan.get("library"))
     plan["weekOverrides"] = {**plan.get("weekOverrides", {}), **generated}
@@ -613,8 +618,9 @@ def main():
         "progression": {"offsetWeeks": inputs_norm["progression"]["offsetWeeks"],
                         "step": (this_meta or {}).get("step"), "phase": (this_meta or {}).get("phase")},
         "sick": inputs_norm["sick"], "hint": hint,
-        "settings": {k: inputs_norm["settings"][k] for k in ("travelMin", "raceDate", "raceName", "raceDistanceKm", "runScalePct", "longRunMaxKm", "includeLegStabi", "includeLegSupersets")},
+        "settings": {k: inputs_norm["settings"][k] for k in ("travelMin", "raceDate", "raceName", "raceDistanceKm", "runScalePct", "longRunMaxKm", "includeLongRide", "includeLegStabi", "includeLegSupersets")},
         "counts": {"shifts": len(inputs_norm["shifts"]), "events": len(inputs_norm["events"])},
+        "externalEvents": ics_added,
     }
 
     output = {
