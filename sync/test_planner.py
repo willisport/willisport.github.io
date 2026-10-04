@@ -140,7 +140,9 @@ class FastedBikeFormula(unittest.TestCase):
             for u in units(w, wd):
                 if u["type"] == "rad":
                     self.assertNotIn("nüchtern", u["detail"])
-                    self.assertIn("14:45", u["detail"])
+                    gym_day = any(x["name"] == "Schweres Beintraining" for x in units(w, wd))
+                    # am Studio-Tag verschiebt sich die Rueckkehr um das Beintraining (13:20 + 65 min + Heimweg 75 min + 30 min Puffer = 15:45)
+                    self.assertIn("15:45" if gym_day else "14:45", u["detail"])
 
 
 class WeekInvariants(unittest.TestCase):
@@ -161,6 +163,8 @@ class WeekInvariants(unittest.TestCase):
             for (s1, e1, n1), (s2, e2, n2) in zip(timed, timed[1:]):
                 self.assertLessEqual(e1 - 12, s2, f"{wd}: {n1} und {n2} ueberlappen")
             for s, e, n in timed:
+                if n == "Schweres Beintraining" and "im Studio" in " ".join(u["detail"] for u in d["units"] if u["name"] == n):
+                    continue    # Studio direkt nach der Schicht: bewusst im Arbeitsblock, Heimweg danach
                 self.assertGreaterEqual(s, 360, f"{wd}: {n} vor 6:00")
                 self.assertLessEqual(e, 22 * 60 + 5, f"{wd}: {n} nach 22:00")
                 for bs, be in busy[wd]:
@@ -394,6 +398,57 @@ class NewTrainingStructure(unittest.TestCase):
         w = week(date(2026, 11, 16))
         bike_days = sum(1 for d in w["days"].values() if any(u["type"] == "rad" for u in d["units"]))
         self.assertGreaterEqual(bike_days, 5)
+
+
+class GymRules(unittest.TestCase):
+    """Beintraining im Studio: nach Fruehschicht ja, an Spaetschicht-Tagen nie."""
+
+    def heavy_days(self, w):
+        return [wd for wd, d in w["days"].items() if any(u["name"] == "Schweres Beintraining" for u in d["units"])]
+
+    def test_never_on_late_shift_days(self):
+        rnd = random.Random(7)
+        for trial in range(60):
+            mon = date(2026, 11, 2) + timedelta(days=7 * trial)
+            shifts = {}
+            for i in range(7):
+                if rnd.random() < 0.7:
+                    start = rnd.choice(["07:00", "08:00", "13:00", "15:00", "16:00"])
+                    shifts[pl.iso(mon + timedelta(days=i))] = [{"start": start, "end": pl.min_to_hm(pl.hm_to_min(start) + 360)}]
+            w = week(mon, {"shifts": shifts})
+            for wd in self.heavy_days(w):
+                idx = list(w["days"]).index(wd)
+                sh = shifts.get(pl.iso(mon + timedelta(days=idx)))
+                if sh:
+                    self.assertLess(pl.hm_to_min(sh[0]["start"]), 12 * 60, f"{mon} {wd}: Beine an Spaetschicht")
+
+    def test_after_early_shift_it_happens_at_the_gym(self):
+        mon = date(2026, 11, 2)
+        shifts = {pl.iso(mon + timedelta(days=i)): [{"start": "07:00", "end": "13:00"}] for i in range(5)}
+        w = week(mon, {"shifts": shifts})
+        days = self.heavy_days(w)
+        self.assertEqual(len(days), 1)
+        u = find(w, days[0], "Schweres Beintraining")
+        self.assertIn("im Studio direkt nach der Schicht", u["detail"])
+        self.assertIn("13:20 Uhr", u["detail"])        # Schichtende 13:00 + 20 min
+
+    def test_only_late_shifts_means_no_heavy_legs_on_work_days(self):
+        mon = date(2026, 11, 2)
+        shifts = {pl.iso(mon + timedelta(days=i)): [{"start": "16:00", "end": "22:00"}] for i in range(7)}
+        w = week(mon, {"shifts": shifts})
+        self.assertEqual(self.heavy_days(w), [])
+        self.assertIn("schweres Beintraining", w["note"])
+
+    def test_no_overlap_after_gym_on_early_shift_day(self):
+        mon = date(2026, 11, 2)
+        shifts = {pl.iso(mon + timedelta(days=i)): [{"start": "07:00", "end": "13:00"}] for i in range(5)}
+        w = week(mon, {"shifts": shifts})
+        for wd, d in w["days"].items():
+            timed = sorted((int(m.group(1)) * 60 + int(m.group(2)), u["plannedDurationMin"], u["name"])
+                           for u in d["units"] if u["type"] != "emom"
+                           for m in [__import__("re").search(r"(\d{2}):(\d{2}) Uhr", u["detail"])] if m)
+            for (s1, d1, n1), (s2, d2, n2) in zip(timed, timed[1:]):
+                self.assertLessEqual(s1 + d1 - 12, s2, f"{wd}: {n1}/{n2}")
 
 
 class Sickness(unittest.TestCase):

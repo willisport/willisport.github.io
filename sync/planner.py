@@ -47,6 +47,7 @@ DEFAULT_SETTINGS = {
     "raceDistanceKm": 100,
     "runScalePct": 100,         # Regler fuer den Laufumfang (Z2- und langer Lauf), 50-130 %
     "longRunMaxKm": 36,         # Obergrenze fuer den langen Lauf
+    "lateShiftFromMin": 12 * 60,  # Schichtbeginn ab hier = Spaetschicht: dann kein Studio-/Beintraining
     "includeLongRide": False,   # langes Rad: zum Start aus, per Coach wieder einschaltbar
     "bikeMaxMin": 60,           # taegliches Rad Zone 2 maximal (Laufen hat Prioritaet)
     "includeLegStabi": False,   # aktuell wegen Knie raus, per Schalter wieder reinholbar
@@ -248,6 +249,9 @@ class DayCtx:
         self.return_: int | None = None
         self.focus_prefix = ""
         self.sick_return_level = None   # None | "rest" | "easy" | float Faktor
+        self.shift_start: int | None = None
+        self.shift_end: int | None = None
+        self.travel = 0
         self.free: list[list[int]] = []
 
     # --- freie Fenster ---
@@ -307,6 +311,9 @@ def build_day_contexts(monday: date, inputs: dict, today: date) -> list[DayCtx]:
             depart = s - travel_default - depart_buf
             ret = e + travel_default
             ctx.busy.append([depart, ret])
+            ctx.shift_start = s if ctx.shift_start is None else min(ctx.shift_start, s)
+            ctx.shift_end = e if ctx.shift_end is None else max(ctx.shift_end, e)
+            ctx.travel = travel_default
             if ctx.depart is None or depart < ctx.depart:
                 ctx.depart = depart
             if ctx.return_ is None or ret > ctx.return_:
@@ -726,11 +733,36 @@ class Planner:
                 pen += 100
             return pen
 
+        # Beintraining findet im Studio statt (Arbeitsort): nach der Fruehschicht direkt dort,
+        # an Spaetschicht-Tagen nie (er will nicht extra frueh hinfahren) - alles andere laeuft zu Hause.
+        late_from = int(st.get("lateShiftFromMin", 12 * 60))
+
+        def is_late(i):
+            return ctxs[i].shift_start is not None and ctxs[i].shift_start >= late_from
+
+        def at_work(i):
+            return ctxs[i].shift_end is not None and not is_late(i)
+
+        def slot_hl(ctx, dur):
+            if ctx.shift_end is not None and ctx.shift_start < late_from:
+                start = ctx.shift_end + 20
+                return start if start + dur + ctx.travel <= st["dayEndMin"] + 30 else None
+            return self.slot_run(ctx, dur)
+
         hi = None
+        gym_start = {}
         if not params.get("skipHeavy"):
-            hi = choose("heavy_legs", hl_dur, self.slot_run, [i for i in key_pool if i not in taken], hl_penalty)
+            hi = choose("heavy_legs", hl_dur, slot_hl, [i for i in key_pool if i not in taken and not is_late(i)],
+                        lambda i: hl_penalty(i) - (250 if at_work(i) else 0))
             if hi is not None:
                 roles[hi].add("heavy_legs")
+                if at_work(hi):
+                    c = ctxs[hi]
+                    gym_start[hi] = c.shift_end + 20
+                    # Heimweg verschiebt sich um die Studio-Zeit: das Fenster danach ist nicht mehr frei
+                    extra = (gym_start[hi] + hl_dur + c.travel) - c.return_
+                    if extra > 0:
+                        c.allocate(c.return_, extra)
             else:
                 missing.append("schweres Beintraining")
 
@@ -851,7 +883,11 @@ class Planner:
                 detail = (lib.get("heavyLegs") or {}).get("detail") or ""
                 if recovery or lvl < 0.85:
                     detail += " · leichter: 3–4 Wdh. im Tank"
-                start = self.slot_run(ctx, hl_dur, after=(last_end[i] + 10) if last_end[i] else None)
+                if i in gym_start:
+                    start = gym_start[i]
+                    detail += " · im Studio direkt nach der Schicht"
+                else:
+                    start = self.slot_run(ctx, hl_dur, after=(last_end[i] + 10) if last_end[i] else None)
                 commit(i, mk_unit("Schweres Beintraining", "kraft", "pflicht", f"{detail}{tsuf(start)}", hl_dur,
                                   exercises=exercises_for(lib, "heavyLegs"),
                                   matchHint={"activityTypes": ["strength_training"]}), start, hl_dur)
