@@ -48,6 +48,8 @@ DEFAULT_SETTINGS = {
     "runScalePct": 100,         # Regler fuer den Laufumfang (Z2- und langer Lauf), 50-130 %
     "longRunMaxKm": 36,         # Obergrenze fuer den langen Lauf
     "lateShiftFromMin": 12 * 60,  # Schichtbeginn ab hier = Spaetschicht: dann kein Studio-/Beintraining
+    "ftpW": None,               # leer = automatisch von Garmin; sonst eigener FTP-Wert (Watt)
+    "ref5kSec": None,           # leer = Garmin-Prognose; sonst eigene 5-km-Zeit in Sekunden
     "includeLongRide": False,   # langes Rad: zum Start aus, per Coach wieder einschaltbar
     "bikeMaxMin": 60,           # taegliches Rad Zone 2 maximal (Laufen hat Prioritaet)
     "includeLegStabi": False,   # aktuell wegen Knie raus, per Schalter wieder reinholbar
@@ -217,6 +219,7 @@ def normalize_inputs(raw: dict | None) -> dict:
         "progression": {"offsetWeeks": int(prog.get("offsetWeeks") or 0)},
         "library": merge_library(raw.get("library")),
         "deload": raw.get("deload") or {},
+        "metrics": raw.get("metrics") or {},
         "runOverrides": run_over,
     }
 
@@ -574,11 +577,65 @@ def pref_bonus(key: str, i: int) -> int:
     return 25 * (len(order) - order.index(i)) if i in order else 0
 
 
+def fmt_pace(sec: float) -> str:
+    sec = int(round(sec))
+    return f"{sec // 60}:{sec % 60:02d}"
+
+
+def training_targets(inputs: dict) -> dict:
+    """Konkrete Zielwerte (Watt, Pace, Puls) aus FTP und Laufprognose - automatisch aus den
+    Garmin-Werten (inputs['metrics']), per Einstellung ueberschreibbar. Ohne Daten: Standardwerte."""
+    st, met = inputs["settings"], inputs.get("metrics") or {}
+
+    def pos(v):
+        try:
+            v = float(v)
+            return v if v > 0 else None
+        except (TypeError, ValueError):
+            return None
+
+    ftp = pos(st.get("ftpW"))
+    ftp_src = "manuell eingetragen" if ftp else None
+    if not ftp and pos(met.get("ftpW")):
+        ftp = pos(met["ftpW"])
+        ftp_src = "Garmin" + (" (Wert veraltet – Test empfohlen)" if met.get("ftpStale") else "")
+    if not ftp:
+        ftp, ftp_src = 230.0, "Standardwert"
+    ref5 = pos(st.get("ref5kSec"))
+    pace5 = ref5 / 5 if ref5 else None
+    pace_src = "deiner eingetragenen 5-km-Zeit" if ref5 else None
+    if not pace5 and pos(met.get("pace5kSec")):
+        pace5, pace_src = pos(met["pace5kSec"]), "deiner Garmin-5-km-Prognose"
+    lthr = pos(met.get("ltHr"))
+
+    def r5(x):
+        return int(round(x / 5.0) * 5)
+
+    out = {
+        "ftpW": int(ftp), "ftpSource": ftp_src, "ftpStale": bool(met.get("ftpStale")) and not pos(st.get("ftpW")),
+        "z2Watt": r5(ftp * 0.72), "thrLo": r5(ftp * 0.92), "thrHi": r5(ftp * 1.00),
+        "thrHr": (int(lthr - 10), int(lthr - 3)) if lthr else None,
+        "pace5kSec": pace5, "paceSource": pace_src, "lthr": int(lthr) if lthr else None,
+    }
+    return out
+
+
+def vo2_pace_text(tg: dict, rep_min: int) -> str:
+    """Zielpace fuer VO2max-Intervalle: je kuerzer das Intervall, desto schneller als die 5-km-Pace."""
+    p5 = tg.get("pace5kSec")
+    if not p5:
+        return ""
+    delta = {1: -14, 2: -10, 3: -5}.get(rep_min, 0)
+    mid = p5 + delta
+    return f"Ziel-Pace {fmt_pace(mid - 4)}–{fmt_pace(mid + 4)} min/km ({tg['paceSource']})"
+
+
 class Planner:
     def __init__(self, inputs: dict, library: dict):
         self.inputs = inputs
         self.st = inputs["settings"]
         self.lib = library
+        self.tg = training_targets(inputs)
 
     # ---------- Slot-Suche (keine Belegung, nur Vorschlag) ----------
     def _slot(self, ctx: DayCtx, dur: int, *, pref, min_start, window_ok=None, gap=None, after=None):
@@ -823,7 +880,7 @@ class Planner:
                 h, mm = divmod(dur, 60)
                 dur_txt = (f"{h} h" + (f" {mm} min" if mm else "")) if h else f"{mm} min"
                 commit(i, mk_unit("Langes Rad Zone 2", "rad", "pflicht",
-                                  f"165 W · {dur_txt}{tsuf(start)}, mit Frühstück/Verpflegung", dur,
+                                  f"{self.tg['z2Watt']} W · {dur_txt}{tsuf(start)}, mit Frühstück/Verpflegung", dur,
                                   keySession=True, matchHint=hint_bike()), start, dur)
             # --- langer Lauf ---
             if "long_run" in r:
@@ -840,8 +897,10 @@ class Planner:
                 dur = threshold_total_min(w)
                 start = self.slot_bike_pm(ctx, dur) or self.slot_fasted(ctx, dur)
                 commit(i, mk_unit("Schwellentraining Rad", "rad", "pflicht",
-                                  f"15 min einrollen · 2×{w} min Schwelle (hart, aber gleichmäßig – ca. 90–95 % deiner Schwellenleistung, "
-                                  f"HF ~165–172 bpm, „kontrolliert unbequem“) · 5 min locker dazwischen · 10 min ausrollen{tsuf(start)}, nicht nüchtern",
+f"15 min einrollen · 2×{w} min Zone 4 (Schwelle): {self.tg['thrLo']}–{self.tg['thrHi']} W "
+                                  f"({int(round(self.tg['thrLo'] / self.tg['ftpW'] * 100))}–100 % deiner FTP von {self.tg['ftpW']} W"
+                                  + (f", HF ca. {self.tg['thrHr'][0]}–{self.tg['thrHr'][1]} bpm" if self.tg["thrHr"] else "")
+                                  + f", „kontrolliert unbequem“) · 5 min locker dazwischen · 10 min ausrollen{tsuf(start)}, nicht nüchtern",
                                   dur, keySession=True, matchHint=hint_bike()), start, dur)
             if "long_ride" not in r and "long_run" not in r and "threshold" not in r:
                 if "rest" in r:
@@ -858,7 +917,7 @@ class Planner:
                         start = self.slot_bike_pm(ctx, dur)
                     if start is not None:
                         commit(i, mk_unit("Rad Zone 2", "rad", "pflicht",
-                                          f"165 W · {dur} min{tsuf(start, fasted)}", dur, matchHint=hint_bike()), start, dur)
+                                          f"{self.tg['z2Watt']} W · {dur} min{tsuf(start, fasted)}", dur, matchHint=hint_bike()), start, dur)
             # --- Intervalle ---
             if "intervals" in r:
                 rp = reps if lvl >= 0.85 else max(3, reps - 1)
@@ -866,8 +925,8 @@ class Planner:
                 dur = interval_total_min(rp, vm)
                 start = self.slot_run(ctx, dur, after=(last_end[i] + 10) if last_end[i] else None)
                 commit(i, mk_unit("VO2max-Intervalle", "lauf", "pflicht",
-                                  f"{rp}×{vm} min ALL OUT (deutlich schneller als dein Schwellentempo ~4:00/km – so hart, wie du es bis zum Ende durchhältst) "
-                                  f"· je {vo2_rest_min(vm)} min locker traben · davor 15 min einlaufen, danach 10 min auslaufen{tsuf(start)}, nicht nüchtern",
+                                  f"{rp}×{vm} min ALL OUT" + (f" · {vo2_pace_text(self.tg, vm)}" if vo2_pace_text(self.tg, vm) else " (deutlich schneller als dein Schwellentempo)")
+                                  + f" · je {vo2_rest_min(vm)} min locker traben · davor 15 min einlaufen, danach 10 min auslaufen{tsuf(start)}, nicht nüchtern",
                                   dur - 10, keySession=True, matchHint={"activityTypes": ["running"]}), start, dur)
             # --- Zone-2-Lauf ---
             if "z2_run" in r:

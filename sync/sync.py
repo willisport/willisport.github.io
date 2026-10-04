@@ -386,12 +386,6 @@ def main():
         plan_inputs, calendar_source.load_events(os.environ.get("CALENDAR_ICS_URL"), this_monday.date()))
     if ics_added:
         print(f"  Kalender: {ics_added} Termine aus dem Google-Kalender uebernommen")
-    gen_from = max(this_monday.date(), planner.PROGRAM_START_MONDAY)
-    generated = planner.generate_plan(plan_inputs, gen_from, MACRO_GOAL_DATE.date(), today_d, plan.get("library"))
-    plan["weekOverrides"] = {**plan.get("weekOverrides", {}), **generated}
-    print(f"  Plan: {len(generated)} Wochen generiert ab {gen_from} "
-          f"({len(plan_inputs.get('shifts') or {})} Schichten, {len(plan_inputs.get('events') or [])} Termine)")
-
     try:
         cleanup_stale_requests(this_monday)
     except Exception as e:
@@ -443,6 +437,28 @@ def main():
         prev_weight = (previous.get("today") or {}).get("body", {}).get("weightKg")
         if prev_weight:
             weights = [{"date": iso_date(today), "weightKg": prev_weight}]
+
+    # --- Zielwerte (FTP, Pace) aus Garmin; bei Ausfall letzter bekannter Stand ---
+    metrics = {}
+    try:
+        metrics = garmin_source.fetch_training_metrics(api)
+    except Exception as e:
+        print(f"  [warn] Trainingskennzahlen nicht verfuegbar: {e}")
+    prev_metrics = ((previous.get("planState") or {}).get("metrics")) or {}
+    for k in ("ftpW", "ftpDate", "ftpStale", "ltHr"):
+        if metrics.get(k) is None and prev_metrics.get(k) is not None:
+            metrics[k] = prev_metrics[k]
+    if (race_predictions or {}).get("time5kSec"):
+        metrics["pace5kSec"] = race_predictions["time5kSec"] / 5.0
+    elif prev_metrics.get("pace5kSec"):
+        metrics["pace5kSec"] = prev_metrics["pace5kSec"]
+    plan_inputs["metrics"] = metrics
+
+    gen_from = max(this_monday.date(), planner.PROGRAM_START_MONDAY)
+    generated = planner.generate_plan(plan_inputs, gen_from, MACRO_GOAL_DATE.date(), today_d, plan.get("library"))
+    plan["weekOverrides"] = {**plan.get("weekOverrides", {}), **generated}
+    print(f"  Plan: {len(generated)} Wochen generiert ab {gen_from} "
+          f"({len(plan_inputs.get('shifts') or {})} Schichten, {len(plan_inputs.get('events') or [])} Termine)")
 
     # --- Woche bauen ---
     week_type, week_label = week_type_and_label(plan, this_monday)
@@ -618,9 +634,10 @@ def main():
         "progression": {"offsetWeeks": inputs_norm["progression"]["offsetWeeks"],
                         "step": (this_meta or {}).get("step"), "phase": (this_meta or {}).get("phase")},
         "sick": inputs_norm["sick"], "hint": hint,
-        "settings": {k: inputs_norm["settings"][k] for k in ("travelMin", "raceDate", "raceName", "raceDistanceKm", "runScalePct", "longRunMaxKm", "includeLongRide", "includeLegStabi", "includeLegSupersets")},
+        "settings": {k: inputs_norm["settings"][k] for k in ("travelMin", "raceDate", "raceName", "raceDistanceKm", "runScalePct", "longRunMaxKm", "ftpW", "ref5kSec", "includeLongRide", "includeLegStabi", "includeLegSupersets")},
         "counts": {"shifts": len(inputs_norm["shifts"]), "events": len(inputs_norm["events"])},
         "externalEvents": ics_added,
+        "metrics": {**metrics, "targets": planner.training_targets(inputs_norm)},
     }
 
     output = {

@@ -15,7 +15,7 @@ function dpSettings() {
   const p = planInputs();
   return {
     travelMin: 75, kuerzel: "WL", raceDate: "2027-08-28", raceName: "Ultramarathon", raceDistanceKm: 100,
-    runScalePct: 100, longRunMaxKm: 36, includeLongRide: false, includeLegStabi: false, includeLegSupersets: false, ...(p.settings || {}),
+    runScalePct: 100, longRunMaxKm: 36, ftpW: null, ref5kSec: null, includeLongRide: false, includeLegStabi: false, includeLegSupersets: false, ...(p.settings || {}),
   };
 }
 
@@ -176,6 +176,17 @@ function dpOverviewHtml() {
    Tab
    --------------------------------------------------------------------------- */
 
+/** Zielwerte, die der Plan automatisch aus Garmin (FTP, 5-km-Prognose, Laktatschwelle) ableitet. */
+function targetsLineHtml(ps) {
+  const tg = ps && ps.metrics && ps.metrics.targets;
+  if (!tg) return "";
+  const pace = tg.pace5kSec ? `${Math.floor(tg.pace5kSec / 60)}:${String(Math.round(tg.pace5kSec % 60)).padStart(2, "0")}` : null;
+  return `
+    <div class="card-note" style="margin-bottom:8px;"><b>Deine Zielwerte (automatisch):</b> FTP ${tg.ftpW} W (${escapeHtml(tg.ftpSource)}) · Rad Zone 2 ca. ${tg.z2Watt} W · Schwelle ${tg.thrLo}–${tg.thrHi} W${tg.thrHr ? ` · HF ${tg.thrHr[0]}–${tg.thrHr[1]}` : ""}${pace ? ` · 5-km-Pace ${pace} min/km` : ""}.
+      Die Vorgaben in den Einheiten passen sich bei jedem Sync an deine Garmin-Werte an.</div>
+    ${tg.ftpStale ? `<div class="card-note" style="margin-bottom:8px; color:var(--amber);">Dein FTP-Wert bei Garmin ist alt. Für genaue Zonen: 20 Minuten Vollgas auf dem Rad fahren, Durchschnittswatt × 0,95 = neue FTP – dann unter Dienstplan → Einstellungen eintragen.</div>` : ""}`;
+}
+
 function planStateCardHtml() {
   const ps = (typeof APP_DATA !== "undefined" && APP_DATA && APP_DATA.planState) || null;
   const p = planInputs();
@@ -189,6 +200,7 @@ function planStateCardHtml() {
     <div class="card">
       <div class="card-head"><span class="card-title">Plan-Status</span><span class="card-note">${escapeHtml(phase || "")}</span></div>
       <div class="card-note" style="margin-bottom:8px;">${escapeHtml(stateTxt)} · Fortschritt ${offset === 0 ? "wie geplant" : (offset > 0 ? "+" : "") + offset + " Wochen"}</div>
+      ${targetsLineHtml(ps)}
       <div class="card-note" style="margin-bottom:8px;">${escapeHtml(dpSettings().raceName)} ${escapeHtml(dpSettings().raceDistanceKm)} km am ${dpFmtDate(dpSettings().raceDate)} ${dpSettings().raceDate.slice(0, 4)} – noch ${Math.max(0, Math.ceil((new Date(dpSettings().raceDate + "T12:00:00") - new Date()) / 604800000))} Wochen · Laufumfang ${escapeHtml(dpSettings().runScalePct)} %</div>
       <div style="display:flex; gap:8px; flex-wrap:wrap;">
         ${sick.from && !sick.to
@@ -269,6 +281,8 @@ function renderDienstplan() {
           <label class="card-note">Wettkampf (Name)<input type="text" id="dp-set-rname" class="text-input" maxlength="40" value="${escapeHtml(st.raceName)}" /></label>
           <label class="card-note">Wettkampfstrecke (km)<input type="number" id="dp-set-rdist" class="text-input" min="1" max="500" value="${escapeHtml(st.raceDistanceKm)}" /></label>
           <label class="card-note">Laufumfang insgesamt: <b id="dp-set-scale-val">${escapeHtml(st.runScalePct)}</b> %<input type="range" id="dp-set-scale" min="50" max="130" step="5" value="${escapeHtml(st.runScalePct)}" style="width:100%;" /></label>
+          <label class="card-note">FTP Rad (Watt) – leer = automatisch von Garmin<input type="number" id="dp-set-ftp" class="text-input" min="80" max="500" value="${st.ftpW ? escapeHtml(st.ftpW) : ""}" placeholder="auto" /></label>
+          <label class="card-note">5-km-Bestzeit jetzt (mm:ss) – leer = Garmin-Prognose<input type="text" id="dp-set-5k" class="text-input" placeholder="auto" value="${st.ref5kSec ? escapeHtml(Math.floor(st.ref5kSec / 60) + ":" + String(Math.round(st.ref5kSec % 60)).padStart(2, "0")) : ""}" /></label>
           <label class="card-note">Langer Lauf maximal (km)<input type="number" id="dp-set-longmax" class="text-input" min="10" max="60" value="${escapeHtml(st.longRunMaxKm)}" /></label>
           <div class="stack" style="gap:6px;">
             <label class="card-note"><input type="checkbox" id="dp-set-longride" ${st.includeLongRide ? "checked" : ""} /> Langes Rad einplanen (1× pro Woche)</label>
@@ -400,6 +414,8 @@ function dpBindDienstplan(panel) {
       raceDistanceKm: Math.max(1, Number($("dp-set-rdist").value) || 100),
       runScalePct: Math.min(130, Math.max(50, Number($("dp-set-scale").value) || 100)),
       longRunMaxKm: Math.min(60, Math.max(10, Number($("dp-set-longmax").value) || 36)),
+      ftpW: Number($("dp-set-ftp").value) > 0 ? Number($("dp-set-ftp").value) : null,
+      ref5kSec: (() => { const m = ($("dp-set-5k").value || "").trim().match(/^(\d{1,2}):(\d{2})$/); return m ? Number(m[1]) * 60 + Number(m[2]) : null; })(),
       includeLongRide: $("dp-set-longride").checked, includeLegStabi: $("dp-set-stabi").checked, includeLegSupersets: $("dp-set-super").checked,
     };
     await applyPlanChange("Einstellungen gespeichert", plan => { plan.settings = { ...(plan.settings || {}), ...settings }; });

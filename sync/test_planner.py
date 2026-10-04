@@ -451,6 +451,53 @@ class GymRules(unittest.TestCase):
                 self.assertLessEqual(s1 + d1 - 12, s2, f"{wd}: {n1}/{n2}")
 
 
+class TrainingTargets(unittest.TestCase):
+    """Watt- und Pace-Vorgaben kommen automatisch aus Garmin-Werten (metrics), per Einstellung ueberschreibbar."""
+    MET = {"ftpW": 230, "ftpStale": True, "ltHr": 174, "pace5kSec": 290.4}
+
+    def unit(self, raw, mon, name):
+        return next(u for u in all_units(week(mon, raw)) if u["name"] == name)
+
+    def test_defaults_without_metrics(self):
+        z2 = self.unit({}, date(2026, 10, 5), "Rad Zone 2")
+        self.assertIn("165 W", z2["detail"])
+        vo2 = self.unit({}, date(2026, 10, 5), "VO2max-Intervalle")
+        self.assertNotIn("Ziel-Pace", vo2["detail"])
+
+    def test_threshold_uses_ftp_zone4_and_heart_rate(self):
+        thr = self.unit({"metrics": self.MET}, date(2026, 11, 16), "Schwellentraining Rad")
+        self.assertIn("Zone 4", thr["detail"])
+        self.assertIn("210–230 W", thr["detail"])         # 92-100 % von 230 W
+        self.assertIn("FTP von 230 W", thr["detail"])
+        self.assertIn("HF ca. 164–171", thr["detail"])    # Laktatschwellen-Puls 174
+
+    def test_manual_ftp_overrides_garmin(self):
+        thr = self.unit({"metrics": self.MET, "settings": {"ftpW": 260}}, date(2026, 11, 16), "Schwellentraining Rad")
+        self.assertIn("FTP von 260 W", thr["detail"])
+        z2 = self.unit({"metrics": self.MET, "settings": {"ftpW": 260}}, date(2026, 11, 16), "Rad Zone 2")
+        self.assertIn("185 W", z2["detail"])              # 72 % von 260 W
+
+    def test_vo2_pace_from_5k_prediction_and_shorter_reps_are_faster(self):
+        short = self.unit({"metrics": self.MET}, date(2026, 10, 5), "VO2max-Intervalle")           # 5x2 min
+        self.assertIn("Ziel-Pace 4:", short["detail"])
+        self.assertIn("5-km-Prognose", short["detail"])
+        tg = pl.training_targets(pl.normalize_inputs({"metrics": self.MET}))
+        self.assertGreater(tg["pace5kSec"], 280)
+        p2 = pl.vo2_pace_text(tg, 2)
+        p4 = pl.vo2_pace_text(tg, 4)
+        self.assertNotEqual(p2, p4)
+        self.assertTrue(p2.split()[1] < p4.split()[1])    # 2-min-Intervalle schneller als 4-min
+
+    def test_manual_5k_time_overrides_prediction(self):
+        tg = pl.training_targets(pl.normalize_inputs({"metrics": self.MET, "settings": {"ref5kSec": 1200}}))
+        self.assertEqual(tg["pace5kSec"], 240)
+        self.assertIn("eingetragenen", tg["paceSource"])
+
+    def test_stale_ftp_is_flagged(self):
+        self.assertTrue(pl.training_targets(pl.normalize_inputs({"metrics": self.MET}))["ftpStale"])
+        self.assertFalse(pl.training_targets(pl.normalize_inputs({"metrics": self.MET, "settings": {"ftpW": 250}}))["ftpStale"])
+
+
 class Sickness(unittest.TestCase):
     RAW = {"sick": {"from": "2026-11-03", "to": "2026-11-06"}}
 

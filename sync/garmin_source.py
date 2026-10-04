@@ -163,6 +163,29 @@ def fetch_race_predictions(api: Garmin) -> dict:
         return {}
 
 
+def fetch_training_metrics(api: Garmin) -> dict:
+    """FTP (Rad) und Laktatschwellen-Puls (Lauf) aus Garmin - jeder Teil darf einzeln fehlen."""
+    out = {}
+    try:
+        r = api.get_cycling_ftp()
+        if isinstance(r, list):
+            r = r[-1] if r else {}
+        if r.get("functionalThresholdPower"):
+            out["ftpW"] = int(r["functionalThresholdPower"])
+            out["ftpDate"] = (r.get("calendarDate") or "")[:10]
+            out["ftpStale"] = bool(r.get("isStale"))
+    except Exception as e:
+        print(f"  [warn] FTP nicht verfuegbar: {e}")
+    try:
+        r = api.get_lactate_threshold()
+        hr = ((r or {}).get("speed_and_heart_rate") or {}).get("heartRate")
+        if hr:
+            out["ltHr"] = int(hr)
+    except Exception as e:
+        print(f"  [warn] Laktatschwelle nicht verfuegbar: {e}")
+    return out
+
+
 def fetch_steps_history(api: Garmin, start: datetime, end: datetime) -> dict:
     """Schritte + Tagesziel pro Tag fuer einen Zeitraum, keyed auf Datums-String."""
     out = {}
