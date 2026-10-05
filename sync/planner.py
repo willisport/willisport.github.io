@@ -102,6 +102,8 @@ BIKE_TYPES = ["cycling", "indoor_cycling", "virtual_ride"]
 
 # Verletzung / Beschwerden: was fuer den Tag wegfaellt. run = betrifft das Laufen (dann auch
 # sanfter Wiedereinstieg und Fortschrittspause danach), auto_days = laeuft von selbst aus.
+SHORT_ILLNESS_DAYS = 3   # bis hierhin: kurzer Wiedereinstieg statt einer ganzen Aufbauwoche Pause
+
 INJURY = {
     "knie":        {"label": "Knie", "run": True},
     "fuss":        {"label": "Fuß/Achillessehne", "run": True},
@@ -330,7 +332,7 @@ def build_day_contexts(monday: date, inputs: dict, today: date) -> list[DayCtx]:
         inj_to = inj_from + timedelta(days=inj_spec["auto_days"] - 1)
     # ohne Enddatum: laufrelevante Beschwerden gelten rollierend 7 Tage ab heute (jeder Sync verlaengert), sonst 2 Tage
     inj_until = inj_to or ((max(today, inj_from) + timedelta(days=7 if inj_spec['run'] else 2)) if inj_from else None)
-    ret_to = recovery_end(inputs)
+    ret_to, ret_len = recovery_info(inputs)
 
     ctxs = []
     for i in range(7):
@@ -422,7 +424,13 @@ def build_day_contexts(monday: date, inputs: dict, today: date) -> list[DayCtx]:
             ctx.focus_prefix += f"{ctx.injury_label}-Beschwerden ({hint}) · "
 
         # Wiedereinstieg nach Krankheit bzw. laufrelevanter Verletzung
-        if ret_to is not None and d > ret_to:
+        if ret_to is not None and d > ret_to and ret_len <= SHORT_ILLNESS_DAYS:
+            delta = (d - ret_to).days
+            if delta == 1:
+                ctx.sick_return_level = "easy"        # leichte Erkaeltung: 1 Tag locker, dann schnell zurueck
+            elif delta <= 3:
+                ctx.sick_return_level = 0.85
+        elif ret_to is not None and d > ret_to:
             delta = (d - ret_to).days
             if delta <= 3:
                 ctx.sick_return_level = "easy"
@@ -477,6 +485,8 @@ def _range_weeks(frm, to) -> int:
     if not (frm and to):
         return 0
     days = (parse_date(to) - parse_date(frm)).days + 1
+    if days <= SHORT_ILLNESS_DAYS:       # leichte Erkaeltung / 1-3 Tage Pause: Fortschritt laeuft weiter
+        return 0
     return max(0, math.ceil(days / 7))
 
 
@@ -489,15 +499,23 @@ def sick_pause_weeks(inputs: dict) -> int:
     return weeks
 
 
-def recovery_end(inputs: dict):
-    """Letzter Tag der Krankheit / laufrelevanten Verletzung (danach Wiedereinstieg) oder None."""
-    ends = []
-    if inputs["sick"].get("to"):
-        ends.append(parse_date(inputs["sick"]["to"]))
+def recovery_info(inputs: dict):
+    """(letzter Tag, Dauer in Tagen) der Krankheit / laufrelevanten Verletzung, die zuletzt endet - sonst (None, 0)."""
+    ranges = []
+    if inputs["sick"].get("from") and inputs["sick"].get("to"):
+        ranges.append((parse_date(inputs["sick"]["to"]), inputs["sick"]["from"]))
     inj = inputs["injury"]
     if inj.get("from") and inj.get("to") and INJURY.get(inj.get("area"), {}).get("run"):
-        ends.append(parse_date(inj["to"]))
-    return max(ends) if ends else None
+        ranges.append((parse_date(inj["to"]), inj["from"]))
+    if not ranges:
+        return None, 0
+    end, frm = max(ranges, key=lambda r: r[0])
+    return end, (end - parse_date(frm)).days + 1
+
+
+def recovery_end(inputs: dict):
+    """Letzter Tag der Krankheit / laufrelevanten Verletzung (danach Wiedereinstieg) oder None."""
+    return recovery_info(inputs)[0]
 
 
 def week_params(monday: date, inputs: dict, factor_override: float | None = None) -> dict:

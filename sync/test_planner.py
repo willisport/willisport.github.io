@@ -592,6 +592,28 @@ class Sickness(unittest.TestCase):
         self.assertEqual(after["p"], healthy["p"] - 1)
 
 
+class ShortIllness(unittest.TestCase):
+    """Leichte Erkaeltung (1-3 Tage): kurzer Wiedereinstieg, Fortschritt pausiert nicht."""
+    RAW = {"sick": {"from": "2026-10-05", "to": "2026-10-06"}}
+
+    def test_two_days_off_then_one_easy_day_then_back(self):
+        w = week(date(2026, 10, 5), self.RAW)
+        for wd in ("Montag", "Dienstag"):
+            self.assertEqual(w["days"][wd]["units"], [], wd)
+        self.assertEqual([u["name"] for u in units(w, "Mittwoch")], ["Rad Zone 1 (locker)"])
+        thursday = [u["name"] for u in units(w, "Donnerstag")]
+        self.assertTrue(thursday)                                  # Donnerstag wieder normal geplant
+
+    def test_progression_does_not_pause_for_short_illness(self):
+        self.assertEqual(pl.sick_pause_weeks(pl.normalize_inputs(self.RAW)), 0)
+        mon = date(2026, 11, 2)
+        self.assertEqual(pl.week_params(mon, pl.normalize_inputs(self.RAW))["p"], pl.week_params(mon, pl.normalize_inputs({}))["p"])
+
+    def test_four_days_is_still_a_real_illness(self):
+        raw = {"sick": {"from": "2026-10-05", "to": "2026-10-08"}}
+        self.assertEqual(pl.sick_pause_weeks(pl.normalize_inputs(raw)), 1)
+
+
 class AgendaOutput(unittest.TestCase):
     def test_agenda_contains_shift_and_event(self):
         raw = {"shifts": {"2026-10-05": [{"start": "16:00", "end": "22:00"}]},
