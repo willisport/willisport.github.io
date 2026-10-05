@@ -602,7 +602,9 @@ class ShortIllness(unittest.TestCase):
             self.assertEqual(w["days"][wd]["units"], [], wd)
         self.assertEqual([u["name"] for u in units(w, "Mittwoch")], ["Rad Zone 1 (locker)"])
         thursday = [u["name"] for u in units(w, "Donnerstag")]
-        self.assertTrue(thursday)                                  # Donnerstag wieder normal geplant
+        self.assertTrue(thursday)                                  # Donnerstag: wieder Training, aber noch ohne harte Einheiten
+        self.assertNotIn("VO2max-Intervalle", thursday)
+        self.assertNotIn("Langer Lauf", thursday)
 
     def test_progression_does_not_pause_for_short_illness(self):
         self.assertEqual(pl.sick_pause_weeks(pl.normalize_inputs(self.RAW)), 0)

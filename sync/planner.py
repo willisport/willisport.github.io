@@ -429,7 +429,7 @@ def build_day_contexts(monday: date, inputs: dict, today: date) -> list[DayCtx]:
             if delta == 1:
                 ctx.sick_return_level = "easy"        # leichte Erkaeltung: 1 Tag locker, dann schnell zurueck
             elif delta <= 3:
-                ctx.sick_return_level = 0.85
+                ctx.sick_return_level = 0.7           # noch keine harten Einheiten (VO2max/Schwelle/langer Lauf)
         elif ret_to is not None and d > ret_to:
             delta = (d - ret_to).days
             if delta <= 3:
