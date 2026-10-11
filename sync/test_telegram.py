@@ -102,6 +102,31 @@ class RunAuto(unittest.TestCase):
         self.assertIn("07.10.2026", sent[0])
 
 
+class UserOverrides(unittest.TestCase):
+    GEN = {"weeks": {"2026-10-12": {"days": {
+        "Montag": {"focus": "x", "units": [{"name": "Rad Zone 1 (locker)", "type": "rad", "detail": "30 min, ganz entspannt · 06:30 Uhr"}]},
+        "Dienstag": {"focus": "y", "units": [{"name": "Core", "type": "core", "detail": "15 min · 17:00 Uhr"}]},
+    }}}}
+    PLAN = {"weekPattern": [], "weekOverrides": {}}
+
+    def test_time_override_replaces_time(self):
+        ov = {"__times": {"2026-10-12|Rad Zone 1 (locker)": "18:00"}}
+        day = ta.day_with_overrides(self.PLAN, date(2026, 10, 12), self.GEN, ov)
+        self.assertIn("18:00 Uhr (angepasst)", day["units"][0]["detail"])
+        self.assertNotIn("06:30", day["units"][0]["detail"])
+
+    def test_moved_unit_disappears_at_home_and_shows_at_target(self):
+        ov = {"__moves": {"2026-10-12|Dienstag|Core": "2026-10-12"}}
+        home = ta.day_with_overrides(self.PLAN, date(2026, 10, 13), self.GEN, ov)
+        target = ta.day_with_overrides(self.PLAN, date(2026, 10, 12), self.GEN, ov)
+        self.assertEqual([u["name"] for u in home["units"]], [])
+        self.assertEqual([u["name"] for u in target["units"]], ["Rad Zone 1 (locker)", "Core"])
+
+    def test_without_overrides_unchanged(self):
+        day = ta.day_with_overrides(self.PLAN, date(2026, 10, 12), self.GEN, {})
+        self.assertIn("06:30 Uhr", day["units"][0]["detail"])
+
+
 DATA = {
     "week": {"startDate": "2026-10-05", "targets": {"runVolumeKm": 36, "bikeVolumeKm": 125, "timeMin": 630},
              "actuals": {"runVolumeKm": 31.2, "bikeVolumeKm": 118, "timeMin": 552},

@@ -15,8 +15,10 @@ Liest den vom Planer erzeugten Langzeitplan (data/plan.enc.json) bzw. die Tagesd
 Manuell: python telegram_agenda.py morning|evening|weekly (sendet sofort, ohne Statusdatei).
 """
 
+import copy
 import json
 import os
+import re
 import sys
 from datetime import date, datetime, timedelta
 from zoneinfo import ZoneInfo
@@ -142,6 +144,41 @@ def day_for_date(plan, d, generated=None):
     return next(day for day in plan["weekPattern"] if day["weekday"] == wd)
 
 
+TIME_ANNOTATION_RE = re.compile(r" · \d{2}:\d{2} Uhr(, nüchtern)?( \(angepasst\))?$")
+
+
+def day_with_overrides(plan, d, generated, overrides):
+    """Tagesplan inkl. Willis manueller Aenderungen auf der Website: verschobene Einheiten (__moves)
+    und angepasste Uhrzeiten (__times) - sonst wuerde Telegram etwas anderes sagen als die Seite."""
+    day = copy.deepcopy(day_for_date(plan, d, generated))
+    if not overrides:
+        return day
+    iso, wd = d.strftime("%Y-%m-%d"), WEEKDAYS[d.weekday()]
+    mon = monday_of(d).strftime("%Y-%m-%d")
+    week_days = (((generated or {}).get("weeks") or {}).get(mon) or {}).get("days") or {}
+    units = list(day.get("units", []))
+    for key, target in (overrides.get("__moves") or {}).items():
+        try:
+            wk, home, name = key.split("|")
+        except ValueError:
+            continue
+        if wk != mon:
+            continue
+        if wk == mon and home == wd and target != iso:
+            units = [u for u in units if u.get("name") != name]
+        elif wk == mon and target == iso and home != wd:
+            src = next((u for u in (week_days.get(home) or {}).get("units", []) if u.get("name") == name), None)
+            if src and not any(u.get("name") == name for u in units):
+                units.append(copy.deepcopy(src))
+    times = overrides.get("__times") or {}
+    for u in units:
+        t = times.get(f"{iso}|{u.get('name')}")
+        if t:
+            u["detail"] = TIME_ANNOTATION_RE.sub("", u.get("detail", "")) + f" · {t} Uhr (angepasst)"
+    day["units"] = units
+    return day
+
+
 def format_message(d, day):
     de_wd = WEEKDAYS[d.weekday()]
     header = f"{de_wd}, {d.strftime('%d.%m.%Y')}"
@@ -191,10 +228,10 @@ def send(text):
 # Tages-Nachrichten
 # ---------------------------------------------------------------------------
 
-def build_daily(mode, now, plan, generated, with_extras=True):
+def build_daily(mode, now, plan, generated, with_extras=True, overrides=None):
     """mode: 'morning' (heute) oder 'evening' (morgen). now: Berliner Datum/Zeit."""
     target = now + (timedelta(days=1) if mode == "evening" else timedelta(days=0))
-    day = day_for_date(plan, target, generated)
+    day = day_with_overrides(plan, target, generated, overrides)
     prefix = "☀️ Guten Morgen! Heute steht an:\n\n" if mode == "morning" else "🌙 Für morgen:\n\n"
     parts = [prefix + format_message(target, day)]
     if with_extras:
@@ -331,7 +368,8 @@ def due_slots(cfg, now, state):
 def run_auto(now=None, send_fn=None, cfg=None):
     now = now or datetime.now(BERLIN)
     send_fn = send_fn or send
-    cfg = cfg or load_config()
+    overrides = _decrypt_file(OVERRIDES_PATH) or {}
+    cfg = cfg or load_config(overrides)
     state = load_state()
     slots = due_slots(cfg, now, state)
     if not slots:
@@ -348,7 +386,7 @@ def run_auto(now=None, send_fn=None, cfg=None):
                     continue
                 text = format_weekly(data, generated, now.date())
             else:
-                text = build_daily(slot, now, plan, generated)
+                text = build_daily(slot, now, plan, generated, overrides=overrides)
             send_fn(text)
             state[slot] = now.date().isoformat()
             sent.append(slot)
@@ -373,7 +411,7 @@ def main():
             return
         send(format_weekly(data, load_generated_plan(), now.date()))
     else:
-        send(build_daily(mode, now, load_plan(), load_generated_plan()))
+        send(build_daily(mode, now, load_plan(), load_generated_plan(), overrides=_decrypt_file(OVERRIDES_PATH) or {}))
     print("gesendet:", mode)
 
 
