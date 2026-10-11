@@ -1200,7 +1200,7 @@ def generate_week(monday: date, inputs: dict, today: date, template_library: dic
         note_bits.append("Beschwerden (" + ", ".join(inj_labels) + ") – Plan angepasst")
     if params["phase"] == "wettkampf":
         note_bits.append("Wettkampfwoche (Termin im Plan hinterlegt)")
-    if missing:
+    if missing and not any(c.kind == "krank" for c in ctxs):
         note_bits.append("keine Zeit für: " + ", ".join(missing))
     known = any(c.agenda for c in ctxs)
     if not known:
