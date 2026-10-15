@@ -410,7 +410,19 @@ def build_day_contexts(monday: date, inputs: dict, today: date) -> list[DayCtx]:
         status = inputs["dayStatus"].get(ds)
         if status:
             k = status["kind"]
-            if k == "uni" and not day_events:
+            if k == "uni" and not day_events and ctx.shift_start is not None:
+                # Uni UND Schicht am selben Tag: zuerst Uni (zu Hause/online, 3 h), dann zur Arbeit
+                if ctx.shift_start >= 12 * 60:
+                    u0, u1 = 9 * 60, min(13 * 60, ctx.shift_start - travel_default - depart_buf - 60)
+                else:
+                    u0 = (ctx.shift_end + travel_default + 30) if ctx.shift_end is not None else 16 * 60
+                    u1 = u0 + 180
+                if u1 > u0:
+                    ctx.busy.append([u0, u1])
+                ctx.agenda.append({"kind": "schule", "title": "Uni (zu Hause)", "start": None, "end": None,
+                                   "note": f"ca. {min_to_hm(u0)}–{min_to_hm(max(u0, u1))} Uhr angenommen, dann Arbeit"})
+                ctx.focus_prefix += f"Uni zu Hause (ca. {min_to_hm(u0)}–{min_to_hm(max(u0, u1))} Uhr) · "
+            elif k == "uni" and not day_events:
                 # Uni-/Schultag ohne genaue Zeit -> ganztaegig belegt (9-16 plus Fahrt)
                 s, e = 9 * 60, 16 * 60
                 ctx.busy.append([s - travel_default - depart_buf, e + travel_default])

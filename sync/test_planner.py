@@ -630,6 +630,34 @@ class ShortIllness(unittest.TestCase):
         self.assertEqual(pl.sick_pause_weeks(pl.normalize_inputs(raw)), 1)
 
 
+class UniAndShift(unittest.TestCase):
+    """Uni (ohne Uhrzeit) UND Schicht am selben Tag: erst Uni zu Hause, dann Arbeit - kein Fahrt-Konflikt."""
+
+    def test_late_shift_with_uni_does_not_block_the_morning_with_travel(self):
+        raw = {"shifts": {"2026-11-03": [{"start": "16:00", "end": "22:00"}]}, "dayStatus": {"2026-11-03": {"kind": "uni"}}}
+        inputs = pl.normalize_inputs(raw)
+        ctx = pl.build_day_contexts(date(2026, 11, 2), inputs, TODAY)[1]
+        self.assertEqual(ctx.kind, "work")
+        starts = sorted(b[0] for b in ctx.busy)
+        self.assertEqual(starts[0], 9 * 60)                 # Uni ab 9:00 (ohne Fahrt)
+        agenda_kinds = [a["kind"] for a in ctx.agenda]
+        self.assertIn("schule", agenda_kinds)
+        self.assertIn("arbeit", agenda_kinds)
+
+    def test_uni_alone_still_blocks_nine_to_four_with_travel(self):
+        raw = {"dayStatus": {"2026-11-03": {"kind": "uni"}}}
+        inputs = pl.normalize_inputs(raw)
+        ctx = pl.build_day_contexts(date(2026, 11, 2), inputs, TODAY)[1]
+        self.assertLess(ctx.busy[0][0], 9 * 60)             # Fahrt davor
+        self.assertGreater(ctx.busy[0][1], 16 * 60)
+
+    def test_uni_with_a_listed_event_adds_nothing_extra(self):
+        raw = {"shifts": {"2026-11-03": [{"start": "16:00", "end": "22:00"}]}, "dayStatus": {"2026-11-03": {"kind": "uni"}},
+               "events": [{"date": "2026-11-03", "title": "Webinar", "kind": "schule", "start": "10:00", "end": "11:30", "travelMin": 0}]}
+        ctx = pl.build_day_contexts(date(2026, 11, 2), pl.normalize_inputs(raw), TODAY)[1]
+        self.assertEqual(len([a for a in ctx.agenda if a["kind"] == "schule"]), 1)
+
+
 class AgendaOutput(unittest.TestCase):
     def test_agenda_contains_shift_and_event(self):
         raw = {"shifts": {"2026-10-05": [{"start": "16:00", "end": "22:00"}]},

@@ -388,7 +388,7 @@ function dpBindDienstplan(panel) {
       chosen.forEach(x => {
         plan.events.push({
           id: `ics-${x.date}-${x.start.replace(":", "")}-${plan.events.length}`, date: x.date, title: x.title,
-          kind: dpGuessKind(x.title), start: x.start, end: x.end, travelMin: /online|digital|zoom|teams/i.test(x.location + " " + x.title) ? 0 : null,
+          kind: dpGuessKind(x.title), start: x.start, end: x.end, travelMin: /online|digital|webinar|zoom|teams|video/i.test(x.location + " " + x.title) ? 0 : null,
           note: x.location || "",
         });
       });
