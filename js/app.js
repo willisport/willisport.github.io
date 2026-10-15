@@ -524,7 +524,7 @@ function weekPlanDetailText(wk) {
   const typeLabel = wk.weekType === "recovery" ? "Recovery-Woche" : "Aufbau-Woche";
   const parts = [`<b>Woche ab ${escapeHtml(wk.label)}</b> – ${typeLabel}`];
   if (wk.note) parts.push(escapeHtml(wk.note));
-  parts.push(`Geschätzt: ${wk.runHours}h Laufen, ${wk.bikeHours}h Rad, ${wk.strengthHours}h Kraft/EMOM/Core`);
+  parts.push(`Geschätzt: ${wk.runHours}h Laufen, ${wk.bikeHours}h Rad, ${wk.strengthHours}h Kraft/Core`);
   return parts.join(" · ");
 }
 
@@ -963,7 +963,7 @@ function renderWoche(data) {
         <div style="display:flex; gap:16px; margin-top:6px; font-size:11px; color:var(--muted); flex-wrap:wrap;">
           <span style="display:flex; align-items:center; gap:6px;"><span style="width:10px; height:10px; border-radius:3px; background:var(--sky-400); display:inline-block;"></span>Laufen</span>
           <span style="display:flex; align-items:center; gap:6px;"><span style="width:10px; height:10px; border-radius:3px; background:var(--ocean-600); display:inline-block;"></span>Radfahren</span>
-          <span style="display:flex; align-items:center; gap:6px;"><span style="width:10px; height:10px; border-radius:3px; background:var(--teal); display:inline-block;"></span>Kraft/EMOM/Core</span>
+          <span style="display:flex; align-items:center; gap:6px;"><span style="width:10px; height:10px; border-radius:3px; background:var(--teal); display:inline-block;"></span>Kraft/Core</span>
         </div>
       </div>
     </div>`;
@@ -1167,7 +1167,7 @@ function buildCoachRecommendation(data) {
   }
 
   if (recoveryScore !== null && recoveryScore >= 55 && recoveryScore < 65) {
-    reasons.push(`Erholung ist solide, aber nicht top – Zusatzreize (EMOM/Core) bei Bedarf als erstes streichen.`);
+    reasons.push(`Erholung ist solide, aber nicht top – Zusatzreize (Core, optionale Einheiten) bei Bedarf als erstes streichen.`);
   }
 
   if (t.note && t.note.trim()) {
@@ -1459,7 +1459,7 @@ function renderKraft(data) {
       <div class="stack">
         ${todayUnits.length
           ? todayUnits.map(u => strengthUnitBlock(u, data.today.date)).join("")
-          : '<div class="card"><div class="card-note">Kein Kraft-/EMOM-Programm heute.</div></div>'}
+          : '<div class="card"><div class="card-note">Heute kein Krafttraining.</div></div>'}
       </div>
     </div>`;
 
@@ -1486,8 +1486,8 @@ function renderKraft(data) {
   document.getElementById("tab-kraft").innerHTML = `
     <div class="page-head">
       <div class="page-eyebrow">Kraft</div>
-      <div class="page-title">Kraft- &amp; EMOM-Programm</div>
-      <div class="page-sub">Alle Kraft- und EMOM-Einheiten aus deinem Wochenplan an einem Ort</div>
+      <div class="page-title">Kraft-Programm: Push · Pull · Beine</div>
+      <div class="page-sub">Push 2×, Pull 2×, Beine 1× pro Woche plus optionales Core – Übungen, Sätze und Gewichte änderst du unten in der Bibliothek</div>
     </div>
 
     <div class="stack">
@@ -2066,7 +2066,7 @@ function renderAll(freshData) {
   applyDeload(data);
   APP_DATA = data;
   const sidenavGoalEl = document.getElementById("sidenav-goal");
-  if (sidenavGoalEl) sidenavGoalEl.textContent = data.profile.goal.replace("Ultramarathon ", "");
+  if (sidenavGoalEl) sidenavGoalEl.textContent = data.profile.goal;
   renderHeute(data);
   renderWoche(data);
   renderVerlauf(data);

@@ -9,6 +9,20 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
 import planner as pl  # noqa: E402
 
+# Diese Tests pruefen den klassischen Plan (Ultra, EMOM, taegliches Rad); der Allrounder-Plan hat test_allrounder.py
+LEGACY = {"planMode": "classic", "raceDate": "2027-08-28", "raceName": "Ultramarathon", "raceDistanceKm": 100, "longRunMaxKm": 36}
+_SAVED_DEFAULTS = dict(pl.DEFAULT_SETTINGS)
+
+
+def setUpModule():
+    pl.DEFAULT_SETTINGS.update(LEGACY)
+
+
+def tearDownModule():
+    pl.DEFAULT_SETTINGS.clear()
+    pl.DEFAULT_SETTINGS.update(_SAVED_DEFAULTS)
+
+
 TODAY = date(2026, 10, 4)
 OCT_SHIFTS = {
     "2026-10-05": [{"start": "16:00", "end": "22:00"}],

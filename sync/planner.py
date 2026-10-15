@@ -17,6 +17,11 @@ Regeln (Willis "Master", siehe Memory/Notizen):
     (Raddauer, langer Lauf, Intervalle, Schwelle), vor dem Wettkampf Taper
   * Krankheit: Pause, danach sanfter Wiedereinstieg, Fortschritt pausiert
 
+Planmodi (Einstellung planMode):
+  * "allrounder" (Standard): Marathon-Aufbau + Kraft - Push 2x, Pull 2x, Beine 1x pro Woche, Rad und Lauf im
+    Wechsel, VO2max-Laeufe, Schwelle auf dem Rad (siehe planner_allrounder.py)
+  * "classic": der fruehere Ultra-Plan (taegliches Rad, EMOM, Arme/Schultern) - bleibt zur Auswahl erhalten
+
 Alle Zeiten sind lokale Minuten seit Mitternacht. Keine Netzwerk-/IO-Zugriffe.
 """
 
@@ -42,11 +47,14 @@ DEFAULT_SETTINGS = {
     "offdayBikeStartMin": 7 * 60,
     "longSessionStartMin": 9 * 60,
     "afternoonStartMin": 16 * 60 + 30,
-    "raceDate": "2027-08-28",   # Annahme (Zielmonat August 2027) - in der Website aenderbar
-    "raceName": "Ultramarathon",
-    "raceDistanceKm": 100,
+    "planMode": "allrounder",   # allrounder (Marathon + Push/Pull/Beine) | classic (alter Ultra-Plan)
+    "raceDate": "2027-09-26",   # Platzhalter (Marathon Ende September 2027) - in der Website aenderbar
+    "raceName": "Marathon",
+    "raceDistanceKm": 42.195,
+    "gymOnLateShift": False,    # Studio-Einheiten (Push/Pull/Beine) auch an Spaetschicht-Tagen?
+    "coreSessions": 2,          # Core pro Woche (eine im Studio an Maschinen, eine zu Hause) - optional
     "runScalePct": 100,         # Regler fuer den Laufumfang (Z2- und langer Lauf), 50-130 %
-    "longRunMaxKm": 36,         # Obergrenze fuer den langen Lauf
+    "longRunMaxKm": 32,         # Obergrenze fuer den langen Lauf (Marathon-Aufbau)
     "lateShiftFromMin": 12 * 60,  # Schichtbeginn ab hier = Spaetschicht: dann kein Studio-/Beintraining
     "ftpW": None,               # leer = automatisch von Garmin; sonst eigener FTP-Wert (Watt)
     "ref5kSec": None,           # leer = Garmin-Prognose; sonst eigene 5-km-Zeit in Sekunden
@@ -85,10 +93,32 @@ DEFAULT_LIBRARY = {
                                    {"name": "Beinbeuger", "sets": 3, "reps": "20", "rest": "2 min"},
                                    {"name": "Wadenheben", "sets": 3, "reps": "20", "rest": "2 min"},
                                    {"name": "Schienbein", "sets": 3, "reps": "20", "rest": "1 min"}]},
-    "core": {"name": "Core", "durationMin": 15, "detail": "15 min",
+    "push": {"name": "Push", "durationMin": 60,
+             "detail": "Brust, Schulter (oben/seitlich), Trizeps · Brustpresse, Schrägbank, Butterfly, Schulterdrücken, Seitheben, Trizepsdrücken",
+             "exercises": [{"name": "Brustpresse / Bankdrücken", "sets": 3, "reps": "6–10", "rest": "2–3 min"},
+                           {"name": "Schrägbankdrücken", "sets": 3, "reps": "8–10", "rest": "2 min"},
+                           {"name": "Butterfly", "sets": 3, "reps": "12", "rest": "90 s"},
+                           {"name": "Schulterdrücken (obere Schulter)", "sets": 3, "reps": "8–10", "rest": "2 min"},
+                           {"name": "Seitheben (seitliche Schulter)", "sets": 3, "reps": "12–15", "rest": "60 s"},
+                           {"name": "Trizepsdrücken", "sets": 3, "reps": "10–12", "rest": "60 s"}]},
+    "pull": {"name": "Pull", "durationMin": 60,
+             "detail": "Rücken, hintere Schulter, Bizeps · Latzug, Rudern, Überzüge, Reverse Butterfly, Bizepscurls",
+             "exercises": [{"name": "Latzug (oder Klimmzüge)", "sets": 3, "reps": "8–10", "rest": "2 min"},
+                           {"name": "Rudern (Kabel/Maschine)", "sets": 3, "reps": "8–10", "rest": "2 min"},
+                           {"name": "Überzüge (Pullover)", "sets": 3, "reps": "10–12", "rest": "90 s"},
+                           {"name": "Hintere Schulter (Reverse Butterfly)", "sets": 3, "reps": "12–15", "rest": "60 s"},
+                           {"name": "Bizepscurls", "sets": 3, "reps": "10–12", "rest": "60 s"},
+                           {"name": "Hammercurls", "sets": 2, "reps": "12", "rest": "60 s"}]},
+    "core": {"name": "Core (zu Hause)", "durationMin": 12, "detail": "12 min Körpergewicht",
              "exercises": [{"name": "Plank", "sets": 3, "reps": "45 s", "rest": "30 s"},
                            {"name": "Seitstütz", "sets": 3, "reps": "30 s pro Seite", "rest": "30 s"},
-                           {"name": "Dead Bug", "sets": 3, "reps": "10 pro Seite", "rest": "30 s"}]},
+                           {"name": "Dead Bug", "sets": 3, "reps": "10 pro Seite", "rest": "30 s"},
+                           {"name": "Hollow Hold", "sets": 3, "reps": "20 s", "rest": "30 s"}]},
+    "coreGym": {"name": "Core (Studio)", "durationMin": 15, "detail": "15 min an Maschinen/Kabel",
+                "exercises": [{"name": "Bauchmaschine", "sets": 3, "reps": "12–15", "rest": "45 s"},
+                              {"name": "Rotationsmaschine / Kabel-Holzfäller", "sets": 3, "reps": "12 pro Seite", "rest": "45 s"},
+                              {"name": "Beinheben hängend", "sets": 3, "reps": "10", "rest": "45 s"},
+                              {"name": "Rückenstrecker", "sets": 3, "reps": "12", "rest": "45 s"}]},
     "armShoulders": {"name": "Arme/Schultern", "durationMin": 25,
                      "detail": "Schulterdrücken, Seitheben, hintere Schulter, Bizeps-/Trizepsdrücken · 3×10–12 Wdh.",
                      "exercises": [{"name": "Schulterdrücken", "sets": 3, "reps": "10–12", "rest": "60 s"},
@@ -271,7 +301,7 @@ class DayCtx:
         self.return_: int | None = None
         self.focus_prefix = ""
         self.sick_return_level = None   # None | "rest" | "easy" | float Faktor
-        self.no_run = self.no_hard = self.no_legs = self.no_core = self.bike_easy = False
+        self.no_run = self.no_hard = self.no_legs = self.no_core = self.no_pull = self.bike_easy = False
         self.injury_label = None
         self.shift_start: int | None = None
         self.shift_end: int | None = None
@@ -414,7 +444,7 @@ def build_day_contexts(monday: date, inputs: dict, today: date) -> list[DayCtx]:
             elif inj["area"] == "muskelkater":
                 ctx.no_hard = ctx.no_legs = True
             elif inj["area"] == "ruecken":
-                ctx.no_legs = ctx.no_core = True
+                ctx.no_legs = ctx.no_core = ctx.no_pull = True
             else:
                 ctx.no_hard = ctx.no_legs = True
             hint = {"knie": "kein Lauf, nur lockeres Rad (wenn schmerzfrei)", "fuss": "kein Lauf, nur lockeres Rad (wenn schmerzfrei)",
@@ -568,7 +598,8 @@ def week_params(monday: date, inputs: dict, factor_override: float | None = None
             return default
 
     scale = num("runScalePct", 100, 50, 130) / 100.0
-    long_cap = num("longRunMaxKm", 36, 10, 60)
+    allround = st.get("planMode", "allrounder") == "allrounder"
+    long_cap = num("longRunMaxKm", 32 if allround else 36, 10, 60)
     z2_km = min(10.0, 6.0 + 0.5 * (s // 3))
     long_km = half(min(long_cap, 10.0 + 1.0 * s))   # Laufen ist Prio 1: schnellerer Aufbau als beim Rad
     long_ride = int(round(min(240, 120 + 7.5 * s) / 5) * 5)
@@ -577,8 +608,10 @@ def week_params(monday: date, inputs: dict, factor_override: float | None = None
     reps, vo2_min = next((r, m) for st0, r, m in reversed(vo2_table) if s >= st0)
     # Schwelle auf dem Rad: 2 x N min, ab dem zweiten Aufbauschritt
     thr_min = 0 if s < 1 else (10 if s < 2 else 12 if s < 4 else 15 if s < 6 else 18 if s < 8 else 20)
+    if allround and s < 1:
+        thr_min = 8                      # Woche A: Schwelle von Anfang an, aber ganz sanft (2 x 8 min)
     bike_min = min(num("bikeMaxMin", 60, 30, 120), 45 + 5 * (s // 2))   # Rad bleibt Grundlage: max. 1 h, gesteigert wird beim Laufen
-    run_days = 3 if s < 3 else 4
+    run_days = (3 if s < 4 else 4) if allround else (3 if s < 3 else 4)
 
     z2_km = max(4.0, half(z2_km * scale * (0.85 if phase == "recovery" else 1.0) * min(1.0, taper_factor + 0.1)))
     long_km = max(6.0, half(long_km * factor * scale))
@@ -602,7 +635,8 @@ def week_params(monday: date, inputs: dict, factor_override: float | None = None
         "p": p, "step": s, "phase": phase, "recovery": phase == "recovery",
         "factor": round(factor, 3), "z2Km": z2_km, "longKm": long_km, "longRideMin": long_ride,
         "intervalReps": reps, "vo2Min": vo2_min, "thresholdMin": thr_min, "bikeMin": bike_min, "runDays": run_days,
-        "skipHeavy": phase == "wettkampf" or (phase == "erholung" and factor < 0.6), "weeksToRace": weeks_to_race, "taper": phase in ("taper", "wettkampf"),
+        "skipHeavy": phase == "wettkampf" or (phase == "erholung" and factor < 0.6) or (allround and weeks_to_race == 1),
+        "weeksToRace": weeks_to_race, "taper": phase in ("taper", "wettkampf"),
     }
 
 
@@ -1119,15 +1153,23 @@ def short_label(unit: dict) -> str:
     return {"Rad Zone 2": "Rad", "Rad Zone 1 (locker)": "lockeres Rad", "Langes Rad Zone 2": "langes Rad",
             "VO2max-Intervalle": "VO2max-Intervalle", "Schwellentraining Rad": "Schwelle (Rad)",
             "Zone-2-Lauf": "Lauf", "Langer Lauf": "langer Lauf", "Schweres Beintraining": "schwere Beine",
-            "Arme/Schultern": "Arme/Schultern"}.get(n, n)
+            "Arme/Schultern": "Arme/Schultern", "Core (zu Hause)": "Core", "Core (Studio)": "Core"}.get(n, n)
 
 
-def generate_week(monday: date, inputs: dict, today: date, template_library: dict | None = None) -> dict:
+def generate_week(monday: date, inputs: dict, today: date, template_library: dict | None = None,
+                  carry: dict | None = None) -> dict:
+    """carry: veraenderliche Uebergabe von der Vorwoche (letzte Push/Pull/Bein-/Hart-Tage), damit auch
+    ueber den Wochenwechsel hinweg genug Abstand bleibt (nur Modus allrounder)."""
     lib = inputs["library"]
     params = week_params(monday, inputs)
     ctxs = build_day_contexts(monday, inputs, today)
-    planner = Planner(inputs, lib)
-    placed, roles, missing = planner.plan_week(monday, ctxs, params, today)
+    if inputs["settings"].get("planMode", "allrounder") == "allrounder":
+        import planner_allrounder
+        planner = planner_allrounder.AllrounderPlanner(inputs, lib)
+        placed, roles, missing = planner.plan_week(monday, ctxs, params, today, carry)
+    else:
+        planner = Planner(inputs, lib)
+        placed, roles, missing = planner.plan_week(monday, ctxs, params, today)
 
     days = {}
     run_km = bike_min = total_min = 0.0
@@ -1249,9 +1291,10 @@ def generate_plan(inputs_raw: dict | None, from_monday: date, to_date: date, tod
     if template_library:
         inputs["library"] = merge_library((inputs_raw or {}).get("library"), template_library)
     weeks = {}
+    carry: dict = {}
     monday = monday_of(from_monday)
     while monday <= to_date:
-        weeks[iso(monday)] = generate_week(monday, inputs, today)
+        weeks[iso(monday)] = generate_week(monday, inputs, today, carry=carry)
         monday += timedelta(days=7)
     return weeks
 

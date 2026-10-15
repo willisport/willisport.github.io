@@ -5,7 +5,7 @@
    Kraft: Übungsbibliothek (unabhängig vom Wochentag) + Extra-Einheiten einfügen
    --------------------------------------------------------------------------- */
 
-const LIB_ORDER = ["emom1", "emom2", "heavyLegs", "legStabi", "legSupersets", "core", "armShoulders"];
+const LIB_ORDER = ["push", "pull", "heavyLegs", "core", "coreGym", "legStabi", "legSupersets", "emom1", "emom2", "armShoulders"];
 
 function currentLibrary(data) {
   const base = JSON.parse(JSON.stringify((data && data.library) || {}));

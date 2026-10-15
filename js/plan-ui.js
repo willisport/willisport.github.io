@@ -14,8 +14,9 @@ function dpFmtDate(iso) {
 function dpSettings() {
   const p = planInputs();
   return {
-    travelMin: 75, kuerzel: "WL", raceDate: "2027-08-28", raceName: "Ultramarathon", raceDistanceKm: 100,
-    runScalePct: 100, longRunMaxKm: 36, ftpW: null, ref5kSec: null, includeLongRide: false, includeLegStabi: false, includeLegSupersets: false, ...(p.settings || {}),
+    travelMin: 75, kuerzel: "WL", raceDate: "2027-09-26", raceName: "Marathon", raceDistanceKm: 42.195,
+    runScalePct: 100, longRunMaxKm: 32, ftpW: null, ref5kSec: null, includeLongRide: false, includeLegStabi: false, includeLegSupersets: false,
+    planMode: "allrounder", gymOnLateShift: false, coreSessions: 2, ...(p.settings || {}),
   };
 }
 
@@ -210,7 +211,7 @@ function planStateCardHtml() {
         <button class="btn-small" type="button" data-plan-act="hold">Fortschritt −1 Woche</button>
       </div>
       ${injuryRowHtml()}
-      <div class="card-note" style="margin-top:8px;"><b>Schwerpunkt:</b> Laufen ist Prio 1. Rad bleibt Grundlage (max. 1 h pro Einheit), gesteigert wird beim Laufen. VO2max = ALL OUT, Schwelle läuft auf dem Rad.</div>
+      <div class="card-note" style="margin-top:8px;"><b>Plan:</b> Allrounder – Marathon-Aufbau + Kraft. Push 2×, Pull 2×, Beine 1× pro Woche (Studio), Rad max. 1 h, VO2max = ALL OUT, Schwelle auf dem Rad. Core ist optional.</div>
       <div class="card-note" style="margin-top:8px;">Oder einfach unten ins Coach-Feld schreiben: „ich bin krank“, „bin wieder gesund“, „fühlt sich gut, wir können hoch“, „stagniert, wir bleiben so“.</div>
     </div>`;
 }
@@ -286,6 +287,16 @@ function renderDienstplan() {
           <label class="card-note">5-km-Bestzeit jetzt (mm:ss) – leer = Garmin-Prognose<input type="text" id="dp-set-5k" class="text-input" placeholder="auto" value="${st.ref5kSec ? escapeHtml(Math.floor(st.ref5kSec / 60) + ":" + String(Math.round(st.ref5kSec % 60)).padStart(2, "0")) : ""}" /></label>
           <label class="card-note">Langer Lauf maximal (km)<input type="number" id="dp-set-longmax" class="text-input" min="10" max="60" value="${escapeHtml(st.longRunMaxKm)}" /></label>
           <div class="stack" style="gap:6px;">
+            <label class="card-note">Planart
+              <select id="dp-set-mode" class="move-select">
+                <option value="allrounder" ${st.planMode !== "classic" ? "selected" : ""}>Allrounder: Marathon + Push/Pull/Beine</option>
+                <option value="classic" ${st.planMode === "classic" ? "selected" : ""}>Klassisch: täglich Rad + EMOM (alter Ultra-Plan)</option>
+              </select></label>
+            <label class="card-note">Core pro Woche (optional)
+              <select id="dp-set-core" class="move-select">
+                ${[0, 1, 2].map(n => `<option value="${n}" ${Number(st.coreSessions) === n ? "selected" : ""}>${n === 0 ? "kein Core" : n === 1 ? "1× (zu Hause)" : "2× (Studio + zu Hause)"}</option>`).join("")}
+              </select></label>
+            <label class="card-note"><input type="checkbox" id="dp-set-gymlate" ${st.gymOnLateShift ? "checked" : ""} /> Studio auch an Spätschicht-Tagen (Push/Pull/Beine)</label>
             <label class="card-note"><input type="checkbox" id="dp-set-longride" ${st.includeLongRide ? "checked" : ""} /> Langes Rad einplanen (1× pro Woche)</label>
             <label class="card-note"><input type="checkbox" id="dp-set-stabi" ${st.includeLegStabi ? "checked" : ""} /> Bein-Stabi wieder einplanen</label>
             <label class="card-note"><input type="checkbox" id="dp-set-super" ${st.includeLegSupersets ? "checked" : ""} /> Bein-Supersätze wieder einplanen</label>
@@ -422,6 +433,7 @@ function dpBindDienstplan(panel) {
       longRunMaxKm: Math.min(60, Math.max(10, Number($("dp-set-longmax").value) || 36)),
       ftpW: Number($("dp-set-ftp").value) > 0 ? Number($("dp-set-ftp").value) : null,
       ref5kSec: (() => { const m = ($("dp-set-5k").value || "").trim().match(/^(\d{1,2}):(\d{2})$/); return m ? Number(m[1]) * 60 + Number(m[2]) : null; })(),
+      planMode: $("dp-set-mode").value, coreSessions: Number($("dp-set-core").value), gymOnLateShift: $("dp-set-gymlate").checked,
       includeLongRide: $("dp-set-longride").checked, includeLegStabi: $("dp-set-stabi").checked, includeLegSupersets: $("dp-set-super").checked,
     };
     await applyPlanChange("Einstellungen gespeichert", plan => { plan.settings = { ...(plan.settings || {}), ...settings }; });

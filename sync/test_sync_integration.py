@@ -5,6 +5,7 @@ Laeuft komplett offline: python -m unittest test_sync_integration -v"""
 
 import json
 import os
+import re
 import shutil
 import sys
 import tempfile
@@ -91,7 +92,7 @@ class SyncIntegration(unittest.TestCase):
         self.assertEqual(data["today"]["dayFocus"], week_days["Mittwoch"]["focus"])
         rad = [u for d in data["week"]["days"] for u in d["units"] if u["type"] == "rad" and d["weekday"] == "Dienstag"]
         self.assertTrue(rad, [u["name"] for u in week_days["Dienstag"]["units"]])
-        self.assertTrue(any(("06:00 Uhr, nüchtern" in u["detail"]) or ("06:30 Uhr, nüchtern" in u["detail"]) for u in rad), [u["detail"] for u in rad])
+        self.assertTrue(all(" Uhr" in u["detail"] for u in rad), [u["detail"] for u in rad])   # Dienstag: Schwelle nach der Schulung
 
         # Wochenziele + Label kommen aus dem Planer
         self.assertIn("Aufbau", data["week"]["label"])
