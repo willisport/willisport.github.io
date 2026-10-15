@@ -82,10 +82,15 @@ function dpParsedHtml() {
     <div class="card accent-teal" id="dp-review">
       <div class="card-head"><span class="card-title">Erkannt – bitte kurz prüfen</span>
         <span class="card-note">${days.length} Tage · ${nShifts} Schichten · ${nEv} Termine · ${nSt} Sonderstatus</span></div>
+      <div style="position:sticky; top:0; z-index:5; display:flex; gap:8px; flex-wrap:wrap; padding:8px 0; background:var(--surface-1, #0b1d33);">
+        <button class="btn-small dp-accept-btn" type="button">✓ Übernehmen &amp; Plan neu berechnen</button>
+        <button class="btn-small dp-discard-btn" type="button">Verwerfen</button>
+        <span class="card-note" style="align-self:center;">Erst danach ist der Dienstplan gespeichert.</span>
+      </div>
       <div class="stack" style="gap:8px;">${rows}</div>
       <div style="display:flex; gap:8px; margin-top:12px; flex-wrap:wrap;">
-        <button class="btn-small" type="button" id="dp-accept">Übernehmen &amp; Plan neu berechnen</button>
-        <button class="btn-small" type="button" id="dp-discard">Verwerfen</button>
+        <button class="btn-small dp-accept-btn" type="button">✓ Übernehmen &amp; Plan neu berechnen</button>
+        <button class="btn-small dp-discard-btn" type="button">Verwerfen</button>
       </div>
     </div>`;
 }
@@ -332,7 +337,7 @@ function dpBindDienstplan(panel) {
         return;
       }
       DPUI.parsed = days;
-      DPUI.status = `${days.length} Tage gelesen.`;
+      DPUI.status = `${days.length} Tage gelesen – unten die Liste prüfen und dann auf „Übernehmen“ drücken (Knopf steht oben und ganz unten in der Liste).`;
       renderDienstplan();
       const rev = document.getElementById("dp-review");
       if (rev) rev.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -341,16 +346,14 @@ function dpBindDienstplan(panel) {
     }
   });
 
-  const accept = $("dp-accept");
-  if (accept) accept.addEventListener("click", async () => {
+  panel.querySelectorAll(".dp-accept-btn").forEach(accept => accept.addEventListener("click", async () => {
     const days = dpReadReview();
     const travel = dpSettings().travelMin;
     DPUI.parsed = null;
     DPUI.status = "";
     await applyPlanChange("Dienstplan übernommen", plan => dpMergeParsedDays(plan, days, travel));
-  });
-  const discard = $("dp-discard");
-  if (discard) discard.addEventListener("click", () => { DPUI.parsed = null; DPUI.status = ""; renderDienstplan(); });
+  }));
+  panel.querySelectorAll(".dp-discard-btn").forEach(discard => discard.addEventListener("click", () => { DPUI.parsed = null; DPUI.status = ""; renderDienstplan(); }));
 
   bindBackup();
   $("dp-ics-export").addEventListener("click", () => downloadIcs(false));
