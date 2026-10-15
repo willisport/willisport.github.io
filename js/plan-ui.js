@@ -52,7 +52,9 @@ function dpParsedHtml() {
   const nEv = days.reduce((n, d) => n + d.events.length, 0);
   const nSt = days.filter(d => d.status).length;
   const rows = days.map(d => {
-    const shiftRows = (d.shifts.length ? d.shifts : [{ start: "", end: "" }]).map(s => `
+    const stored = (planInputs().shifts || {})[d.date];
+    const keptOld = !d.shifts.length && stored && stored.length;
+    const shiftRows = (d.shifts.length ? d.shifts : keptOld ? stored : [{ start: "", end: "" }]).map(s => `
       <div class="dp-shift" style="display:flex; gap:6px; align-items:center;">
         <span class="card-note" style="width:52px;">Arbeit</span>${dpTimeInput("dp-s", s.start)}<span class="card-note">bis</span>${dpTimeInput("dp-e", s.end)}
       </div>`).join("");
@@ -71,6 +73,7 @@ function dpParsedHtml() {
             ${[["", "kein Sonderstatus"], ["uni", "Uni / Schule"], ["frei", "Frei"], ["urlaub", "Urlaub"]].map(([k, l]) => `<option value="${k}" ${k === (d.status || "") ? "selected" : ""}>${l}</option>`).join("")}
           </select>
         </div>
+        ${keptOld ? `<div class="card-note" style="color:var(--amber); margin-bottom:4px;">Im neuen PDF steht für diesen Tag keine Schicht – die bisher gespeicherte bleibt vorbelegt. Zeiten leeren = Schicht löschen.</div>` : ""}
         <div class="stack" style="gap:6px;">${shiftRows}${evRows}</div>
         ${d.notes && d.notes.length ? `<details style="margin-top:6px;"><summary class="card-note" style="cursor:pointer;">Notizen aus dem PDF</summary><div class="card-note">${d.notes.map(escapeHtml).join("<br>")}</div></details>` : ""}
       </div>`;

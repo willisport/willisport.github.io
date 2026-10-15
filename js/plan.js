@@ -186,11 +186,21 @@ function dpParseDienstplanItems(pages, kuerzel = "WL") {
   return days;
 }
 
-/** Notizen der Spalte rechts auswerten - nur Zeilen, die das eigene Kürzel enthalten. */
+/** Zeitspanne aus einer Notizzeile: "9:00-13:00" oder nur Stunden wie "8-12 Steg" / "13-17". */
+function dpParseRange(line) {
+  let m = line.match(/(\d{1,2}):(\d{2})\s*[-–]\s*(\d{1,2}):(\d{2})/);
+  if (m) return { start: `${dpPad(+m[1])}:${m[2]}`, end: `${dpPad(+m[3])}:${m[4]}` };
+  m = line.match(/^(\d{1,2})\s*[-–]\s*(\d{1,2})(?!\d)/);
+  if (m && +m[1] >= 5 && +m[2] > +m[1] && +m[2] <= 24) return { start: `${dpPad(+m[1])}:00`, end: `${dpPad(+m[2] % 24)}:00` };
+  return null;
+}
+
+/** Notizen der Spalte rechts auswerten - nur Zeilen, die das eigene Kürzel enthalten.
+    Ein Termin-Block steht je nach Layout als "Titel / Zeit / Kürzel" oder "Zeit / Kürzel / Titel". */
 function dpInterpretNotes(lines, kz) {
   const kzRe = new RegExp(`(^|[^A-ZÄÖÜa-zäöü])${kz}([^A-ZÄÖÜa-zäöü]|$)`, "i");
-  const timeRe = /(\d{1,2}):(\d{2})\s*[-–]\s*(\d{1,2}):(\d{2})/;
   const kuerzelOnly = /^([A-ZÄÖÜ]{2,3}[\s,\-/]*)+$/;
+  const startsWithKuerzel = /^[A-ZÄÖÜ]{2,3}(\s|$)/;
   const events = [];
   let status = null;
   lines.forEach((line, k) => {
@@ -198,22 +208,30 @@ function dpInterpretNotes(lines, kz) {
     if (/frei/i.test(line)) { status = status || "frei"; return; }
     if (/urlaub|\burl\b/i.test(line)) { status = "urlaub"; return; }
     if (/\buni\b/i.test(line)) { if (status !== "urlaub") status = "uni"; return; }
-    // Kürzel-Zeile eines Termin-Blocks: davor steht ggf. die Zeitspanne, davor der Titel
-    let timeIdx = -1;
+    // Zeitspanne direkt vor der Kürzel-Zeile (bis zu 3 Zeilen davor)
+    let rangeIdx = -1;
     for (let j = k - 1; j >= Math.max(0, k - 3); j--) {
-      if (timeRe.test(lines[j])) { timeIdx = j; break; }
+      if (dpParseRange(lines[j])) { rangeIdx = j; break; }
     }
-    const titleLines = [];
-    for (let j = (timeIdx >= 0 ? timeIdx : k) - 1; j >= Math.max(0, (timeIdx >= 0 ? timeIdx : k) - 3); j--) {
-      if (kuerzelOnly.test(lines[j]) || timeRe.test(lines[j])) break;
-      titleLines.unshift(lines[j]);
+    const before = [];
+    for (let j = (rangeIdx >= 0 ? rangeIdx : k) - 1; j >= Math.max(0, (rangeIdx >= 0 ? rangeIdx : k) - 3); j--) {
+      if (kuerzelOnly.test(lines[j]) || startsWithKuerzel.test(lines[j]) || dpParseRange(lines[j])) break;
+      before.unshift(lines[j]);
     }
-    const title = titleLines.join(" ").replace(/\s+/g, " ").trim();
-    if (timeIdx >= 0) {
-      const m = lines[timeIdx].match(timeRe);
+    // Titel kann auch HINTER der Kürzel-Zeile stehen ("13-17 / JA LZ WL / Verkauf / Schulung 1")
+    const after = [];
+    if (!before.length) {
+      for (let j = k + 1; j < Math.min(lines.length, k + 4); j++) {
+        if (kuerzelOnly.test(lines[j]) || startsWithKuerzel.test(lines[j]) || dpParseRange(lines[j])) break;
+        after.push(lines[j]);
+      }
+    }
+    const title = (before.length ? before : after).join(" ").replace(/\s+/g, " ").trim();
+    if (rangeIdx >= 0) {
+      const r = dpParseRange(lines[rangeIdx]);
       events.push({
-        title: title || "Termin laut Dienstplan", kind: /schul|seminar|uni/i.test(title) ? "schule" : "termin",
-        start: `${dpPad(+m[1])}:${m[2]}`, end: `${dpPad(+m[3])}:${m[4]}`,
+        title: title || "Termin laut Dienstplan", kind: /schul|seminar|uni|verkauf|steg/i.test(title + " " + lines[rangeIdx]) ? "schule" : "termin",
+        start: r.start, end: r.end,
       });
     } else if (/schul|seminar/i.test(title)) {
       if (status !== "urlaub") status = "uni";
