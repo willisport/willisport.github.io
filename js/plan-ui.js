@@ -270,7 +270,7 @@ function renderDienstplan() {
 
       <div class="card">
         <div class="card-head"><span class="card-title">Kalender</span><span class="card-note">Plan in dein Handy-/Google-Kalender bringen</span></div>
-        <div class="card-note" style="margin-bottom:8px;">${(APP_DATA && APP_DATA.planState && APP_DATA.planState.externalEvents) ? `${APP_DATA.planState.externalEvents} Termine kommen automatisch aus deinem Google-Kalender.` : "Google-Kalender-Anbindung: noch nicht eingerichtet (geheime iCal-Adresse fehlt) – dann übernimmt die Seite deine Termine automatisch."}</div>
+        <div class="card-note" style="margin-bottom:8px;">${(APP_DATA && APP_DATA.planState && APP_DATA.planState.externalEvents) ? `${APP_DATA.planState.externalEvents} Termine kommen automatisch aus deinem Google-Kalender.` : "Kalender: Die Seite kennt deine Schichten und Termine selbst. Für TimeTree gibt es keine offizielle Schnittstelle – du kannst die Daten als .ics exportieren (Google/Apple Kalender) und in TimeTree über dessen Kalender-Import einlesen."}</div>
         <div style="display:flex; gap:8px; flex-wrap:wrap;">
           <button class="btn-small" type="button" id="dp-ics-export">Schichten &amp; Termine als .ics</button>
           <button class="btn-small" type="button" id="dp-ics-export-train">… mit Training als .ics</button>
