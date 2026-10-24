@@ -285,7 +285,7 @@ function raceCountdownHtml(data) {
       <div class="card-head"><span class="card-title">Countdown</span><span class="card-note">${escapeHtml(label)} · ${dpFmtDate(race)} ${race.slice(0, 4)}</span></div>
       <div class="stat-row">
         <div class="stat"><span class="stat-value">${days}<span class="unit">Tage</span></span><span class="stat-label">bis zum Wettkampf</span></div>
-        <div class="stat"><span class="stat-value">${weeks}<span class="unit">Wochen</span></span><span class="stat-label">${days % 7} Tage extra</span></div>
+        <div class="stat"><span class="stat-value">${weeks}<span class="unit">Wochen</span></span><span class="stat-label">${days % 7} ${days % 7 === 1 ? "Tag" : "Tage"} extra</span></div>
       </div>
     </div>`;
 }

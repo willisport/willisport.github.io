@@ -366,5 +366,28 @@ class SpecialWeeks(unittest.TestCase):
         self.assertEqual((st["planMode"], st["raceName"], st["longRunMaxKm"]), ("allrounder", "Marathon", 32))
 
 
+class OpenEndedSickness(unittest.TestCase):
+    """Offene Krankheit: der Plan DANACH zeigt sanften Wiedereinstieg, nicht sofort VO2max ALL OUT."""
+    TODAY = date(2026, 10, 24)
+
+    def test_projected_return_is_gentle_after_long_illness(self):
+        raw = {"sick": {"from": "2026-10-05", "to": None}}
+        weeks = pl.generate_plan(raw, date(2026, 10, 19), date(2026, 11, 22), self.TODAY)
+        first = weeks["2026-10-26"]
+        # Dienstag 27.10. ist der erste Tag nach dem angenommenen Ende (26.10.): nur locker
+        self.assertEqual(names(first, "Dienstag"), ["Rad Zone 1 (locker)"])
+        for wd, u in all_units(first):
+            self.assertNotIn(u["name"], HARD, wd)
+        # Fortschritt pausiert: Wochenziel Lauf deutlich unter dem Wert ohne Krankheit
+        healthy = pl.generate_plan({}, date(2026, 10, 26), date(2026, 10, 26), self.TODAY)["2026-10-26"]
+        self.assertLess(first["meta"]["targets"]["runVolumeKm"], healthy["meta"]["targets"]["runVolumeKm"])
+
+    def test_short_open_illness_keeps_progress(self):
+        raw = {"sick": {"from": "2026-10-23", "to": None}}
+        weeks = pl.generate_plan(raw, date(2026, 10, 26), date(2026, 10, 26), self.TODAY)
+        healthy = pl.generate_plan({}, date(2026, 10, 26), date(2026, 10, 26), self.TODAY)
+        self.assertEqual(weeks["2026-10-26"]["meta"]["step"], healthy["2026-10-26"]["meta"]["step"])
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

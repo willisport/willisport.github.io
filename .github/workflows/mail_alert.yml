@@ -1,8 +1,8 @@
 name: Mail-Sofortalarm
 
 on:
-  schedule:
-    - cron: "*/15 * * * *"
+  # Zeitplan aus: Mails laufen kuenftig anders; der alte Alarm scheiterte bei jedem Lauf
+  # (es gab nie einen Status-Stand zum Committen). Bei Bedarf manuell startbar.
   workflow_dispatch: {}
 
 permissions:

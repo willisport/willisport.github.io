@@ -2,7 +2,8 @@ name: Trainingsdaten synchronisieren
 
 on:
   schedule:
-    - cron: "*/10 * * * *"
+    # krumme Minuten: GitHub verzoegert/verwirft Laeufe zu den runden Zeiten (:00, :10 ...) bei hoher Last
+    - cron: "7,22,37,52 * * * *"
   workflow_dispatch: {}
 
 permissions:

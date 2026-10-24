@@ -534,21 +534,38 @@ def _range_weeks(frm, to) -> int:
 
 def sick_pause_weeks(inputs: dict) -> int:
     """Wochen, um die der Fortschritt nach Krankheit bzw. laufrelevanter Verletzung pausiert."""
-    weeks = _range_weeks(inputs["sick"].get("from"), inputs["sick"].get("to"))
+    weeks = _range_weeks(inputs["sick"].get("from"), inputs["sick"].get("to") or inputs["sick"].get("_proj_to"))
     inj = inputs["injury"]
     if inj.get("from") and INJURY.get(inj.get("area"), {}).get("run"):
-        weeks += _range_weeks(inj["from"], inj.get("to"))
+        weeks += _range_weeks(inj["from"], inj.get("to") or inj.get("_proj_to"))
     return weeks
+
+
+def project_open_ranges(inputs: dict, today: date) -> None:
+    """Krankheit / laufrelevante Beschwerden ohne Enddatum gelten rollierend ab heute (jeder Sync verlaengert).
+    Fuer den Plan DANACH wird so getan, als endeten sie dann: sanfter Wiedereinstieg + Fortschrittspause,
+    statt ab Tag 3 wieder volle Intensitaet zu zeigen."""
+    sick = inputs["sick"]
+    sick.pop("_proj_to", None)
+    if sick.get("from") and not sick.get("to"):
+        sick["_proj_to"] = iso(max(today, parse_date(sick["from"])) + timedelta(days=2))
+    inj = inputs["injury"]
+    inj.pop("_proj_to", None)
+    spec = INJURY.get(inj.get("area"))
+    if inj.get("from") and not inj.get("to") and spec and spec["run"] and not spec.get("auto_days"):
+        inj["_proj_to"] = iso(max(today, parse_date(inj["from"])) + timedelta(days=7))
 
 
 def recovery_info(inputs: dict):
     """(letzter Tag, Dauer in Tagen) der Krankheit / laufrelevanten Verletzung, die zuletzt endet - sonst (None, 0)."""
     ranges = []
-    if inputs["sick"].get("from") and inputs["sick"].get("to"):
-        ranges.append((parse_date(inputs["sick"]["to"]), inputs["sick"]["from"]))
+    sick_end = inputs["sick"].get("to") or inputs["sick"].get("_proj_to")
+    if inputs["sick"].get("from") and sick_end:
+        ranges.append((parse_date(sick_end), inputs["sick"]["from"]))
     inj = inputs["injury"]
-    if inj.get("from") and inj.get("to") and INJURY.get(inj.get("area"), {}).get("run"):
-        ranges.append((parse_date(inj["to"]), inj["from"]))
+    inj_end = inj.get("to") or inj.get("_proj_to")
+    if inj.get("from") and inj_end and INJURY.get(inj.get("area"), {}).get("run"):
+        ranges.append((parse_date(inj_end), inj["from"]))
     if not ranges:
         return None, 0
     end, frm = max(ranges, key=lambda r: r[0])
@@ -1173,6 +1190,7 @@ def generate_week(monday: date, inputs: dict, today: date, template_library: dic
     """carry: veraenderliche Uebergabe von der Vorwoche (letzte Push/Pull/Bein-/Hart-Tage), damit auch
     ueber den Wochenwechsel hinweg genug Abstand bleibt (nur Modus allrounder)."""
     lib = inputs["library"]
+    project_open_ranges(inputs, today)
     params = week_params(monday, inputs)
     ctxs = build_day_contexts(monday, inputs, today)
     if inputs["settings"].get("planMode", "allrounder") == "allrounder":
@@ -1207,7 +1225,9 @@ def generate_week(monday: date, inputs: dict, today: date, template_library: dic
         if roles[i] == {"race"}:
             focus += "WETTKAMPFTAG"
         elif ctx.kind == "krank":
-            focus += "Krank – Training pausiert. Wenn du wieder gesund bist: im Coach-Tab „Ich bin wieder gesund“ eintragen."
+            focus += "Krank – Training pausiert"
+            if ctx.date == today:
+                focus += ". Wenn du wieder gesund bist: im Coach-Tab „Ich bin wieder gesund“ eintragen."
             units = []
         elif ctx.sick_return_level == "easy":
             focus += "Wiedereinstieg nach Krankheit – nur locker bewegen"

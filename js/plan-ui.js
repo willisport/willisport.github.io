@@ -201,14 +201,15 @@ function planStateCardHtml() {
   const p = planInputs();
   const sick = p.sick || {};
   const offset = (p.progression && p.progression.offsetWeeks) || 0;
-  const stateTxt = sick.from && !sick.to ? `krank seit ${dpFmtDate(sick.from)} – Plan pausiert`
+  const sickDays = sick.from && !sick.to ? Math.round((new Date(isoToday() + "T12:00:00") - new Date(sick.from + "T12:00:00")) / 86400000) + 1 : 0;
+  const stateTxt = sick.from && !sick.to ? `krank seit ${dpFmtDate(sick.from)} – Plan pausiert${sickDays > 3 ? ", danach sanfter Wiedereinstieg" : ""}`
     : sick.from && sick.to && sick.to >= isoAddDays(isoToday(), -7) ? `wieder gesund seit ${dpFmtDate(sick.to)} – Plan baut langsam wieder auf`
       : "gesund, Plan läuft normal";
   const phase = ps && ps.progression ? ps.progression.phase : null;
   return `
     <div class="card">
       <div class="card-head"><span class="card-title">Plan-Status</span><span class="card-note">${escapeHtml(phase || "")}</span></div>
-      <div class="card-note" style="margin-bottom:8px;">${escapeHtml(stateTxt)} · Fortschritt ${offset === 0 ? "wie geplant" : (offset > 0 ? "+" : "") + offset + " Wochen"}</div>
+      <div class="card-note" style="margin-bottom:8px;">${escapeHtml(stateTxt)} · Fortschritt ${sickDays > 3 ? "pausiert automatisch" : offset === 0 ? "wie geplant" : (offset > 0 ? "+" : "") + offset + " Wochen"}</div>
       ${targetsLineHtml(ps)}
       <div class="card-note" style="margin-bottom:8px;">${escapeHtml(dpSettings().raceName)} ${escapeHtml(dpSettings().raceDistanceKm)} km am ${dpFmtDate(dpSettings().raceDate)} ${dpSettings().raceDate.slice(0, 4)} – noch ${Math.max(0, Math.ceil((new Date(dpSettings().raceDate + "T12:00:00") - new Date()) / 604800000))} Wochen · Laufumfang ${escapeHtml(dpSettings().runScalePct)} %</div>
       <div style="display:flex; gap:8px; flex-wrap:wrap;">

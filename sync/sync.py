@@ -201,7 +201,8 @@ def build_upcoming_plan(
 def build_day(plan_day: dict, date: datetime, activities: list, today: datetime, steps_by_date: dict, day_override: dict = None) -> dict:
     date_str = iso_date(date)
     day_acts = activities_on_date(activities, date_str)
-    plan_day = {**plan_day, **(day_override or {})}
+    # Der Planer liefert fallbackNote nur, wenn sie zum Tag passt - der Hinweis der alten Wochenvorlage darf dann nicht stehenbleiben
+    plan_day = {**plan_day, **({"fallbackNote": None, **day_override} if day_override else {})}
     units = []
     for pu in plan_day["units"]:
         matched = next((a for a in day_acts if unit_matches_activity(pu, a)), None)
@@ -653,6 +654,10 @@ def main():
         [pw["completionPct"] for pw in perf_weeks[:-1] if pw["monday"] >= iso_date(datetime.combine(planner.PROGRAM_START_MONDAY, datetime.min.time()))],
         bool(today_obj["overloadWarning"]),
     )
+    # Waehrend / kurz nach einer Krankheit keine Vorschlaege zum Fortschritt (der Planer pausiert den Fortschritt selbst)
+    sick_in = inputs_norm["sick"]
+    if sick_in.get("from") and (not sick_in.get("to") or sick_in["to"] >= (today_d - timedelta(days=14)).isoformat()):
+        hint = None
     plan_state = {
         "progression": {"offsetWeeks": inputs_norm["progression"]["offsetWeeks"],
                         "step": (this_meta or {}).get("step"), "phase": (this_meta or {}).get("phase")},

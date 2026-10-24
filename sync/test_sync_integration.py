@@ -94,6 +94,9 @@ class SyncIntegration(unittest.TestCase):
         self.assertTrue(rad, [u["name"] for u in week_days["Dienstag"]["units"]])
         self.assertTrue(all(" Uhr" in u["detail"] for u in rad), [u["detail"] for u in rad])   # Dienstag: Schwelle nach der Schulung
 
+        # Hinweise der alten Wochenvorlage (fallbackNote) duerfen nicht an Planer-Tagen haengenbleiben
+        self.assertNotIn("Supersätze", json.dumps(data["week"]["days"], ensure_ascii=False))
+
         # Wochenziele + Label kommen aus dem Planer
         self.assertIn("Aufbau", data["week"]["label"])
         self.assertGreater(data["week"]["targets"]["runVolumeKm"], 20)
@@ -151,6 +154,14 @@ class SyncIntegration(unittest.TestCase):
             sync.main()
         self.assertEqual(self.read("training-data.enc.json")["planState"]["externalEvents"], 0)
 
+
+    def test_no_progression_hint_while_sick(self):
+        inputs = dict(PLAN_INPUTS, sick={"from": "2026-10-05", "to": None})
+        raw = {"__plan": inputs, "__deload": {}}
+        enc = crypto_utils.encrypt_json_bytes(DEK, json.dumps(raw).encode("utf-8"))
+        (self.tmp / "data" / "overrides.enc.json").write_text(json.dumps(enc), encoding="utf-8")
+        sync.main()
+        self.assertIsNone(self.read("training-data.enc.json")["planState"]["hint"])
 
     def test_shoe_km_are_counted(self):
         inputs = dict(PLAN_INPUTS, shoes=[{"id": "g18", "name": "Brooks Ghost 18", "startDate": "2026-10-06", "retireKm": 700}])

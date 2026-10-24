@@ -739,7 +739,7 @@ function renderHeuteAgendaBody(data) {
     <div class="card-note" style="margin:12px 0 6px; font-weight:700; text-transform:uppercase; letter-spacing:.05em;">Als Nächstes</div>
     ${upcoming.map(d => `
       <div class="agenda-day"><span class="agenda-day-label">${WEEKDAYS_SHORT[d.weekday] || d.weekday} ${fmtDateShort(d.date)}</span>
-        <span class="agenda-day-items">${d.items.map(it => `${AGENDA_KIND_LABEL[it.kind] || it.kind}${it.start ? " " + it.start + (it.end ? "–" + it.end : "") : ""}${it.title && it.kind !== "arbeit" ? " (" + escapeHtml(it.title) + ")" : ""}`).join(" · ")}</span></div>`).join("")}` : "";
+        <span class="agenda-day-items">${d.items.map(it => `${AGENDA_KIND_LABEL[it.kind] || it.kind}${it.start ? " " + it.start + (it.end ? "–" + it.end : "") : ""}${it.title && it.kind !== "arbeit" && it.title !== (AGENDA_KIND_LABEL[it.kind] || it.kind) ? " (" + escapeHtml(it.title) + ")" : ""}`).join(" · ")}</span></div>`).join("")}` : "";
   return `<div class="card-head"><span class="card-title">Heute im Kalender</span><span class="card-note">Dienstplan &amp; Termine</span></div>${todayHtml}${upcomingHtml}`;
 }
 
@@ -783,8 +783,8 @@ function renderHeute(data) {
       </div>` : ""}
 
       <div class="card accent-teal">
-        <div class="card-head"><span class="card-title">Heutige Einheiten</span><span class="card-note">Kreis: geplant → erledigt → abgelehnt · Dropdown: Tag wählen · Uhr: Zeit ändern · 🪄: automatisch sinnvoll verschieben</span></div>
-        <div class="unit-list">${unitsHtml}</div>
+        <div class="card-head"><span class="card-title">Heutige Einheiten</span>${t.units.length ? '<span class="card-note">Kreis: geplant → erledigt → abgelehnt · Dropdown: Tag wählen · Uhr: Zeit ändern · 🪄: automatisch sinnvoll verschieben</span>' : ""}</div>
+        ${t.units.length ? `<div class="unit-list">${unitsHtml}</div>` : '<div class="card-note">Heute steht kein Training an.</div>'}
       </div>
 
       ${raceCountdownHtml(data)}
@@ -984,7 +984,7 @@ function renderVerlauf(data) {
     const up = diff >= 0;
     const deltaText = Math.abs(diff) < 0.05
       ? "Genau wie zuvor"
-      : `${up ? "+" : ""}${diff.toFixed(1)} km (${up ? "+" : ""}${pct}%) ${up ? "mehr" : "weniger"} als ${previousHeading.toLowerCase()}`;
+      : `${up ? "+" : ""}${diff.toFixed(1)} km (${up ? "+" : ""}${pct}%) ${up ? "mehr" : "weniger"} als ${previousHeading.split(" ").map((w, i) => i === 0 ? w.toLowerCase() : w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(" ")}`;
     return `
       <div class="compare-pair">
         <div class="compare-side">
@@ -1143,8 +1143,18 @@ function buildCoachRecommendation(data) {
   reasons.push(`Erholung: Score ${fmtVal(recoveryScore)} (Schlaf-Score ${fmtVal(t.sleep.sleepScore)}, Body Battery ${fmtVal(t.sleep.bodyBattery)}${hrvNote}).`);
   reasons.push(`Wochenfortschritt: ${fmtMin(w.actuals.timeMin)} von ${fmtMin(w.targets.timeMin)} Zielzeit (Lauf ${w.actuals.runVolumeKm} km, Rad ${w.actuals.bikeVolumeKm} km) – Tag ${dayIndex + 1} von 7.`);
 
+  const sick = (typeof planInputs === "function" && planInputs().sick) || {};
+  const sickOngoing = !!(sick.from && !sick.to);
+  const sickDays = sickOngoing ? Math.round((new Date(t.date + "T12:00:00") - new Date(sick.from + "T12:00:00")) / 86400000) + 1 : 0;
+
   let headline;
-  if (recoveryLow && isKeyDay) {
+  if (sickOngoing) {
+    headline = `Du bist krank – heute nichts erzwingen. Erholung geht vor, der Plan wartet auf dich.`;
+    reasons.length = 0;
+    reasons.push(`Krank gemeldet seit ${sickDays} Tag${sickDays === 1 ? "" : "en"}. Training ist pausiert; sobald du dich gesund fühlst, im Coach-Tab „Ich bin wieder gesund“ drücken – der Plan baut dann sanft wieder auf.`);
+    if (sickDays >= 14) reasons.push(`Bei so langer Dauer lohnt sich ein Arztbesuch (z. B. HNO bei Ohrdruck) – dauerhafte Beschwerden nicht „aussitzen“.`);
+    reasons.push(`Erholung: Score ${fmtVal(recoveryScore)} (Schlaf-Score ${fmtVal(t.sleep.sleepScore)}, Body Battery ${fmtVal(t.sleep.bodyBattery)}${hrvNote}).`);
+  } else if (recoveryLow && isKeyDay) {
     const key = todayPlan.units.find(u => u.keySession);
     headline = `Erholung ist niedrig, aber heute ist mit ${key.name} eine Schlüsseleinheit – lauf sie, nimm aber Tempo und Zusatzreize raus.`;
     reasons.push(`${key.name} bleibt bestehen – das ist eine der beiden Laufeinheiten, die nicht durchs Rad ersetzt werden sollten.`);
@@ -1248,12 +1258,77 @@ function renderCoach(data) {
   bindPlanStatus(document.getElementById("tab-coach"));
 }
 
+/* Tagesplan (Einheiten + Kalender) fuer ein beliebiges Datum - aus dem Langzeitplan, sonst aus der laufenden Woche. */
+function coachPlanForDate(iso, data) {
+  const weekdays = ["Sonntag", "Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag"];
+  const wd = weekdays[new Date(iso + "T12:00:00").getDay()];
+  const monday = isoMondayOf(iso);
+  let day = null;
+  if (typeof PLAN_DATA !== "undefined" && PLAN_DATA && PLAN_DATA.weeks && PLAN_DATA.weeks[monday]) day = PLAN_DATA.weeks[monday].days[wd];
+  if (!day) day = (data.week.days || []).find(d => d.date === iso);
+  const agenda = ((data.agenda || []).find(a => a.date === iso) || {}).items || [];
+  const cal = agenda.filter(i => i.kind !== "krank").map(i => `${AGENDA_KIND_LABEL[i.kind] || i.kind}${i.start ? " " + i.start + (i.end ? "–" + i.end : "") : ""}${i.kind !== "arbeit" && i.title && i.title !== (AGENDA_KIND_LABEL[i.kind] || i.kind) ? " (" + i.title + ")" : ""}`);
+  const sick = agenda.some(i => i.kind === "krank");
+  const units = day ? day.units.map(u => u.name) : [];
+  const label = `${wd}, ${fmtDateShort(iso)}`;
+  const parts = [];
+  if (cal.length) parts.push(`Kalender: ${cal.join(", ")}`);
+  if (sick) parts.push("krank – Training pausiert");
+  else if (units.length) parts.push(`Training: ${units.join(" + ")}`);
+  else parts.push("kein Training geplant");
+  return `${label}: ${parts.join(" · ")}.`;
+}
+
+/* Naechster Termin einer Einheit (z. B. "Langer Lauf") im Langzeitplan ab heute. */
+function coachFindNextUnit(names, data) {
+  const weekdays = ["Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag", "Sonntag"];
+  const today = data.today.date;
+  const weeks = (typeof PLAN_DATA !== "undefined" && PLAN_DATA && PLAN_DATA.weeks) || {};
+  for (const monday of Object.keys(weeks).sort()) {
+    for (let i = 0; i < 7; i++) {
+      const iso = isoAddDays(monday, i);
+      if (iso < today) continue;
+      const u = (weeks[monday].days[weekdays[i]] || { units: [] }).units.find(x => names.includes(x.name));
+      if (u) return { iso, wd: weekdays[i], unit: u };
+    }
+  }
+  return null;
+}
+
+function coachDayFromQuestion(q) {
+  const today = isoToday();
+  if (/übermorgen/.test(q)) return isoAddDays(today, 2);
+  if (/morgen/.test(q)) return isoAddDays(today, 1);
+  if (/heute/.test(q)) return today;
+  const names = ["sonntag", "montag", "dienstag", "mittwoch", "donnerstag", "freitag", "samstag"];
+  const hit = names.findIndex(n => q.includes(n));
+  if (hit >= 0) {
+    for (let i = 0; i < 8; i++) { const iso = isoAddDays(today, i); if (new Date(iso + "T12:00:00").getDay() === hit) return iso; }
+  }
+  return null;
+}
+
 function answerCoachQuestion(question, data) {
   const q = question.toLowerCase();
   const t = data.today, w = data.week;
   const recoveryScore = computeRecoveryScore(t.sleep);
-  const findUnit = (name) => w.days.flatMap(d => d.units).find(u => u.name === name);
+  const nextText = (names, label) => {
+    const hit = coachFindNextUnit(names, data);
+    return hit ? `${label}: ${hit.wd}, ${fmtDateShort(hit.iso)} – ${hit.unit.detail}` : `Ich finde ${label} im Plan gerade nicht (z. B. weil du krank bist oder der Plan noch nicht berechnet wurde).`;
+  };
 
+  if (/marathon|wettkampf|countdown|wie lange noch|noch wie viele (tage|wochen)/.test(q)) {
+    const st = dpSettings();
+    const days = Math.ceil((new Date(st.raceDate + "T12:00:00") - new Date(isoToday() + "T12:00:00")) / 86400000);
+    const rp = (data.performance || {}).racePredictions || {};
+    const pred = rp.timeMarathonSec && /marathon/i.test(st.raceName || "") ? ` Garmin schätzt aktuell ${fmtDuration(rp.timeMarathonSec)}.` : "";
+    return `${st.raceName || "Wettkampf"} am ${dpFmtDate(st.raceDate)} ${st.raceDate.slice(0, 4)}: noch ${days} Tage (${Math.floor(days / 7)} Wochen).${pred}`;
+  }
+  if (/\b(müde|kaputt|schlapp|erschöpft|keine lust|antriebslos)\b/.test(q)) {
+    const sk = planInputs().sick || {};
+    const tail = sk.from && !sk.to ? "" : " Wenn es länger anhält, sag es im Coach mit „stagniert, wir bleiben so“ oder „ich bin krank“.";
+    return `${buildCoachRecommendation(data).headline} Erholungs-Score: ${fmtVal(recoveryScore)}.${tail}`;
+  }
   if (/schlaf/.test(q)) {
     return `Letzte Nacht: ${fmtMin(t.sleep.totalMin)} gesamt, Schlaf-Score ${fmtVal(t.sleep.sleepScore)}. ${buildSleepTips(t.sleep)[0]}`;
   }
@@ -1263,43 +1338,40 @@ function answerCoachQuestion(question, data) {
   if (/gewicht/.test(q)) {
     return `Aktuelles Gewicht: ${fmtVal(t.body.weightKg)} kg.`;
   }
-  if (/vo2max/.test(q)) {
+  if (/vo2max/.test(q) && !/intervall/.test(q)) {
     return `Aktueller VO2max-Wert: ${fmtVal(t.body.vo2max)}.`;
   }
-  if (/rad/.test(q)) {
+  if (/schuh/.test(q)) {
+    const shoes = ((data.planState || {}).shoes) || [];
+    return shoes.length ? shoes.map(sh => `${sh.name}: ${sh.km} km von ${sh.retireKm} km Richtwert`).join(" · ") : "Es ist noch kein Schuh eingetragen (Performance-Tab).";
+  }
+  if (/soll ich.*(laufen|trainieren|fahren)|heute.*(laufen|trainieren)|sollte ich/.test(q)) {
+    return buildCoachRecommendation(data).headline;
+  }
+  if (/langer lauf|lange.* lauf/.test(q)) return nextText(["Langer Lauf"], "Nächster langer Lauf");
+  if (/intervall|vo2/.test(q)) return nextText(["VO2max-Intervalle"], "Nächste Intervalle");
+  if (/schwelle/.test(q)) return nextText(["Schwellentraining Rad"], "Nächstes Schwellentraining");
+  if (/beintraining|beine\b|leg day/.test(q)) return nextText(["Schweres Beintraining"], "Nächstes Beintraining");
+  if (/\bpush\b/.test(q)) return nextText(["Push"], "Nächstes Push");
+  if (/\bpull\b/.test(q)) return nextText(["Pull"], "Nächstes Pull");
+  if (/\bcore\b/.test(q)) return nextText(["Core (zu Hause)", "Core (Studio)"], "Nächstes Core");
+  const day = coachDayFromQuestion(q);
+  if (day && /(was|steht|plan|ansteht|habe ich|geplant|machen|mach)/.test(q)) {
+    return coachPlanForDate(day, data);
+  }
+  if (/\b(radfahren|rad|fahrrad)\b/.test(q)) {
     return `Diese Woche bisher ${w.actuals.bikeVolumeKm} von ${w.targets.bikeVolumeKm} km Rad-Ziel.`;
   }
   if (/(wie viel|wieviel|km).*lauf|lauf.*(woche|km)/.test(q)) {
     return `Diese Woche bisher ${w.actuals.runVolumeKm} von ${w.targets.runVolumeKm} km Lauf-Ziel.`;
   }
-  if (/zeit|trainiert|umfang/.test(q)) {
+  if (/zeit|trainiert|umfang|fortschritt/.test(q)) {
     return `Diese Woche bisher ${fmtMin(w.actuals.timeMin)} von ${fmtMin(w.targets.timeMin)} Zielzeit trainiert.`;
   }
-  if (/was.*heute|heute.*(einheit|plan)/.test(q)) {
-    return t.units.length
-      ? t.units.map(u => `${u.name} (${u.status === "done" ? "erledigt" : u.status === "skipped" ? "abgelehnt" : "geplant"})`).join(", ")
-      : "Heute stehen keine Einheiten an.";
+  if (/was.*heute|heute.*(einheit|plan)|heute/.test(q)) {
+    return coachPlanForDate(isoToday(), data);
   }
-  if (/soll ich.*(laufen|trainieren|fahren)|heute.*(laufen|trainieren)/.test(q)) {
-    return buildCoachRecommendation(data).headline;
-  }
-  if (/langer lauf|lang.*lauf|mittwoch/.test(q)) {
-    const u = findUnit("Langer Lauf");
-    return u ? `Langer Lauf: ${u.detail}` : "Kein langer Lauf in dieser Woche gefunden.";
-  }
-  if (/intervall|freitag|vo2/.test(q)) {
-    const u = findUnit("VO2max-Intervalle") || findUnit("Intervalle");
-    return u ? `VO2max-Intervalle: ${u.detail}` : "Keine Intervalle in dieser Woche gefunden.";
-  }
-  if (/schwelle/.test(q)) {
-    const u = findUnit("Schwellentraining Rad");
-    return u ? `Schwellentraining: ${u.detail}` : "Kein Schwellentraining in dieser Woche gefunden.";
-  }
-  if (/emom/.test(q)) {
-    const u = t.units.find(x => x.type === "emom");
-    return u ? `Heutiges EMOM: ${u.detail}` : "Heute steht kein EMOM an.";
-  }
-  return "Dazu hab ich noch keine feste Antwort. Frag z. B. nach Schlaf, Erholung, Gewicht, VO2max, Wochenfortschritt (Lauf/Rad/Zeit), dem langen Lauf, den Intervallen oder ob du heute trainieren solltest.";
+  return "Dazu hab ich noch keine feste Antwort. Frag z. B.: „was steht morgen an“, „wann ist der nächste lange Lauf“, „wie lange noch bis zum Marathon“, nach Schlaf, Erholung, Gewicht, Schuhen oder ob du heute trainieren solltest.";
 }
 
 /**

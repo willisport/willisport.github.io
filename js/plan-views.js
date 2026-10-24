@@ -21,7 +21,7 @@ function libKeys(lib) {
 
 function libExerciseRowHtml(e) {
   return `
-    <div class="lib-ex" style="display:grid; grid-template-columns:minmax(120px,2fr) 60px minmax(70px,1fr) minmax(70px,1fr) 74px auto; gap:6px; align-items:center;">
+    <div class="lib-ex">
       <input type="text" class="text-input lx-name" value="${escapeHtml(e.name)}" placeholder="Übung" />
       <input type="number" class="text-input lx-sets" value="${escapeHtml(e.sets)}" min="1" placeholder="Sätze" />
       <input type="text" class="text-input lx-reps" value="${escapeHtml(e.reps)}" placeholder="Wdh." />
@@ -43,7 +43,7 @@ function kraftLibraryHtml(data) {
         <label class="card-note">Dauer (Min)<input type="number" class="text-input lb-dur" value="${escapeHtml(e.durationMin || 15)}" min="1" /></label>
       </div>
       <label class="card-note" style="display:block; margin-bottom:8px;">Kurztext im Plan<input type="text" class="text-input lb-detail" value="${escapeHtml(e.detail || "")}" /></label>
-      <div class="card-note" style="display:grid; grid-template-columns:minmax(120px,2fr) 60px minmax(70px,1fr) minmax(70px,1fr) 74px auto; gap:6px; margin-bottom:4px;"><span>Übung</span><span>Sätze</span><span>Wdh.</span><span>Pause</span><span>Gewicht</span><span></span></div>
+      <div class="card-note lib-head" style="display:grid; grid-template-columns:minmax(120px,2fr) 60px minmax(70px,1fr) minmax(70px,1fr) 74px auto; gap:6px; margin-bottom:4px;"><span>Übung</span><span>Sätze</span><span>Wdh.</span><span>Pause</span><span>Gewicht</span><span></span></div>
       <div class="stack lib-exs" style="gap:6px;">${exs.map(libExerciseRowHtml).join("")}</div>
       <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:10px;">
         <button class="btn-small lb-add" type="button">+ Übung</button>
@@ -244,7 +244,9 @@ function futureUnitRowHtml(u, dateStr, days, monday) {
 function weekRunControlHtml(monday) {
   const wk = PLAN_DATA && PLAN_DATA.weeks && PLAN_DATA.weeks[monday];
   const km = wk && wk.meta && wk.meta.runKm;
-  if (!km || !canEdit()) return "";
+  if (!km || !(Number(km.long) > 0) || !(Number(km.z2) > 0) || !canEdit()) return "";
+  const hasRun = Object.values(wk.days || {}).some(d => (d.units || []).some(u => u.type === "lauf"));
+  if (!hasRun) return "";   // z. B. Krankheitswoche: nichts zu steuern
   const manual = (planInputs().runOverrides || {})[monday];
   return `
     <div class="run-ctl" data-monday="${monday}" style="display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-bottom:10px;">

@@ -216,21 +216,30 @@ function showLoginOverlay(authConfig, onSuccess, existingOverlay) {
   pwInput.addEventListener("keydown", (e) => { if (e.key === "Enter") attempt(); });
 }
 
+let SYNC_STATUS_ISO = null;
+let SYNC_STATUS_TIMER = null;
+
 function showSyncStatus(syncedAtIso) {
   const el = document.getElementById("sync-status");
   if (!el) return;
-  let label = "Automatisch synchronisiert (alle 10 Min)";
-  if (syncedAtIso) {
-    const d = new Date(syncedAtIso);
+  if (syncedAtIso) SYNC_STATUS_ISO = syncedAtIso;
+  let label = "Automatisch synchronisiert";
+  let stale = false;
+  if (SYNC_STATUS_ISO) {
+    const d = new Date(SYNC_STATUS_ISO);
     if (!Number.isNaN(d.getTime())) {
       const time = d.toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" });
       const ageMin = Math.round((Date.now() - d.getTime()) / 60000);
       const ageTxt = ageMin < 1 ? "gerade eben" : ageMin < 60 ? `vor ${ageMin} min` : `vor ${Math.round(ageMin / 60)} h`;
       label = `⟳ Zuletzt synchronisiert ${time} Uhr (${ageTxt})`;
+      stale = ageMin > 12 * 60;
+      if (stale) label += " – veraltet, „Sync auslösen“ drücken";
     }
   }
   el.textContent = label;
+  el.classList.toggle("is-stale", stale);
   el.hidden = false;
+  if (!SYNC_STATUS_TIMER) SYNC_STATUS_TIMER = setInterval(() => showSyncStatus(), 60000);   // Altersangabe laufend aktuell halten
 }
 
 function setupLogoutControl() {
@@ -292,6 +301,45 @@ function setupHostedSyncButton(onData) {
       setTimeout(() => { if (panel) panel.hidden = true; }, 12000);
     }
   });
+}
+
+/** Haelt die Seite aktuell, wenn sie lange offen oder im Hintergrund war (Handy-App):
+    beim Zurueckkehren bzw. alle 5 Minuten wird nachgeladen, wenn die Daten > 15 min alt sind
+    oder ein neuer Tag begonnen hat. Steht der Sync fuer den neuen Tag noch aus, wird er
+    einmal pro Tag selbst angestossen. Ungespeicherte Dienstplan-Eingaben bleiben unangetastet. */
+function setupAutoRefresh(onData) {
+  const localIso = () => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  };
+  let lastLoad = Date.now();
+  let busy = false;
+  const check = async () => {
+    if (busy || document.hidden || !CURRENT_DEK || typeof APP_DATA === "undefined" || !APP_DATA) return;
+    const dirty = document.getElementById("dp-dirty-bar");
+    if (dirty && !dirty.hidden) return;
+    const ae = document.activeElement;
+    if (ae && /^(INPUT|TEXTAREA|SELECT)$/.test(ae.tagName)) return;   // gerade am Tippen
+    const newDay = !!(APP_DATA.today && APP_DATA.today.date !== localIso());
+    if (!newDay && Date.now() - lastLoad < 15 * 60000) return;
+    busy = true;
+    try {
+      const data = await decryptDataFile(CURRENT_DEK, await fetchFreshFile("data/training-data.enc.json"));
+      lastLoad = Date.now();
+      if (data.syncedAt !== APP_DATA.syncedAt) {
+        try { await reloadPlanData(true); } catch { /* Plan bleibt beim alten Stand */ }
+        onData(data);
+        showSyncStatus(data.syncedAt);
+      }
+      if (data.today && data.today.date !== localIso()) {
+        let done = false;
+        try { done = sessionStorage.getItem("autoSyncDay") === localIso(); sessionStorage.setItem("autoSyncDay", localIso()); } catch { /* ignore */ }
+        if (!done) runHostedSync(onData, null).catch(() => { /* naechster Versuch beim naechsten Mal */ });
+      }
+    } catch { /* offline o. ae. - beim naechsten Mal wieder */ } finally { busy = false; }
+  };
+  document.addEventListener("visibilitychange", check);
+  setInterval(check, 5 * 60000);
 }
 
 /** Frische Dateiversion holen: raw.githubusercontent mit Cache-Buster (kein Rate-Limit),
@@ -402,6 +450,7 @@ async function bootWithAuth(onData) {
       onData(data);
       setupLogoutControl();
       setupHostedSyncButton(onData);
+      setupAutoRefresh(onData);
       setupLoginsNavItem();
       showSyncStatus(data.syncedAt);
       reloadPlanData(false).catch(() => { /* erster Sync mit Planer steht evtl. noch aus */ });
