@@ -365,6 +365,25 @@ def due_slots(cfg, now, state):
     return out
 
 
+REMINDER_WINDOW_H = 24   # einmalige Erinnerungen werden bis zu einem Tag nach der Wunschzeit nachgeholt
+
+
+def due_reminders(overrides, now, state):
+    """Einmalige Erinnerungen (overrides.__plan.reminders: id, date, time, text), die faellig und noch nicht gesendet sind."""
+    done = set(state.get("reminders") or [])
+    out = []
+    for r in ((overrides.get("__plan") or {}).get("reminders") or []):
+        try:
+            rid, text = str(r["id"]), str(r["text"]).strip()
+            h, m = (int(x) for x in str(r.get("time") or "08:00").split(":"))
+            sched = datetime.fromisoformat(r["date"]).replace(hour=h, minute=m, tzinfo=BERLIN)
+        except Exception:
+            continue
+        if text and rid not in done and sched <= now < sched + timedelta(hours=REMINDER_WINDOW_H):
+            out.append((rid, text))
+    return out
+
+
 def run_auto(now=None, send_fn=None, cfg=None):
     now = now or datetime.now(BERLIN)
     send_fn = send_fn or send
@@ -372,11 +391,20 @@ def run_auto(now=None, send_fn=None, cfg=None):
     cfg = cfg or load_config(overrides)
     state = load_state()
     slots = due_slots(cfg, now, state)
-    if not slots:
+    reminders = due_reminders(overrides, now, state)
+    if not slots and not reminders:
         print("Telegram: nichts faellig")
         return []
     plan, generated, data = load_plan(), load_generated_plan(), None
     sent = []
+    for rid, text in reminders:
+        try:
+            send_fn(text)
+            state["reminders"] = (state.get("reminders") or [])[-40:] + [rid]
+            sent.append("reminder:" + rid)
+            print("gesendet: Erinnerung", rid)
+        except Exception as e:
+            print(f"Telegram: Erinnerung {rid} fehlgeschlagen ({type(e).__name__}: {e}) - naechster Lauf versucht es erneut")
     for slot in slots:
         try:
             if slot == "weekly":

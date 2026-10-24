@@ -144,6 +144,21 @@ GEN = {"weeks": {"2026-10-12": {"note": "", "meta": {"label": "Recovery-Woche", 
                                 "days": {"Dienstag": {"units": [{"name": "VO2max-Intervalle", "detail": "4×2 min ALL OUT · Ziel", "keySession": True}]}}}}}
 
 
+class Reminders(unittest.TestCase):
+    OV = {"__plan": {"reminders": [{"id": "bf", "date": "2026-11-27", "time": "08:00", "text": "Black Friday!"}]}}
+
+    def test_due_only_after_time_once_and_for_a_day(self):
+        self.assertEqual(ta.due_reminders(self.OV, at(2026, 11, 27, 7, 59), {}), [])
+        self.assertEqual(ta.due_reminders(self.OV, at(2026, 11, 27, 8, 5), {}), [("bf", "Black Friday!")])
+        self.assertEqual(ta.due_reminders(self.OV, at(2026, 11, 28, 6, 0), {}), [("bf", "Black Friday!")])   # verspaeteter Lauf
+        self.assertEqual(ta.due_reminders(self.OV, at(2026, 11, 28, 9, 0), {}), [])                          # zu spaet
+        self.assertEqual(ta.due_reminders(self.OV, at(2026, 11, 27, 9, 0), {"reminders": ["bf"]}), [])
+
+    def test_broken_entries_are_ignored(self):
+        ov = {"__plan": {"reminders": [{"id": "x"}, {"id": "y", "date": "kaputt", "text": "a"}, None]}}
+        self.assertEqual(ta.due_reminders(ov, at(2026, 11, 27, 9, 0), {}), [])
+
+
 class Weekly(unittest.TestCase):
     def setUp(self):
         self.txt = ta.format_weekly(DATA, GEN, date(2026, 10, 11))
