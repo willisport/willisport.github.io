@@ -52,6 +52,7 @@ DEFAULT_SETTINGS = {
     "raceName": "Marathon",
     "raceDistanceKm": 42.195,
     "gymOnLateShift": False,    # Studio-Einheiten (Push/Pull/Beine) auch an Spaetschicht-Tagen?
+    "gymForce": {},             # ausdruecklich gewuenschte Studio-Tage {"2026-10-27": "Push"} - gelten auch an Spaetschicht-/Wiedereinstiegstagen
     "coreSessions": 2,          # Core pro Woche (eine im Studio an Maschinen, eine zu Hause) - optional
     "runScalePct": 100,         # Regler fuer den Laufumfang (Z2- und langer Lauf), 50-130 %
     "longRunMaxKm": 32,         # Obergrenze fuer den langen Lauf (Marathon-Aufbau)

@@ -389,5 +389,35 @@ class OpenEndedSickness(unittest.TestCase):
         self.assertEqual(weeks["2026-10-26"]["meta"]["step"], healthy["2026-10-26"]["meta"]["step"])
 
 
+class ForcedGymDay(unittest.TestCase):
+    """Wunsch 'Kraft ab morgen': Push am ersten Tag nach der Krankheit, trotz Spaetschicht."""
+    TODAY = date(2026, 10, 26)
+    RAW = {"sick": {"from": "2026-10-05", "to": "2026-10-26"},
+           "shifts": {"2026-10-27": [{"start": "16:00", "end": "22:00"}], "2026-10-28": [{"start": "16:00", "end": "22:00"}],
+                      "2026-10-31": [{"start": "08:00", "end": "14:00"}]}}
+
+    def week(self, extra=None):
+        raw = {**self.RAW, **(extra or {})}
+        return pl.generate_plan(raw, date(2026, 10, 26), date(2026, 10, 26), self.TODAY)["2026-10-26"]
+
+    def test_without_wish_no_strength_on_late_shift_or_first_days(self):
+        w = self.week()
+        self.assertNotIn("Push", names(w, "Dienstag"))
+        self.assertNotIn("Push", names(w, "Mittwoch"))
+
+    def test_forced_push_tomorrow_even_on_late_shift(self):
+        w = self.week({"settings": {"gymForce": {"2026-10-27": "Push"}}})
+        self.assertIn("Push", names(w, "Dienstag"))
+        self.assertEqual(len(day_of(w, "Push")), 2)          # Push 2x in der Woche, Abstand >= 3 Tage
+        pushes = sorted(WD.index(d) for d in day_of(w, "Push"))
+        self.assertGreaterEqual(pushes[1] - pushes[0], pl.__dict__.get("MIN_GAP", 3) if False else 3)
+        self.assertLessEqual(len(day_of(w, "Pull")), 1)      # Wiedereinstieg: Pull nur 1x
+        self.assertEqual(day_of(w, "Schweres Beintraining"), [])
+
+    def test_impossible_wish_falls_back_to_normal_plan(self):
+        w = self.week({"settings": {"gymForce": {"2026-10-24": "Push", "2026-10-25": "Pull"}}})   # Tage liegen nicht in der Woche
+        self.assertTrue(day_of(w, "Push"))
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

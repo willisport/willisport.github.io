@@ -98,8 +98,18 @@ class AllrounderPlanner(pl.Planner):
                 return start if start + dur + c.travel <= st["dayEndMin"] + 30 else None
             return self.slot_run(c, dur)
 
-        def gym_ok(i, dur=60, min_level=0.7):
-            return (i in pool and level[i] >= min_level and (gym_late_ok or not is_late(i))
+        forced = {}
+        for d_iso, kind in (st.get("gymForce") or {}).items():
+            try:
+                fd = pl.parse_date(d_iso)
+            except Exception:
+                continue
+            if fd in dates and kind in ("Push", "Pull") and ctxs[dates.index(fd)].kind != "krank":
+                forced[dates.index(fd)] = kind
+
+        def gym_ok(i, dur=60, min_level=0.7, allow_easy=False):
+            usable = i in pool or (allow_easy and i in forced and ctxs[i].kind != "krank")
+            return (usable and level[i] >= min_level and (gym_late_ok or not is_late(i) or i in forced)
                     and gym_slot(i, dur) is not None)
 
         # ---------------------------------------------------------------- Auswahlhelfer
@@ -134,6 +144,8 @@ class AllrounderPlanner(pl.Planner):
             want = {"Push": 1, "Pull": 1, "Legs": 0}
         if params.get("skipHeavy"):
             want["Legs"] = 0
+        if any(c.sick_return_level is not None for c in ctxs):
+            want["Pull"] = min(want["Pull"], 1)       # Wiedereinstieg: Push 2x, Pull nur 1x in dieser Woche
         light_week = params["recovery"] or params["factor"] < 0.85 or phase in ("taper", "erholung", "wettkampf")
         gym_dur = {"Push": int((lib.get("push") or {}).get("durationMin") or 60),
                    "Pull": int((lib.get("pull") or {}).get("durationMin") or 60),
@@ -249,7 +261,9 @@ class AllrounderPlanner(pl.Planner):
         hard_days = {d for d in (li, ii, ti) if d is not None}
 
         # ---------------------------------------------------------------- 5. Push / Pull
-        free_gym = [i for i in range(n) if i != legs_day and gym_ok(i, 45, 0.5)]
+        free_gym = [i for i in range(n) if i != legs_day and gym_ok(i, 45, 0.5, allow_easy=True)]
+        forced_push = {i for i, k in forced.items() if k == "Push" and i in free_gym}
+        forced_pull = {i for i, k in forced.items() if k == "Pull" and i in free_gym}
         free_pull = [i for i in free_gym if not ctxs[i].no_pull]
 
         def spaced(days, kind):
@@ -276,21 +290,30 @@ class AllrounderPlanner(pl.Planner):
             return sum(abs(a - b) for a, b in zip(ds, ts)) * 12
 
         best = None
-        for np_, nl in ((want["Push"], want["Pull"]), (want["Push"], max(0, want["Pull"] - 1)),
-                        (max(0, want["Push"] - 1), want["Pull"]), (max(0, want["Push"] - 1), max(0, want["Pull"] - 1)),
-                        (min(1, want["Push"]), 0), (0, min(1, want["Pull"]))):
-            if np_ == 0 and nl == 0:
-                continue
-            for pu in combos(free_gym, np_, "Push"):
-                for pl_ in combos([d for d in free_pull if d not in pu], nl, "Pull"):
-                    cost = pref_cost(pu, "push") + pref_cost(pl_, "pull")
-                    # harte Ausdauer am selben Tag ist ok (Oberkoerper), aber Beine-Tag und Folgetag leicht meiden
-                    cost += sum(15 for d in pu + pl_ if legs_day is not None and d == legs_day + 1)
-                    key = (-(np_ + nl), cost)
-                    if best is None or key < best[0]:
-                        best = (key, pu, pl_)
-            if best is not None and -best[0][0] == want["Push"] + want["Pull"]:
-                break
+        for attempt in (0, 1):
+            if attempt == 1:
+                if best is not None or not (forced_push or forced_pull):
+                    break
+                forced_push, forced_pull = set(), set()      # Wunschtage nicht machbar (Abstand/Belegung) -> normal planen
+            for np_, nl in ((want["Push"], want["Pull"]), (want["Push"], max(0, want["Pull"] - 1)),
+                            (max(0, want["Push"] - 1), want["Pull"]), (max(0, want["Push"] - 1), max(0, want["Pull"] - 1)),
+                            (min(1, want["Push"]), 0), (0, min(1, want["Pull"]))):
+                if np_ == 0 and nl == 0:
+                    continue
+                for pu in combos(free_gym, np_, "Push"):
+                    if not forced_push <= set(pu):
+                        continue
+                    for pl_ in combos([d for d in free_pull if d not in pu], nl, "Pull"):
+                        if not forced_pull <= set(pl_):
+                            continue
+                        cost = pref_cost(pu, "push") + pref_cost(pl_, "pull")
+                        # harte Ausdauer am selben Tag ist ok (Oberkoerper), aber Beine-Tag und Folgetag leicht meiden
+                        cost += sum(15 for d in pu + pl_ if legs_day is not None and d == legs_day + 1)
+                        key = (-(np_ + nl), cost)
+                        if best is None or key < best[0]:
+                            best = (key, pu, pl_)
+                if best is not None and -best[0][0] == want["Push"] + want["Pull"]:
+                    break
         push_days, pull_days = (best[1], best[2]) if best else ((), ())
         for d in push_days:
             roles[d].add("push")
@@ -369,8 +392,7 @@ class AllrounderPlanner(pl.Planner):
                 commit(i, mk_unit("Rad Zone 1 (locker)", "rad", "pflicht",
                                   f"30 min, ganz entspannt – Wiedereinstieg nach der Krankheit{tsuf(start)}", 30,
                                   matchHint=hint_bike()), start, 30)
-                continue
-            r = roles[i]
+            r = roles[i]          # Wiedereinstiegstag: nur Rad Zone 1 - plus Push/Pull, wenn ausdruecklich gewuenscht (gymForce)
 
             # ---- Ausdauer
             if "long_run" in r:
@@ -392,7 +414,7 @@ class AllrounderPlanner(pl.Planner):
                                   + (f", HF ca. {self.tg['thrHr'][0]}–{self.tg['thrHr'][1]} bpm" if self.tg["thrHr"] else "")
                                   + f", „kontrolliert unbequem“) · 5 min locker dazwischen · 10 min ausrollen{tsuf(start)}, nicht nüchtern",
                                   dur, keySession=True, matchHint=hint_bike()), start, dur)
-            elif "intervals" not in r and "easy_run" not in r:
+            elif "intervals" not in r and "easy_run" not in r and not easy_only[i]:
                 # taegliches Rad: nuechtern am Morgen, sonst nach Feierabend
                 if ctx.bike_easy:
                     dur = 30 if ctx.kind != "free" else 40
@@ -443,7 +465,7 @@ class AllrounderPlanner(pl.Planner):
                     continue
                 entry = lib.get(libkey) or {}
                 detail = entry.get("detail") or name
-                lighter = light_week or lvl < 0.85
+                lighter = light_week or lvl < 0.85 or easy_only[i]
                 if lighter:
                     detail += " · leichter: 1 Satz weniger je Übung, Gewicht etwas runter"
                 where = " · im Studio direkt nach der Schicht" if at_work(i) else ""
