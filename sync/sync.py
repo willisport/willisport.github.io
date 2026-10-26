@@ -39,6 +39,7 @@ OUTPUT_PATH = ROOT / "data" / "training-data.json"
 ENCRYPTED_OUTPUT_PATH = ROOT / "data" / "training-data.enc.json"
 OVERRIDES_PATH = ROOT / "data" / "overrides.enc.json"
 PLAN_OUT_PATH = ROOT / "data" / "plan.enc.json"
+GARMIN_WORKOUTS_STATE = ROOT / "data" / "garmin-workouts-state.json"
 
 LOCAL_TZ = ZoneInfo("Europe/Berlin")  # GitHub-Actions-Runner laufen in UTC - ohne das
 # faellt "heute" naeher an Mitternacht (v.a. 22-24 Uhr deutscher Zeit) faelschlich noch
@@ -484,6 +485,20 @@ def main():
     plan["weekOverrides"] = {**plan.get("weekOverrides", {}), **generated}
     print(f"  Plan: {len(generated)} Wochen generiert ab {gen_from} "
           f"({len(plan_inputs.get('shifts') or {})} Schichten, {len(plan_inputs.get('events') or [])} Termine)")
+
+    # Garmin-Workouts: besondere Laeufe als strukturiertes Workout im Garmin-Kalender (Name = spaeterer Aktivitaetsname)
+    try:
+        if planner.normalize_inputs(plan_inputs)["settings"].get("garminWorkouts", True):
+            import garmin_workouts
+            try:
+                old_state = json.loads(GARMIN_WORKOUTS_STATE.read_text(encoding="utf-8"))
+            except Exception:
+                old_state = {}
+            new_state = garmin_workouts.sync_workouts(api, garmin_workouts.wanted_workouts(generated, today_d), old_state)
+            if new_state != (old_state or {"items": {}}):
+                GARMIN_WORKOUTS_STATE.write_text(json.dumps(new_state, indent=1, sort_keys=True), encoding="utf-8")
+    except Exception as e:  # noqa: BLE001 - Workouts sind ein Extra und duerfen den Sync nie abbrechen
+        print(f"  [warn] Garmin-Workouts uebersprungen: {type(e).__name__}: {e}")
 
     # --- Woche bauen ---
     week_type, week_label = week_type_and_label(plan, this_monday)

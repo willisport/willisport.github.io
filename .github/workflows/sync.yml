@@ -68,6 +68,7 @@ jobs:
           git add data/training-data.enc.json
           if [ -f data/plan.enc.json ]; then git add data/plan.enc.json; fi
           if [ -f data/telegram-state.json ]; then git add data/telegram-state.json; fi
+          if [ -f data/garmin-workouts-state.json ]; then git add data/garmin-workouts-state.json; fi
           git diff --staged --quiet && exit 0
           git commit -m "Automatischer Trainingsdaten-Sync"
           for i in 1 2 3 4 5; do

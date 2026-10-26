@@ -58,6 +58,7 @@ class SyncIntegration(unittest.TestCase):
             mock.patch.object(sync, "ENCRYPTED_OUTPUT_PATH", d / "training-data.enc.json"),
             mock.patch.object(sync, "OVERRIDES_PATH", d / "overrides.enc.json"),
             mock.patch.object(sync, "PLAN_OUT_PATH", d / "plan.enc.json"),
+            mock.patch.object(sync, "GARMIN_WORKOUTS_STATE", d / "garmin-workouts-state.json"),
             mock.patch.object(sync, "datetime", FakeDatetime),
             mock.patch.dict(os.environ, {"DATA_ENCRYPTION_KEY": DEK_B64}, clear=False),
             mock.patch.object(sync, "cleanup_stale_requests", lambda *_: None),
