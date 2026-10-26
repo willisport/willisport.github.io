@@ -662,7 +662,7 @@ def main():
         "progression": {"offsetWeeks": inputs_norm["progression"]["offsetWeeks"],
                         "step": (this_meta or {}).get("step"), "phase": (this_meta or {}).get("phase")},
         "sick": inputs_norm["sick"], "hint": hint,
-        "settings": {k: inputs_norm["settings"][k] for k in ("travelMin", "raceDate", "raceName", "raceDistanceKm", "runScalePct", "longRunMaxKm", "ftpW", "ref5kSec", "includeLongRide", "includeLegStabi", "includeLegSupersets", "planMode", "gymOnLateShift", "coreSessions", "bRace", "hardFrom", "returnRamp")},
+        "settings": {k: inputs_norm["settings"][k] for k in ("travelMin", "raceDate", "raceName", "raceDistanceKm", "runScalePct", "longRunMaxKm", "ftpW", "ref5kSec", "includeLongRide", "includeLegStabi", "includeLegSupersets", "planMode", "gymOnLateShift", "coreSessions", "bRace", "hardFrom", "returnRamp", "miniSessions")},
         "counts": {"shifts": len(inputs_norm["shifts"]), "events": len(inputs_norm["events"])},
         "externalEvents": ics_added,
         "shoes": compute_shoes(plan_inputs.get("shoes"), activities, (previous.get("planState") or {}).get("shoes"), iso_date(window_start)),

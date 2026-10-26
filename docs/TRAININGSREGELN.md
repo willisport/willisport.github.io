@@ -44,6 +44,19 @@ Der Planer (`sync/planner.py`, `sync/planner_allrounder.py`) richtet sich nach d
 | **Langsamer starten, als es sich gut anfühlt**, keine Zeit „sparen“ | Häufigster Anfängerfehler ([Tailwind](https://tailwindnutrition.com/blogs/tw/what-is-a-backyard-ultra-and-how-do-you-fuel-for-one)) | Renntag-Text |
 | In der Pause **sofort essen**, etwa 30–60 g Kohlenhydrate pro Stunde, 300–600 ml trinken nach Durst, Koffein später, nur Bekanntes essen | Verpflegungsempfehlungen der Hersteller und Läuferportale ([Multiday Running](https://multidayrunning.com/nutrition/backyard-ultra-nutrition)); Werte schwanken, **im Training testen** | Renntag-Text, Simulation: „essen/trinken wie am Renntag“ |
 
+## 6. Mini-Einheiten (5–15 Minuten, optional)
+
+Kleine Zusatzreize statt zusätzlicher voller Einheiten. Sie sind begrenzt (maximal ca. 90 Minuten pro Woche), immer optional und in den Einstellungen abschaltbar (`miniSessions`).
+
+| Einheit | Wann | Belegt? |
+|---|---|---|
+| **Wandsitzen** 2× 45–60 s (+ 2× 15 langsame Wadenheben an den ersten zwei Lauftagen) | direkt nach jedem Lauf, nicht am schweren Beintag | Isometrische Übungen lindern kurzfristig Knieschmerzen (kleine Studien zum Patellarsehnenschmerz, [BJSM 2015](https://bjsm.bmj.com/content/49/19/1277.abstract)); für die Laufökonomie sind isometrische Übungen laut Meta-Analyse eher weniger wirksam; Wadenheben mit langsamem Absenken stärkt die Achillessehne (Übersichtsarbeit, überwiegend Beobachtung/Reha). Dass es die Laufökonomie verbessert, ist nicht belegt. |
+| **Sprungübungen** 5 min (Pogo-Sprünge, Skippings) | 2×/Woche nach einem lockeren Lauf, erst wenn harte Einheiten erlaubt sind; nicht in der Rennwoche | Meta-Analyse 2024 ([Sports Medicine](https://pmc.ncbi.nlm.nih.gov/articles/PMC11052887)): Plyometrie verbessert die Laufökonomie vor allem bei **niedrigen Tempi (bis ca. 12 km/h)**, über alle Tempi hinweg nicht signifikant; schweres Krafttraining wirkt eher auch bei höherem Tempo. Passt zu deinen lockeren Läufen. Strides allein: nur Trainerwissen, keine Studie. |
+| **Rückwärtsgehen am Berg** 10 min (Laufband, 5 % Steigung, 3–4 km/h) | bis zu 3×/Woche hinter Push/Pull | Belegt vor allem bei Kniearthrose ([Meta-Analyse zu Rückwärtsgehen bei Kniearthrose](https://journals.sagepub.com/doi/abs/10.1177/0269215518801430)); für Läufer/Laufleistung nicht belegt – hier eine knieschonende Zusatzbelastung. |
+| **Stairmaster** 15 min locker bis mittel | bis zu 2×/Woche hinter Push/Pull, nicht in der Rennwoche | Gelenkschonendes Ausdauer-Cross-Training; verbessert Laufzeit/VO2 etwas weniger als Laufen selbst (eine ältere Studie, nur Sekundärquelle). |
+
+Nicht belegt, deshalb nicht im Plan: Strides als eigener Baustein, Hüft-Clamshells.
+
 ## Grenzen
 
 - Viele Quellen sind Läuferportale oder Hersteller. Die Meta-Analysen sind belastbarer, sagen aber oft nur „Richtung“, keine exakten Zahlen.

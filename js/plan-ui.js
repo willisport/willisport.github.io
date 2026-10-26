@@ -305,6 +305,7 @@ function renderDienstplan() {
               <select id="dp-set-core" class="move-select">
                 ${[0, 1, 2].map(n => `<option value="${n}" ${Number(st.coreSessions) === n ? "selected" : ""}>${n === 0 ? "kein Core" : n === 1 ? "1× (zu Hause)" : "2× (Studio + zu Hause)"}</option>`).join("")}
               </select></label>
+            <label class="card-note"><input type="checkbox" id="dp-set-mini" ${st.miniSessions !== false ? "checked" : ""} /> Mini-Einheiten: Wandsitzen/Waden nach dem Lauf, Rückwärtsgehen, Stairmaster, Sprungübungen (je Woche begrenzt, optional)</label>
             <label class="card-note"><input type="checkbox" id="dp-set-gymlate" ${st.gymOnLateShift ? "checked" : ""} /> Studio auch an Spätschicht-Tagen (Push/Pull/Beine)</label>
             <div class="card-note" style="margin-top:6px;">Zwischenziel (optional, z. B. Backyard-Lauf): eine ruhige Woche davor, danach Erholung</div>
             <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
@@ -449,6 +450,7 @@ function dpBindDienstplan(panel) {
       longRunMaxKm: Math.min(60, Math.max(10, Number($("dp-set-longmax").value) || 36)),
       ftpW: Number($("dp-set-ftp").value) > 0 ? Number($("dp-set-ftp").value) : null,
       ref5kSec: (() => { const m = ($("dp-set-5k").value || "").trim().match(/^(\d{1,2}):(\d{2})$/); return m ? Number(m[1]) * 60 + Number(m[2]) : null; })(),
+      miniSessions: $("dp-set-mini").checked,
       planMode: $("dp-set-mode").value, coreSessions: Number($("dp-set-core").value), gymOnLateShift: $("dp-set-gymlate").checked,
       bRace: $("dp-set-brace-date").value ? { ...((dpSettings().bRace) || {}), date: $("dp-set-brace-date").value, name: ($("dp-set-brace-name").value || "Zwischenziel").trim(), km: Number($("dp-set-brace-km").value) || null } : null,
       hardFrom: $("dp-set-hardfrom").value || null, returnRamp: $("dp-set-fastramp").checked ? "fast" : "normal",

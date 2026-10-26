@@ -70,7 +70,7 @@ class BaseWeek(unittest.TestCase):
         self.assertIn("VO2max-Intervalle", names(w, "Freitag"))
         self.assertIn("Push", names(w, "Freitag"))
         self.assertIn("Pull", names(w, "Samstag"))
-        self.assertEqual(names(w, "Sonntag"), ["Langer Lauf"])
+        self.assertEqual(names(w, "Sonntag")[:1], ["Langer Lauf"])
 
     def test_no_emom_no_arm_day_no_long_ride(self):
         found = {u["name"] for _, u in all_units(self.w)}
@@ -432,6 +432,48 @@ class PushPullAlternate(unittest.TestCase):
         self.assertGreaterEqual(len(seq), 12)
         same = sum(1 for a, b in zip(seq, seq[1:]) if a == b)
         self.assertLessEqual(same, 1, seq)
+
+
+class MiniSessions(unittest.TestCase):
+    MON = date(2026, 11, 23)
+
+    def setUp(self):
+        self.w = plan(start=self.MON)[pl.iso(self.MON)]
+        self.units = all_units(self.w)
+
+    def test_wall_sit_after_every_run_but_not_on_leg_day(self):
+        for wd in WD:
+            n = names(self.w, wd)
+            has_run = any(x in n for x in ("Zone-2-Lauf", "Langer Lauf", "VO2max-Intervalle"))
+            has_wall = any(x.startswith("Nach dem Lauf: Wandsitzen") for x in n)
+            if has_run and "Schweres Beintraining" not in n:
+                self.assertTrue(has_wall, (wd, n))
+            if not has_run:
+                self.assertFalse(has_wall, (wd, n))
+
+    def test_weekly_limits(self):
+        us = [u["name"] for _, u in self.units]
+        self.assertLessEqual(us.count("Rückwärtsgehen am Berg"), 3)
+        self.assertLessEqual(us.count("Stairmaster (15 min)"), 2)
+        self.assertLessEqual(us.count("Sprungübungen (5 min)"), 2)
+        self.assertLessEqual(sum(1 for n in us if n.endswith("+ Waden")), 2)
+        mini_min = sum(u["plannedDurationMin"] for _, u in self.units if u["tag"] == "bonus" and not u["name"].startswith("Core"))
+        self.assertLessEqual(mini_min, 90)
+
+    def test_gym_minis_only_on_push_pull_days(self):
+        for wd in WD:
+            n = names(self.w, wd)
+            if "Rückwärtsgehen am Berg" in n or "Stairmaster (15 min)" in n:
+                self.assertTrue(any(x in ("Push", "Pull") for x in n), (wd, n))
+
+    def test_no_impact_minis_in_race_week_and_when_switched_off(self):
+        raw = {"settings": {"bRace": {"date": "2026-11-28", "name": "B", "km": 30, "durationMin": 300}}}
+        w = pl.generate_plan(raw, date(2026, 11, 23), date(2026, 11, 23), TODAY)["2026-11-23"]
+        for _, u in all_units(w):
+            self.assertNotIn(u["name"], ("Sprungübungen (5 min)", "Stairmaster (15 min)", "Rückwärtsgehen am Berg"))
+        off = pl.generate_plan({"settings": {"miniSessions": False}}, self.MON, self.MON, TODAY)[pl.iso(self.MON)]
+        for _, u in all_units(off):
+            self.assertNotIn("Wandsitzen", u["name"])
 
 
 class SecondaryGoal(unittest.TestCase):
