@@ -22,6 +22,7 @@ Gleiche Slot-Logik wie der klassische Planer (Rad nuechtern vor der Schicht, Lae
 from __future__ import annotations
 
 import itertools
+import re
 from datetime import timedelta
 
 import planner as pl
@@ -95,13 +96,17 @@ class AllrounderPlanner(pl.Planner):
             return ctxs[i].shift_end is not None and not is_late(i)
 
         def gym_slot(i, dur):
-            """Startzeit einer Studio-Einheit: direkt nach der Fruehschicht am Arbeitsort, sonst nachmittags."""
+            """Startzeit einer Studio-Einheit: direkt nach der Fruehschicht am Arbeitsort, an Spaetschichten direkt davor, sonst nachmittags."""
             c = ctxs[i]
+            if is_late(i) and c.shift_start is not None:
+                start = c.shift_start - 20 - dur
+                return start if start - c.travel - 15 >= max(st["dayStartMin"], 9 * 60) else None
             if at_work(i):
                 start = c.shift_end + 20
                 return start if start + dur + c.travel <= st["dayEndMin"] + 30 else None
             return self.slot_run(c, dur)
 
+        fast_ramp = st.get("returnRamp") == "fast"      # Kraft bleibt normal, nur die Ausdauer steigt langsam
         forced = {}
         for d_iso, kind in (st.get("gymForce") or {}).items():
             try:
@@ -112,8 +117,9 @@ class AllrounderPlanner(pl.Planner):
                 forced[dates.index(fd)] = kind
 
         def gym_ok(i, dur=60, min_level=0.7, allow_easy=False):
-            usable = i in pool or (allow_easy and i in forced and ctxs[i].kind != "krank")
-            return (usable and level[i] >= min_level and (gym_late_ok or not is_late(i) or i in forced)
+            usable = i in pool or (allow_easy and (i in forced or fast_ramp) and ctxs[i].kind != "krank")
+            lv = 1.0 if fast_ramp else level[i]
+            return (usable and lv >= min_level and (gym_late_ok or not is_late(i) or i in forced)
                     and gym_slot(i, dur) is not None)
 
         # ---------------------------------------------------------------- Auswahlhelfer
@@ -148,7 +154,7 @@ class AllrounderPlanner(pl.Planner):
             want = {"Push": 1, "Pull": 1, "Legs": 0}
         if params.get("skipHeavy"):
             want["Legs"] = 0
-        if any(c.sick_return_level is not None for c in ctxs):
+        if any(c.sick_return_level is not None for c in ctxs) and st.get("returnRamp") != "fast":
             want["Pull"] = min(want["Pull"], 1)       # Wiedereinstieg: Push 2x, Pull nur 1x in dieser Woche
         light_week = params["recovery"] or params["factor"] < 0.85 or phase in ("taper", "erholung", "wettkampf")
         gym_dur = {"Push": int((lib.get("push") or {}).get("durationMin") or 60),
@@ -377,6 +383,13 @@ class AllrounderPlanner(pl.Planner):
         for d in list(push_days) + list(pull_days) + ([legs_day] if legs_day is not None else []):
             kind = "Push" if d in push_days else ("Pull" if d in pull_days else "Legs")
             gym_start[d] = gym_slot(d, gym_dur[kind])
+            if is_late(d) and gym_start[d] is not None:
+                c = ctxs[d]
+                new_dep = gym_start[d] - c.travel - 10                   # frueher losfahren, damit das Studio vor der Schicht passt
+                if c.depart is not None and new_dep < c.depart:
+                    c.allocate(new_dep, c.depart - new_dep)
+                    c.focus_prefix = re.sub(r"Abfahrt \d{2}:\d{2}", f"Abfahrt {min_to_hm(new_dep)} (Studio vor der Schicht)", c.focus_prefix)
+                    c.depart = new_dep
             if at_work(d) and gym_start[d] is not None:
                 c = ctxs[d]
                 extra = (gym_start[d] + gym_dur[kind] + c.travel) - c.return_
@@ -471,8 +484,8 @@ class AllrounderPlanner(pl.Planner):
                 if not is_mine:
                     continue
                 dur = gym_dur[kind]
-                if at_work(i):
-                    start = gym_start.get(i)           # direkt nach der Schicht am Arbeitsort
+                if at_work(i) or (is_late(i) and gym_start.get(i) is not None):
+                    start = gym_start.get(i)           # direkt nach (Fruehschicht) bzw. vor (Spaetschicht) der Schicht am Arbeitsort
                 else:                                  # sonst hinter die schon geplanten Einheiten des Tages
                     start = self.slot_run(ctx, dur, after=(last_end[i] + 10) if last_end[i] else None)
                 if start is None:
@@ -483,7 +496,7 @@ class AllrounderPlanner(pl.Planner):
                 lighter = light_week or lvl < 0.85 or easy_only[i]
                 if lighter:
                     detail += " · leichter: 1 Satz weniger je Übung, Gewicht etwas runter"
-                where = " · im Studio direkt nach der Schicht" if at_work(i) else ""
+                where = " · im Studio direkt nach der Schicht" if at_work(i) else (" · im Studio direkt vor der Schicht" if is_late(i) else "")
                 commit(i, mk_unit(name, "kraft", "pflicht", f"{detail}{where}{tsuf(start)}", dur,
                                   exercises=exercises_for(lib, libkey), matchHint={"activityTypes": ["strength_training"]}),
                        start, dur)

@@ -53,6 +53,7 @@ DEFAULT_SETTINGS = {
     "raceDistanceKm": 42.195,
     "gymOnLateShift": False,    # Studio-Einheiten (Push/Pull/Beine) auch an Spaetschicht-Tagen?
     "bRace": None,              # Zwischenziel: {"date": "2026-11-28", "name": "Backyard-Lauf", "detail": "...", "km": 30} - Tapering davor, Erholung danach
+    "runDays": None,            # Laufeinheiten pro Woche fest vorgeben (sonst 3, ab Fortschrittsstufe 4 dann 4)
     "hardFrom": None,           # "2026-11-09": davor keine harten Einheiten (VO2max, Schwelle, langer Lauf, schwere Beine)
     "returnRamp": "normal",     # Wiedereinstieg nach Krankheit: "normal" (vorsichtig) | "fast" (Rueckkehr schon nach ca. 2 Wochen bei 100 %)
     "gymForce": {},             # ausdruecklich gewuenschte Studio-Tage {"2026-10-27": "Push"} - gelten auch an Spaetschicht-/Wiedereinstiegstagen
@@ -492,7 +493,7 @@ def build_day_contexts(monday: date, inputs: dict, today: date) -> list[DayCtx]:
         if hard_from:
             try:
                 if d < parse_date(hard_from):
-                    ctx.no_hard = ctx.no_legs = True       # bis dahin nur Umfang, keine Intervalle/Schwelle/langer Lauf/schwere Beine
+                    ctx.no_hard = True                     # bis dahin nur Umfang: keine Intervalle/Schwelle/langer Lauf (Kraft bleibt normal)
             except Exception:
                 pass
         ctx.compute_free(st)
@@ -668,6 +669,11 @@ def week_params(monday: date, inputs: dict, factor_override: float | None = None
         thr_min = 8                      # Woche A: Schwelle von Anfang an, aber ganz sanft (2 x 8 min)
     bike_min = min(num("bikeMaxMin", 60, 30, 120), 45 + 5 * (s // 2))   # Rad bleibt Grundlage: max. 1 h, gesteigert wird beim Laufen
     run_days = (3 if s < 4 else 4) if allround else (3 if s < 3 else 4)
+    try:
+        if st.get("runDays"):
+            run_days = max(2, min(6, int(st["runDays"])))
+    except Exception:
+        pass
 
     z2_km = max(4.0, half(z2_km * scale * (0.85 if phase == "recovery" else 1.0) * min(1.0, taper_factor + 0.1)))
     long_km = max(6.0, half(long_km * factor * scale))

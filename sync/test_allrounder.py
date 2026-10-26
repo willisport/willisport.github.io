@@ -463,7 +463,7 @@ class SecondaryGoal(unittest.TestCase):
     def test_no_hard_sessions_before_hard_from(self):
         w = self.weeks()["2026-11-02"]
         for wd, u in all_units(w):
-            self.assertNotIn(u["name"], HARD + ("Schweres Beintraining",), wd)
+            self.assertNotIn(u["name"], HARD, wd)          # Kraft (auch Beine) laeuft normal weiter
         self.assertNotIn("keine Zeit", w["note"])             # keine irrefuehrende Meldung fuer bewusst fehlende Einheiten
 
     def test_week_after_is_gentle(self):
