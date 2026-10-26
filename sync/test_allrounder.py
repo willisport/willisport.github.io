@@ -445,7 +445,7 @@ class MiniSessions(unittest.TestCase):
         for wd in WD:
             n = names(self.w, wd)
             has_run = any(x in n for x in ("Zone-2-Lauf", "Langer Lauf", "VO2max-Intervalle"))
-            has_wall = any(x.startswith("Nach dem Lauf: Wandsitzen") for x in n)
+            has_wall = "Nach dem Lauf: Wandsitzen + Waden" in n
             if has_run and "Schweres Beintraining" not in n:
                 self.assertTrue(has_wall, (wd, n))
             if not has_run:
@@ -453,10 +453,9 @@ class MiniSessions(unittest.TestCase):
 
     def test_weekly_limits(self):
         us = [u["name"] for _, u in self.units]
-        self.assertLessEqual(us.count("Rückwärtsgehen am Berg"), 3)
+        self.assertLessEqual(us.count("Rückwärtsgehen am Berg"), 2)
         self.assertLessEqual(us.count("Stairmaster (15 min)"), 2)
         self.assertLessEqual(us.count("Sprungübungen (5 min)"), 2)
-        self.assertLessEqual(sum(1 for n in us if n.endswith("+ Waden")), 2)
         mini_min = sum(u["plannedDurationMin"] for _, u in self.units if u["tag"] == "bonus" and not u["name"].startswith("Core"))
         self.assertLessEqual(mini_min, 90)
 

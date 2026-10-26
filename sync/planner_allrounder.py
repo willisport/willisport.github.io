@@ -570,7 +570,15 @@ class AllrounderPlanner(pl.Planner):
             gym_names = ("Push", "Pull")
             b_race_week = params.get("bWeek") == 1
             limit_end = st["dayEndMin"]
-            n_back = n_stairs = n_plyo = n_calf = 0
+            n_back = n_stairs = n_plyo = 0
+            try:
+                mini_week = max(0, (monday - pl.parse_date(st.get("miniStart") or pl.iso(monday))).days // 7)
+            except Exception:
+                mini_week = 0
+            incline = min(12, 6 + 2 * (mini_week // 2))                 # Laufband-Steigung: 6 -> 8 -> 10 -> 12 %
+            back_speed = "3" if mini_week < 2 else ("3,5" if mini_week < 4 else "4")
+            wall_s = "45" if mini_week < 2 else ("60" if mini_week < 4 else "75")
+            calf_reps = 15 if mini_week < 4 else 20
 
             def entry_end(i, names):
                 ends = [p["start"] + p["dur"] for p in placed[i] if p["unit"]["name"] in names and p["start"] is not None]
@@ -589,8 +597,7 @@ class AllrounderPlanner(pl.Planner):
                     return False
                 if is_late(i) and ctxs[i].shift_start is not None and start + dur > ctxs[i].shift_start - 10:
                     return False                                   # Spaetschicht: vor der Schicht muss alles fertig sein
-                where = " · im Studio direkt nach der Schicht" if at_work(i) and any(
-                    p["unit"]["name"] in gym_names and p["start"] is not None for p in placed[i]) and "Nach dem Lauf" not in name and name != "Sprungübungen (5 min)" else ""
+                where = " · im Studio direkt nach der Schicht" if at_work(i) and "Nach dem Lauf" not in name and name != "Sprungübungen (5 min)" else ""
                 commit(i, mk_unit(name, "core", "bonus", f"{detail} · optional{where}{tsuf(start)}", dur, exercises=exercises,
                                   matchHint={"activityTypes": ["strength_training", "cardio", "walking", "running"]}), start, dur)
                 return True
@@ -601,37 +608,45 @@ class AllrounderPlanner(pl.Planner):
                 day_names = [p["unit"]["name"] for p in placed[i]]
                 legs_today = "Schweres Beintraining" in day_names
                 near_race = b_race_week
-                # 1) nach jedem Lauf: Wandsitzen (+ an den ersten beiden Lauftagen Wadenheben)
+                # 1) nach jedem Lauf: Wandsitzen + langsame Wadenheben (immer)
                 run_end = entry_end(i, run_names)
                 if run_end is not None and not legs_today:
-                    with_calves = n_calf < 2
-                    ex = [{"name": "Wandsitzen (Knie 90°, Rücken an der Wand)", "sets": 2, "reps": "45–60 s", "rest": "30 s"}]
-                    if with_calves:
-                        ex.append({"name": "Wadenheben auf der Stufe, langsam senken (3 s)", "sets": 2, "reps": "15", "rest": "30 s"})
-                    if add_mini(i, "Nach dem Lauf: Wandsitzen" + (" + Waden" if with_calves else ""),
-                                "2× 45–60 s Wandsitzen" + (" + 2× 15 langsame Wadenheben" if with_calves else "") + " – Knie und Achillessehne stabilisieren",
-                                5 if with_calves else 3, ex, run_end):
-                        n_calf += 1 if with_calves else 0
+                    ex = [{"name": "Wandsitzen (Knie 90°, Rücken an der Wand)", "sets": 2, "reps": f"{wall_s} s", "rest": "30 s"},
+                          {"name": "Wadenheben auf der Stufe, 3 s langsam absenken", "sets": 2, "reps": str(calf_reps), "rest": "30 s"}]
+                    add_mini(i, "Nach dem Lauf: Wandsitzen + Waden",
+                             f"2× {wall_s} s Wandsitzen + 2× {calf_reps} langsame Wadenheben – Knie und Achillessehne stabilisieren",
+                             5, ex, run_end)
                 # 2) Sprungübungen: nur wenn harte Einheiten erlaubt sind, nicht in der Rennwoche, max. 2x
                 if (run_end is not None and not legs_today and not near_race and n_plyo < 2 and not ctxs[i].no_hard
                         and (level[i] >= 0.85) and "Zone-2-Lauf" in day_names):
                     ex = [{"name": "Pogo-Sprünge (kurzer Bodenkontakt)", "sets": 2, "reps": "15", "rest": "30 s"},
                           {"name": "Skippings", "sets": 2, "reps": "20 m", "rest": "30 s"}]
                     if add_mini(i, "Sprungübungen (5 min)", "2×15 Pogo-Sprünge + 2×20 m Skippings, locker und federnd – verbessert die Laufökonomie", 5, ex,
-                                max(e for e in [entry_end(i, ("Nach dem Lauf: Wandsitzen", "Nach dem Lauf: Wandsitzen + Waden")), run_end] if e)):
+                                max(e for e in [entry_end(i, ("Nach dem Lauf: Wandsitzen + Waden",)), run_end] if e)):
                         n_plyo += 1
                 # 3) Studio-Tage (Push/Pull): Rückwärtsgehen am Berg bzw. Stairmaster hinter der Kraft
                 gym_end = entry_end(i, gym_names + ("Core (Studio)",)) if entry_end(i, gym_names) is not None else None
+                if gym_end is None and at_work(i) and ctxs[i].shift_end is not None:
+                    gym_end = ctxs[i].shift_end + 15            # Arbeitsplatz = Studio: direkt nach der Fruehschicht auf Laufband/Stairmaster
                 if gym_end is not None and not near_race:
-                    if n_back < 3 and (n_stairs >= 2 or n_back <= n_stairs):
-                        ex = [{"name": "Rückwärtsgehen, Laufband 5 % Steigung, 3–4 km/h", "sets": 1, "reps": "10 min", "rest": "-"}]
-                        if add_mini(i, "Rückwärtsgehen am Berg", "10 min Laufband, 5 % Steigung, 3–4 km/h rückwärts, locker – schont das Knie und kräftigt die Oberschenkel", 10, ex, gym_end):
+                    if n_back < 2 and (n_stairs >= 2 or n_back <= n_stairs):
+                        ex = [{"name": f"Rückwärtsgehen, Laufband {incline} % Steigung, {back_speed} km/h", "sets": 1, "reps": "10 min", "rest": "-"}]
+                        if add_mini(i, "Rückwärtsgehen am Berg",
+                                    f"10 min Laufband, {incline} % Steigung, {back_speed} km/h rückwärts (Handlauf nur leicht berühren) – schont das Knie und kräftigt die Oberschenkel",
+                                    10, ex, gym_end):
                             n_back += 1
                             continue
                     if n_stairs < 2:
-                        ex = [{"name": "Stairmaster, locker bis mittel (du kannst noch sprechen)", "sets": 1, "reps": "15 min", "rest": "-"}]
-                        if add_mini(i, "Stairmaster (15 min)", "15 min locker bis mittel, gleichmäßig – gelenkschonendes Ausdauerplus", 15, ex, gym_end):
+                        ex = [{"name": "Stairmaster, Puls ca. 125–140, du kannst noch sprechen", "sets": 1, "reps": "15 min", "rest": "-"}]
+                        if add_mini(i, "Stairmaster (15 min)", "15 min gleichmäßig, Puls ca. 125–140 (du kannst noch sprechen), nicht am Geländer abstützen – gelenkschonendes Ausdauerplus", 15, ex, gym_end):
                             n_stairs += 1
+                            continue
+                    if n_back < 2:
+                        ex = [{"name": f"Rückwärtsgehen, Laufband {incline} % Steigung, {back_speed} km/h", "sets": 1, "reps": "10 min", "rest": "-"}]
+                        if add_mini(i, "Rückwärtsgehen am Berg",
+                                    f"10 min Laufband, {incline} % Steigung, {back_speed} km/h rückwärts (Handlauf nur leicht berühren) – schont das Knie und kräftigt die Oberschenkel",
+                                    10, ex, gym_end):
+                            n_back += 1
 
         # Uebergabe an die naechste Woche
         run_idx = [i for i in range(n) if roles[i] & {"easy_run", "long_run", "intervals"}]

@@ -56,6 +56,7 @@ DEFAULT_SETTINGS = {
     "runDays": None,            # Laufeinheiten pro Woche fest vorgeben (sonst 3, ab Fortschrittsstufe 4 dann 4)
     "hardFrom": None,           # "2026-11-09": davor keine harten Einheiten (VO2max, Schwelle, langer Lauf, schwere Beine)
     "returnRamp": "normal",     # Wiedereinstieg nach Krankheit: "normal" (vorsichtig) | "fast" (Rueckkehr schon nach ca. 2 Wochen bei 100 %)
+    "miniStart": "2026-10-26",  # ab dieser Woche steigern sich Laufband-Steigung und Wandsitzen-Dauer
     "miniSessions": True,       # kleine Zusatzreize (Wandsitzen/Waden nach dem Lauf, Rueckwaertsgehen, Stairmaster, Spruenge) - je Woche begrenzt
     "gymForce": {},             # ausdruecklich gewuenschte Studio-Tage {"2026-10-27": "Push"} - gelten auch an Spaetschicht-/Wiedereinstiegstagen
     "coreSessions": 2,          # Core pro Woche (eine im Studio an Maschinen, eine zu Hause) - optional
