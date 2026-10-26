@@ -432,5 +432,46 @@ class PushPullAlternate(unittest.TestCase):
         self.assertLessEqual(same, 1, seq)
 
 
+class SecondaryGoal(unittest.TestCase):
+    """Zwischenziel (Backyard-Lauf am 28.11.): Aufbau, ruhige Woche davor, Rennen, Erholung danach."""
+    TODAY = date(2026, 10, 26)
+    RAW = {"sick": {"from": "2026-10-05", "to": "2026-10-26"},
+           "settings": {"returnRamp": "fast", "hardFrom": "2026-11-09",
+                        "bRace": {"date": "2026-11-28", "name": "Backyard-Lauf", "detail": "Jede Stunde 6 km", "km": 30, "durationMin": 300}}}
+
+    def weeks(self):
+        return pl.generate_plan(self.RAW, date(2026, 11, 2), date(2026, 12, 6), self.TODAY)
+
+    def test_race_day_and_day_after(self):
+        w = self.weeks()["2026-11-23"]
+        self.assertEqual(names(w, "Samstag"), ["Wettkampf: Backyard-Lauf"])
+        self.assertEqual(names(w, "Freitag"), ["Lockeres Auslaufen"])
+        self.assertEqual(names(w, "Sonntag"), ["Regeneration nach dem Lauf"])
+
+    def test_race_week_has_no_hard_sessions_and_label(self):
+        w = self.weeks()["2026-11-23"]
+        for wd, u in all_units(w):
+            self.assertNotIn(u["name"], HARD, wd)
+            self.assertNotEqual(u["name"], "Schweres Beintraining")
+        self.assertIn("Zwischenziel", w["meta"]["label"])
+
+    def test_week_before_has_no_intervals_or_heavy_legs(self):
+        w = self.weeks()["2026-11-16"]
+        for wd, u in all_units(w):
+            self.assertNotIn(u["name"], ("VO2max-Intervalle", "Schweres Beintraining"), wd)
+
+    def test_no_hard_sessions_before_hard_from(self):
+        w = self.weeks()["2026-11-02"]
+        for wd, u in all_units(w):
+            self.assertNotIn(u["name"], HARD + ("Schweres Beintraining",), wd)
+        self.assertNotIn("keine Zeit", w["note"])             # keine irrefuehrende Meldung fuer bewusst fehlende Einheiten
+
+    def test_week_after_is_gentle(self):
+        w = self.weeks()["2026-11-30"]
+        self.assertLessEqual(w["meta"]["targets"]["runVolumeKm"], 20)
+        for wd, u in all_units(w):
+            self.assertNotIn(u["name"], ("VO2max-Intervalle", "Schwellentraining Rad"), wd)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

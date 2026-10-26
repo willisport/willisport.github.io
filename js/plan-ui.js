@@ -306,6 +306,15 @@ function renderDienstplan() {
                 ${[0, 1, 2].map(n => `<option value="${n}" ${Number(st.coreSessions) === n ? "selected" : ""}>${n === 0 ? "kein Core" : n === 1 ? "1× (zu Hause)" : "2× (Studio + zu Hause)"}</option>`).join("")}
               </select></label>
             <label class="card-note"><input type="checkbox" id="dp-set-gymlate" ${st.gymOnLateShift ? "checked" : ""} /> Studio auch an Spätschicht-Tagen (Push/Pull/Beine)</label>
+            <div class="card-note" style="margin-top:6px;">Zwischenziel (optional, z. B. Backyard-Lauf): eine ruhige Woche davor, danach Erholung</div>
+            <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
+              <input type="date" id="dp-set-brace-date" class="text-input" value="${escapeHtml((st.bRace || {}).date || "")}" style="max-width:160px;" />
+              <input type="text" id="dp-set-brace-name" class="text-input" placeholder="Name" value="${escapeHtml((st.bRace || {}).name || "")}" style="max-width:200px;" />
+              <input type="number" id="dp-set-brace-km" class="text-input" placeholder="km" value="${escapeHtml((st.bRace || {}).km || "")}" style="max-width:90px;" />
+            </div>
+            <label class="card-note">Harte Einheiten (Intervalle, Schwelle, langer Lauf, schwere Beine) erst ab
+              <input type="date" id="dp-set-hardfrom" class="text-input" value="${escapeHtml(st.hardFrom || "")}" style="max-width:160px;" /></label>
+            <label class="card-note"><input type="checkbox" id="dp-set-fastramp" ${st.returnRamp === "fast" ? "checked" : ""} /> Wiedereinstieg nach Krankheit schneller (Umfang früher wieder hoch)</label>
             <label class="card-note"><input type="checkbox" id="dp-set-longride" ${st.includeLongRide ? "checked" : ""} /> Langes Rad einplanen (1× pro Woche)</label>
             <label class="card-note"><input type="checkbox" id="dp-set-stabi" ${st.includeLegStabi ? "checked" : ""} /> Bein-Stabi wieder einplanen</label>
             <label class="card-note"><input type="checkbox" id="dp-set-super" ${st.includeLegSupersets ? "checked" : ""} /> Bein-Supersätze wieder einplanen</label>
@@ -441,6 +450,8 @@ function dpBindDienstplan(panel) {
       ftpW: Number($("dp-set-ftp").value) > 0 ? Number($("dp-set-ftp").value) : null,
       ref5kSec: (() => { const m = ($("dp-set-5k").value || "").trim().match(/^(\d{1,2}):(\d{2})$/); return m ? Number(m[1]) * 60 + Number(m[2]) : null; })(),
       planMode: $("dp-set-mode").value, coreSessions: Number($("dp-set-core").value), gymOnLateShift: $("dp-set-gymlate").checked,
+      bRace: $("dp-set-brace-date").value ? { ...((dpSettings().bRace) || {}), date: $("dp-set-brace-date").value, name: ($("dp-set-brace-name").value || "Zwischenziel").trim(), km: Number($("dp-set-brace-km").value) || null } : null,
+      hardFrom: $("dp-set-hardfrom").value || null, returnRamp: $("dp-set-fastramp").checked ? "fast" : "normal",
       includeLongRide: $("dp-set-longride").checked, includeLegStabi: $("dp-set-stabi").checked, includeLegSupersets: $("dp-set-super").checked,
     };
     await applyPlanChange("Einstellungen gespeichert", plan => { plan.settings = { ...(plan.settings || {}), ...settings }; });

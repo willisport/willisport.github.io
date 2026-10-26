@@ -76,7 +76,11 @@ class AllrounderPlanner(pl.Planner):
                 return ""
             return f" · {min_to_hm(start)} Uhr" + (", nüchtern" if fasted else "")
 
+        all_no_hard = all(c.no_hard for c in ctxs if c.kind != "krank")
+
         def note_missing(label):
+            if label in ("langer Lauf", "VO2max-Intervalle", "Schwellentraining", "schweres Beintraining") and all_no_hard:
+                return                                  # bewusst keine harten Einheiten (Einstellung hardFrom)
             if key_pool and not any_injury:
                 missing.append(label)
 
@@ -161,7 +165,7 @@ class AllrounderPlanner(pl.Planner):
         reps = params["intervalReps"]
         thr = params["thresholdMin"]
         iv_dur = interval_total_min(reps, params["vo2Min"]) if reps >= 3 else 0
-        want_long, want_vo2, want_thr = phase != "wettkampf", reps >= 3, bool(thr)
+        want_long, want_vo2, want_thr = phase != "wettkampf" and not params.get("bWeek") == 1, reps >= 3, bool(thr)
         win = [c.largest_window() for c in ctxs]
         MISSING = -6000
 

@@ -279,6 +279,8 @@ function raceCountdownHtml(data) {
   const days = Math.ceil((new Date(race + "T12:00:00") - new Date(isoToday() + "T12:00:00")) / 86400000);
   if (days < 0) return "";
   const weeks = Math.floor(days / 7);
+  const bd = st.bRace && st.bRace.date ? Math.ceil((new Date(st.bRace.date + "T12:00:00") - new Date(isoToday() + "T12:00:00")) / 86400000) : null;
+  const bDays = bd !== null && bd >= 0 ? bd : null;
   const label = `${st.raceName || "Wettkampf"}${st.raceDistanceKm ? " " + st.raceDistanceKm + " km" : ""}`;
   return `
     <div class="card" id="race-countdown">
@@ -286,6 +288,7 @@ function raceCountdownHtml(data) {
       <div class="stat-row">
         <div class="stat"><span class="stat-value">${days}<span class="unit">Tage</span></span><span class="stat-label">bis zum Wettkampf</span></div>
         <div class="stat"><span class="stat-value">${weeks}<span class="unit">Wochen</span></span><span class="stat-label">${days % 7} ${days % 7 === 1 ? "Tag" : "Tage"} extra</span></div>
+        ${bDays !== null ? `<div class="stat"><span class="stat-value">${bDays}<span class="unit">Tage</span></span><span class="stat-label">bis ${escapeHtml((st.bRace.name || "Zwischenziel"))}</span></div>` : ""}
       </div>
     </div>`;
 }

@@ -52,6 +52,9 @@ DEFAULT_SETTINGS = {
     "raceName": "Marathon",
     "raceDistanceKm": 42.195,
     "gymOnLateShift": False,    # Studio-Einheiten (Push/Pull/Beine) auch an Spaetschicht-Tagen?
+    "bRace": None,              # Zwischenziel: {"date": "2026-11-28", "name": "Backyard-Lauf", "detail": "...", "km": 30} - Tapering davor, Erholung danach
+    "hardFrom": None,           # "2026-11-09": davor keine harten Einheiten (VO2max, Schwelle, langer Lauf, schwere Beine)
+    "returnRamp": "normal",     # Wiedereinstieg nach Krankheit: "normal" (vorsichtig) | "fast" (Rueckkehr schon nach ca. 2 Wochen bei 100 %)
     "gymForce": {},             # ausdruecklich gewuenschte Studio-Tage {"2026-10-27": "Push"} - gelten auch an Spaetschicht-/Wiedereinstiegstagen
     "coreSessions": 2,          # Core pro Woche (eine im Studio an Maschinen, eine zu Hause) - optional
     "runScalePct": 100,         # Regler fuer den Laufumfang (Z2- und langer Lauf), 50-130 %
@@ -475,15 +478,23 @@ def build_day_contexts(monday: date, inputs: dict, today: date) -> list[DayCtx]:
                 ctx.sick_return_level = 0.7           # noch keine harten Einheiten (VO2max/Schwelle/langer Lauf)
         elif ret_to is not None and d > ret_to:
             delta = (d - ret_to).days
+            fast = st.get("returnRamp") == "fast"
             if delta <= 3:
                 ctx.sick_return_level = "easy"
             elif delta <= 7:
-                ctx.sick_return_level = 0.5
+                ctx.sick_return_level = 0.7 if fast else 0.5
             elif delta <= 14:
-                ctx.sick_return_level = 0.7
-            elif delta <= 21:
+                ctx.sick_return_level = 0.85 if fast else 0.7
+            elif delta <= 21 and not fast:
                 ctx.sick_return_level = 0.85
 
+        hard_from = st.get("hardFrom")
+        if hard_from:
+            try:
+                if d < parse_date(hard_from):
+                    ctx.no_hard = ctx.no_legs = True       # bis dahin nur Umfang, keine Intervalle/Schwelle/langer Lauf/schwere Beine
+            except Exception:
+                pass
         ctx.compute_free(st)
         ctxs.append(ctx)
     return ctxs
@@ -607,6 +618,21 @@ def week_params(monday: date, inputs: dict, factor_override: float | None = None
         if k <= 4:
             taper_factor, phase = [0.3, 0.5, 0.7, 0.85][k - 1], "erholung"
 
+    # Zwischenziel (z. B. Backyard-Lauf): eine Woche Tapering davor, eine ruhige Woche danach
+    b_week = 0
+    b = st.get("bRace") or {}
+    if b.get("date") and phase in ("aufbau",):
+        try:
+            wb = (monday_of(parse_date(b["date"])) - monday).days // 7
+        except Exception:
+            wb = None
+        if wb == 1:
+            b_week = 2                      # Woche davor: weiter aufbauen, aber keine Intervalle/schweren Beine mehr
+        elif wb == 0:
+            taper_factor, phase, b_week = 0.6, "taper", 1
+        elif wb == -1:
+            taper_factor, phase, b_week = 0.5, "erholung", -1
+
     base_factor = 1.0
     if recovery and phase == "aufbau":
         phase = "recovery"
@@ -657,15 +683,18 @@ def week_params(monday: date, inputs: dict, factor_override: float | None = None
     bike_min = int(round(bike_min * (0.85 if phase == "recovery" else 1.0) / 5) * 5)
     if phase in ("taper", "wettkampf", "erholung"):
         bike_min = min(bike_min, 45)
-    if phase == "wettkampf" or (phase == "erholung" and factor < 0.6):
+    if phase == "wettkampf" or (phase == "erholung" and factor < 0.6) or b_week == 1:
         reps = 0
         thr_min = 0
+    if b_week == 2:
+        reps = 0
 
     return {
         "p": p, "step": s, "phase": phase, "recovery": phase == "recovery",
         "factor": round(factor, 3), "z2Km": z2_km, "longKm": long_km, "longRideMin": long_ride,
         "intervalReps": reps, "vo2Min": vo2_min, "thresholdMin": thr_min, "bikeMin": bike_min, "runDays": run_days,
-        "skipHeavy": phase == "wettkampf" or (phase == "erholung" and factor < 0.6) or (allround and weeks_to_race == 1),
+        "skipHeavy": phase == "wettkampf" or (phase == "erholung" and factor < 0.6) or (allround and weeks_to_race == 1) or b_week in (1, 2),
+        "bWeek": b_week,
         "weeksToRace": weeks_to_race, "taper": phase in ("taper", "wettkampf"),
     }
 
@@ -1205,8 +1234,32 @@ def generate_week(monday: date, inputs: dict, today: date, template_library: dic
     days = {}
     run_km = bike_min = total_min = 0.0
     race_date = parse_date(inputs["settings"]["raceDate"])
+    b = inputs["settings"].get("bRace") or {}
+    b_date = None
+    if b.get("date"):
+        try:
+            b_date = parse_date(b["date"])
+        except Exception:
+            b_date = None
     for i, ctx in enumerate(ctxs):
-        if ctx.date == race_date:
+        if b_date is not None and ctx.date == b_date:
+            bkm = b.get("km")
+            placed[i] = [{"unit": mk_unit(f"Wettkampf: {(b.get('name') or 'Zwischenziel').strip()}", "lauf", "pflicht",
+                                          (b.get("detail") or "") + " · locker starten, jede Runde gleichmäßig, in den Pausen essen und trinken",
+                                          int(b.get("durationMin") or 0), keySession=True,
+                                          matchHint={"activityTypes": ["running"], "minDistanceKm": int(max(5, (bkm or 10) * 0.6))}),
+                          "start": None, "dur": int(b.get("durationMin") or 0)}]
+            roles[i] = {"race"}
+            run_km += float(bkm or 0)
+        elif b_date is not None and ctx.date == b_date + timedelta(days=1):
+            placed[i] = [{"unit": mk_unit("Regeneration nach dem Lauf", "rad", "ergaenzung",
+                                          "30 min Spaziergang oder Rad Zone 1 – Beine ausschütteln, viel trinken und essen", 30,
+                                          matchHint={"activityTypes": BIKE_TYPES}), "start": None, "dur": 30}]
+            roles[i] = {"rest"}
+        elif b_date is not None and ctx.date == b_date - timedelta(days=1):
+            placed[i] = [{"unit": mk_unit("Lockeres Auslaufen", "lauf", "pflicht", "15–20 min locker traben + Material checken (Schuhe, Verpflegung, Lampe)", 20,
+                                          matchHint={"activityTypes": ["running"]}), "start": None, "dur": 20}]
+        elif ctx.date == race_date:
             rname = (inputs["settings"].get("raceName") or "Wettkampf").strip()
             rdist = inputs["settings"].get("raceDistanceKm")
             placed[i] = [{"unit": mk_unit(f"Wettkampf: {rname}" + (f" {rdist:g} km" if isinstance(rdist, (int, float)) and rdist else ""), "lauf", "pflicht",
@@ -1308,6 +1361,10 @@ def phase_label(params: dict) -> str:
     ph = params["phase"]
     if ph == "recovery":
         return "Recovery-Woche"
+    if ph == "taper" and params.get("bWeek") == 1:
+        return "Taper vor dem Zwischenziel"
+    if ph == "erholung" and params.get("bWeek") == -1:
+        return "Erholung nach dem Zwischenziel"
     if ph == "taper":
         return f"Taper (noch {params['weeksToRace']} Wo. bis zum Wettkampf)"
     if ph == "wettkampf":
