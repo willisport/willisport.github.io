@@ -58,6 +58,7 @@ class AllrounderPlanner(pl.Planner):
         roles: list[set] = [set() for _ in range(n)]
         missing: list[str] = []
 
+        streak_in = int(carry.get("runStreak") or 0) if carry.get("runLast") == pl.iso(dates[0] - timedelta(days=1)) else 0
         easy_only = [c.sick_return_level == "easy" for c in ctxs]
         level = [c.sick_return_level if isinstance(c.sick_return_level, float) else 1.0 for c in ctxs]
         pool = [i for i in range(n) if ctxs[i].kind != "krank" and not easy_only[i]]
@@ -191,9 +192,12 @@ class AllrounderPlanner(pl.Planner):
                     out[i] = base_score(key, i, st_, extra_pen(i))
             return out
 
-        long_opts = opts(want_long, "long", long_dur, self.slot_long, lambda i: carry_hard_pen(i, 1500),
+        def streak_pen(i):
+            return 3000 if i == 0 and streak_in >= 2 else 0          # kein dritter Lauftag in Folge ueber den Wochenwechsel
+
+        long_opts = opts(want_long, "long", long_dur, self.slot_long, lambda i: carry_hard_pen(i, 1500) + streak_pen(i),
                          lambda c: not c.no_run and not c.no_hard)
-        vo2_opts = opts(want_vo2, "vo2", iv_dur, self.slot_run, lambda i: carry_hard_pen(i),
+        vo2_opts = opts(want_vo2, "vo2", iv_dur, self.slot_run, lambda i: carry_hard_pen(i) + streak_pen(i),
                         lambda c: not c.no_run and not c.no_hard)
         thr_opts = opts(want_thr, "thr", threshold_total_min(thr) if thr else 0, self.slot_bike_pm, lambda i: carry_hard_pen(i),
                         lambda c: not c.no_hard)
@@ -369,7 +373,24 @@ class AllrounderPlanner(pl.Planner):
 
         # Alle Kombinationen bewerten: Laufen und Rad moeglichst abwechselnd (keine Laufserien an Folgetagen)
         km_min = max(4.0, round(z2_km * 0.7 * 2) / 2)
-        prev_run = carry.get("runLast") == pl.iso(dates[0] - timedelta(days=1))
+        hard_runs = {d for d in (li, ii) if d is not None}
+
+        def run_penalty(combo):
+            """Laufserien: nie drei Lauftage hintereinander; zwei lockere Laeufe hintereinander vermeiden (auch ueber den Wochenwechsel)."""
+            easy = set(combo)
+            carried = {-1 - k for k in range(streak_in)}
+            days = sorted(easy | hard_runs | carried)
+            pen = 0
+            run_len = 1
+            for a, b in zip(days, days[1:]):
+                if b - a == 1:
+                    run_len += 1
+                    pen += 1200 if (a in easy or a in carried) and b in easy else 150
+                    if run_len >= 3:
+                        pen += 3000
+                else:
+                    run_len = 1
+            return pen
         cand_scores = {}
         for i in pool:
             if i in (li, ii, ti, legs_day) or ctxs[i].no_run or level[i] < 0.5:
@@ -382,13 +403,12 @@ class AllrounderPlanner(pl.Planner):
         if n_easy > 0:
             k_take = min(n_easy, len(cand_scores))
             best_combo = None
-            for combo in itertools.combinations(sorted(cand_scores), k_take):
-                adjacent = sum(1 for x, y in zip(combo, combo[1:]) if y - x == 1)
-                total = sum(cand_scores[i] for i in combo) - 1200 * adjacent
-                if combo and combo[0] == 0 and prev_run:
-                    total -= 1200                      # Sonntag der Vorwoche war schon ein Lauftag
-                if best_combo is None or total > best_combo[0]:
-                    best_combo = (total, combo)
+            # lieber einen lockeren Lauf weniger als drei Lauftage hintereinander (kostet 2500 je fehlendem Lauf)
+            for k in range(k_take, max(0, k_take - 2), -1):
+                for combo in itertools.combinations(sorted(cand_scores), k):
+                    total = sum(cand_scores[i] for i in combo) - run_penalty(combo) - 2500 * (k_take - k)
+                    if best_combo is None or total > best_combo[0]:
+                        best_combo = (total, combo)
             if best_combo is not None:
                 easy_days = sorted(best_combo[1], key=lambda i: -cand_scores[i])
             if len(easy_days) < n_easy and key_pool and not any_injury:
@@ -548,8 +568,16 @@ class AllrounderPlanner(pl.Planner):
         run_idx = [i for i in range(n) if roles[i] & {"easy_run", "long_run", "intervals"}]
         if run_idx:
             carry["runLast"] = pl.iso(dates[max(run_idx)])
+            streak = 0
+            for k in range(max(run_idx), -1, -1):
+                if k in run_idx:
+                    streak += 1
+                else:
+                    break
+            carry["runStreak"] = streak
         else:
             carry.pop("runLast", None)
+            carry.pop("runStreak", None)
         for kind, days in (("Push", push_days), ("Pull", pull_days), ("Legs", [legs_day] if legs_day is not None else [])):
             if days:
                 carry[kind] = pl.iso(dates[max(days)])

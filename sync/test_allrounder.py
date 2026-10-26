@@ -58,8 +58,10 @@ class BaseWeek(unittest.TestCase):
 
     def test_week_a_layout(self):
         w = self.w
-        self.assertEqual(names(w, "Montag")[:1], ["Rad Zone 2"])
         self.assertIn("Push", names(w, "Montag"))
+        runs = [any(n in ("Zone-2-Lauf", "Langer Lauf", "VO2max-Intervalle") for n in names(w, wd)) for wd in WD]
+        for k in range(5):
+            self.assertFalse(runs[k] and runs[k + 1] and runs[k + 2], "drei Lauftage hintereinander")
         self.assertIn("Schwellentraining Rad", names(w, "Dienstag"))
         self.assertIn("Pull", names(w, "Dienstag"))
         self.assertIn("Schweres Beintraining", names(w, "Mittwoch"))
@@ -485,6 +487,25 @@ class SecondaryGoal(unittest.TestCase):
         self.assertLessEqual(w["meta"]["targets"]["runVolumeKm"], 20)
         for wd, u in all_units(w):
             self.assertNotIn(u["name"], ("VO2max-Intervalle", "Schwellentraining Rad"), wd)
+
+
+class RunStreaks(unittest.TestCase):
+    def test_three_run_days_in_a_row_are_very_rare(self):
+        rnd = random.Random(7)
+        triples = weeks_n = 0
+        for _ in range(30):
+            start = date(2026, 11, 2)
+            shifts = {}
+            for k in range(6):
+                shifts.update(random_shifts(rnd, start + timedelta(days=7 * k)))
+            weeks = plan({"shifts": shifts}, start, 6)
+            flags = []
+            for m in sorted(weeks):
+                for wd in WD:
+                    flags.append(any(n in ("Zone-2-Lauf", "Langer Lauf", "VO2max-Intervalle", "Backyard-Simulation") for n in names(weeks[m], wd)))
+            weeks_n += len(weeks)
+            triples += sum(1 for k in range(len(flags) - 2) if flags[k] and flags[k + 1] and flags[k + 2])
+        self.assertLessEqual(triples, weeks_n * 0.04, (triples, weeks_n))      # bei sehr vollen Dienstplaenen (65 % Schichttage) nicht immer vermeidbar
 
 
 if __name__ == "__main__":
