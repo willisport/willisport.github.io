@@ -86,15 +86,16 @@ def build_workout(unit):
         reps, mins = int(m.group(1)), int(m.group(2))
         rest = re.search(r"je (\d+) min locker traben", detail)
         rest_min = int(rest.group(1)) if rest else min(mins, 3)
-        pace = re.search(r"Ziel-Pace (\d+):(\d+)–(\d+):(\d+)", detail)
-        target = pace_target(int(pace.group(1)) * 60 + int(pace.group(2)), int(pace.group(3)) * 60 + int(pace.group(4))) if pace else None
+        # ALL OUT: nur eine Untergrenze ("schneller als ..."), nach oben keine Grenze - sonst piept die Uhr, sobald du wirklich Gas gibst
+        pace = re.search(r"schneller als (\d+):(\d+) min/km", detail)
+        target = pace_target(int(pace.group(1)) * 60 + int(pace.group(2)), 200) if pace else None
         steps = [
-            step(1, "warmup", "time", 15 * 60, desc="15 min locker einlaufen"),
+            step(1, "warmup", "lap", desc="Einlaufen, bis du am Platz bist (mind. 10 min) – dann Lap-Taste"),
             repeat(2, reps, [
                 step(3, "interval", "time", mins * 60, target, desc=f"{mins} min ALL OUT"),
                 step(4, "recovery", "time", rest_min * 60, desc="locker traben"),
             ]),
-            step(5, "cooldown", "time", 10 * 60, desc="10 min auslaufen"),
+            step(5, "cooldown", "lap", desc="Auslaufen, so lange du magst – dann Lap-Taste"),
         ]
         seconds = (15 + reps * (mins + rest_min) + 10) * 60
         return workout(f"Intervalle {reps}×{mins} min ALL OUT", steps, seconds, detail)

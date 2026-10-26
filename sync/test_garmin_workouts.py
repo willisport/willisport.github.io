@@ -9,8 +9,8 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
 import garmin_workouts as gw  # noqa: E402
 
-VO2 = {"name": "VO2max-Intervalle", "detail": "6×2 min ALL OUT · Ziel-Pace 4:38–4:46 min/km (deiner Garmin-5-km-Prognose) · je 2 min locker traben · "
-                                               "davor 15 min einlaufen, danach 10 min auslaufen · 10:30 Uhr, nicht nüchtern"}
+VO2 = {"name": "VO2max-Intervalle", "detail": "6×2 min ALL OUT · auf jeden Fall schneller als 4:42 min/km (deiner Garmin-5-km-Prognose) – so schnell, wie du es alle Wiederholungen halten kannst · je 2 min locker traben · "
+                                               "davor einlaufen (mind. 10 min, bis du am Platz bist), danach auslaufen · 10:30 Uhr, nicht nüchtern"}
 SIM = {"name": "Backyard-Simulation", "detail": "18 km · 3 Runden à 6 km, jede volle Stunde ein Start, locker (Zone 2, 130–140 bpm) · in den Pausen essen/trinken · 09:00 Uhr"}
 LONG = {"name": "Langer Lauf", "detail": "12 km · Zone 2 (130–140 bpm) · 06:30 Uhr, nach dem Frühstück"}
 
@@ -51,8 +51,10 @@ class Builder(unittest.TestCase):
         work, rest = rep["workoutSteps"]
         self.assertEqual((work["endConditionValue"], rest["endConditionValue"]), (120.0, 120.0))
         self.assertEqual(work["targetType"]["workoutTargetTypeKey"], "pace.zone")
-        self.assertAlmostEqual(work["targetValueOne"], 1000 / 286, places=3)      # 4:46 min/km = langsamere Grenze
-        self.assertAlmostEqual(work["targetValueTwo"], 1000 / 278, places=3)      # 4:38 min/km
+        self.assertAlmostEqual(work["targetValueOne"], 1000 / 282, places=3)      # nur Untergrenze: schneller als 4:42 min/km
+        self.assertGreater(work["targetValueTwo"], 4.5)                           # nach oben praktisch offen (kein Piepen bei Vollgas)
+        self.assertEqual(steps[0]["endCondition"]["conditionTypeKey"], "lap.button")      # Einlaufen: bis du die Lap-Taste drueckst
+        self.assertEqual(steps[2]["endCondition"]["conditionTypeKey"], "lap.button")      # Auslaufen: ebenso
         self.assertEqual(w["estimatedDurationInSecs"], (15 + 6 * 4 + 10) * 60)
 
     def test_backyard_simulation_laps_with_lap_button_rests(self):

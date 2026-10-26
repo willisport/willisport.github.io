@@ -826,7 +826,7 @@ def vo2_pace_text(tg: dict, rep_min: int) -> str:
         return ""
     delta = {1: -14, 2: -10, 3: -5}.get(rep_min, 0)
     mid = p5 + delta
-    return f"Ziel-Pace {fmt_pace(mid - 4)}–{fmt_pace(mid + 4)} min/km ({tg['paceSource']})"
+    return f"auf jeden Fall schneller als {fmt_pace(mid)} min/km ({tg['paceSource']}) – so schnell, wie du es alle Wiederholungen halten kannst"
 
 
 class Planner:
@@ -1131,7 +1131,7 @@ f"15 min einrollen · 2×{w} min Zone 4 (Schwelle): {self.tg['thrLo']}–{self.t
                 start = self.slot_run(ctx, dur, after=(last_end[i] + 10) if last_end[i] else None)
                 commit(i, mk_unit("VO2max-Intervalle", "lauf", "pflicht",
                                   f"{rp}×{vm} min ALL OUT" + (f" · {vo2_pace_text(self.tg, vm)}" if vo2_pace_text(self.tg, vm) else " (deutlich schneller als dein Schwellentempo)")
-                                  + f" · je {vo2_rest_min(vm)} min locker traben · davor 15 min einlaufen, danach 10 min auslaufen{tsuf(start)}, nicht nüchtern",
+                                  + f" · je {vo2_rest_min(vm)} min locker traben · davor einlaufen (mind. 10 min, bis du am Platz bist), danach auslaufen{tsuf(start)}, nicht nüchtern",
                                   dur - 10, keySession=True, matchHint={"activityTypes": ["running"]}), start, dur)
             # --- Zone-2-Lauf ---
             if "z2_run" in r:

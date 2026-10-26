@@ -529,7 +529,7 @@ class AllrounderPlanner(pl.Planner):
                 start = self.slot_run(ctx, dur, after=(last_end[i] + 10) if last_end[i] else None)
                 commit(i, mk_unit("VO2max-Intervalle", "lauf", "pflicht",
                                   f"{rp}×{vm} min ALL OUT" + (f" · {vo2_pace_text(self.tg, vm)}" if vo2_pace_text(self.tg, vm) else " (deutlich schneller als dein Schwellentempo)")
-                                  + f" · je {vo2_rest_min(vm)} min locker traben · davor 15 min einlaufen, danach 10 min auslaufen{tsuf(start)}, nicht nüchtern",
+                                  + f" · je {vo2_rest_min(vm)} min locker traben · davor einlaufen (mind. 10 min, bis du am Platz bist), danach auslaufen{tsuf(start)}, nicht nüchtern",
                                   dur - 10, keySession=True, matchHint={"activityTypes": ["running"]}), start, dur)
             if "easy_run" in r:
                 km = easy_km[i] if lvl >= 1 else max(4.0, round(easy_km[i] * lvl * 2) / 2)

@@ -476,7 +476,7 @@ class TrainingTargets(unittest.TestCase):
         z2 = self.unit({}, date(2026, 10, 5), "Rad Zone 2")
         self.assertIn("165 W", z2["detail"])
         vo2 = self.unit({}, date(2026, 10, 5), "VO2max-Intervalle")
-        self.assertNotIn("Ziel-Pace", vo2["detail"])
+        self.assertNotIn("schneller als 4", vo2["detail"])
 
     def test_threshold_uses_ftp_zone4_and_heart_rate(self):
         thr = self.unit({"metrics": self.MET}, date(2026, 11, 16), "Schwellentraining Rad")
@@ -494,14 +494,14 @@ class TrainingTargets(unittest.TestCase):
 
     def test_vo2_pace_from_5k_prediction_and_shorter_reps_are_faster(self):
         short = self.unit({"metrics": self.MET}, date(2026, 10, 5), "VO2max-Intervalle")           # 5x2 min
-        self.assertIn("Ziel-Pace 4:", short["detail"])
+        self.assertIn("schneller als 4:", short["detail"])
         self.assertIn("5-km-Prognose", short["detail"])
         tg = pl.training_targets(pl.normalize_inputs({"metrics": self.MET}))
         self.assertGreater(tg["pace5kSec"], 280)
         p2 = pl.vo2_pace_text(tg, 2)
         p4 = pl.vo2_pace_text(tg, 4)
         self.assertNotEqual(p2, p4)
-        self.assertTrue(p2.split()[1] < p4.split()[1])    # 2-min-Intervalle schneller als 4-min
+        self.assertTrue(p2.split("schneller als ")[1].split()[0] < p4.split("schneller als ")[1].split()[0])    # 2-min-Intervalle schneller als 4-min
 
     def test_manual_5k_time_overrides_prediction(self):
         tg = pl.training_targets(pl.normalize_inputs({"metrics": self.MET, "settings": {"ref5kSec": 1200}}))
