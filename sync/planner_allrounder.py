@@ -369,6 +369,7 @@ class AllrounderPlanner(pl.Planner):
 
         # Alle Kombinationen bewerten: Laufen und Rad moeglichst abwechselnd (keine Laufserien an Folgetagen)
         km_min = max(4.0, round(z2_km * 0.7 * 2) / 2)
+        prev_run = carry.get("runLast") == pl.iso(dates[0] - timedelta(days=1))
         cand_scores = {}
         for i in pool:
             if i in (li, ii, ti, legs_day) or ctxs[i].no_run or level[i] < 0.5:
@@ -384,6 +385,8 @@ class AllrounderPlanner(pl.Planner):
             for combo in itertools.combinations(sorted(cand_scores), k_take):
                 adjacent = sum(1 for x, y in zip(combo, combo[1:]) if y - x == 1)
                 total = sum(cand_scores[i] for i in combo) - 1200 * adjacent
+                if combo and combo[0] == 0 and prev_run:
+                    total -= 1200                      # Sonntag der Vorwoche war schon ein Lauftag
                 if best_combo is None or total > best_combo[0]:
                     best_combo = (total, combo)
             if best_combo is not None:
@@ -531,6 +534,11 @@ class AllrounderPlanner(pl.Planner):
                                   matchHint={"activityTypes": ["strength_training", "cardio"]}), start, cdur)
 
         # Uebergabe an die naechste Woche
+        run_idx = [i for i in range(n) if roles[i] & {"easy_run", "long_run", "intervals"}]
+        if run_idx:
+            carry["runLast"] = pl.iso(dates[max(run_idx)])
+        else:
+            carry.pop("runLast", None)
         for kind, days in (("Push", push_days), ("Pull", pull_days), ("Legs", [legs_day] if legs_day is not None else [])):
             if days:
                 carry[kind] = pl.iso(dates[max(days)])
