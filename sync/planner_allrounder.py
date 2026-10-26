@@ -610,7 +610,7 @@ class AllrounderPlanner(pl.Planner):
                 near_race = b_race_week
                 # 1) nach jedem Lauf: Wandsitzen + langsame Wadenheben (immer)
                 run_end = entry_end(i, run_names)
-                if run_end is not None and not legs_today:
+                if run_end is not None:                              # an jedem Lauftag, auch wenn am selben Tag Beine anstehen
                     ex = [{"name": "Wandsitzen (Knie 90°, Rücken an der Wand)", "sets": 2, "reps": f"{wall_s} s", "rest": "30 s"},
                           {"name": "Wadenheben auf der Stufe, 3 s langsam absenken", "sets": 2, "reps": str(calf_reps), "rest": "30 s"}]
                     add_mini(i, "Nach dem Lauf: Wandsitzen + Waden",

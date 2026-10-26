@@ -441,12 +441,12 @@ class MiniSessions(unittest.TestCase):
         self.w = plan(start=self.MON)[pl.iso(self.MON)]
         self.units = all_units(self.w)
 
-    def test_wall_sit_after_every_run_but_not_on_leg_day(self):
+    def test_wall_sit_after_every_run_and_only_on_run_days(self):
         for wd in WD:
             n = names(self.w, wd)
             has_run = any(x in n for x in ("Zone-2-Lauf", "Langer Lauf", "VO2max-Intervalle"))
             has_wall = "Nach dem Lauf: Wandsitzen + Waden" in n
-            if has_run and "Schweres Beintraining" not in n:
+            if has_run:
                 self.assertTrue(has_wall, (wd, n))
             if not has_run:
                 self.assertFalse(has_wall, (wd, n))
