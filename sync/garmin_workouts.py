@@ -17,7 +17,7 @@ import re
 from datetime import date, timedelta
 
 KEY_UNITS = ("VO2max-Intervalle", "Backyard-Simulation", "Langer Lauf")
-DAYS_AHEAD = 14
+DAYS_AHEAD = 21
 
 SPORT_RUN = {"sportTypeId": 1, "sportTypeKey": "running", "displayOrder": 1}
 NO_TARGET = {"workoutTargetTypeId": 1, "workoutTargetTypeKey": "no.target", "displayOrder": 1}
