@@ -230,7 +230,11 @@ class RandomShifts(unittest.TestCase):
                         continue
                     for u in w["days"][wd]["units"]:
                         if u["name"] in GYM_NAMES:
-                            self.assertEqual(hm_in(u["detail"]), pl.hm_to_min(sh[0]["end"]) + 20, (d, u["name"]))
+                            runs_first = any("auf dem Laufband" in v["detail"] for v in w["days"][wd]["units"])
+                            if runs_first:                       # Lauf auf dem Laufband zuerst, danach die Kraft
+                                self.assertGreater(hm_in(u["detail"]), pl.hm_to_min(sh[0]["end"]) + 20, (d, u["name"]))
+                            else:
+                                self.assertEqual(hm_in(u["detail"]), pl.hm_to_min(sh[0]["end"]) + 20, (d, u["name"]))
                             seen += 1
         self.assertGreater(seen, 20)
 
@@ -547,6 +551,33 @@ class RunStreaks(unittest.TestCase):
             weeks_n += len(weeks)
             triples += sum(1 for k in range(len(flags) - 2) if flags[k] and flags[k + 1] and flags[k + 2])
         self.assertLessEqual(triples, weeks_n * 0.04, (triples, weeks_n))      # bei sehr vollen Dienstplaenen (65 % Schichttage) nicht immer vermeidbar
+
+
+class OrderOfTheDay(unittest.TestCase):
+    """Reihenfolge am Tag: Rad (frueh) -> Lauf -> Kraft -> Mini-Einheiten."""
+
+    def test_run_comes_before_strength_and_bike_before_run(self):
+        rnd = random.Random(11)
+        days = bad_run = bad_bike = 0
+        for _ in range(25):
+            start = date(2026, 11, 2)
+            shifts = {}
+            for k in range(6):
+                shifts.update(random_shifts(rnd, start + timedelta(days=7 * k)))
+            for m, w in plan({"shifts": shifts}, start, 6).items():
+                for wd in WD:
+                    timed = [(hm_in(u["detail"]), u["name"]) for u in w["days"][wd]["units"] if hm_in(u["detail"]) is not None]
+                    runs = [s for s, n in timed if n in ("Zone-2-Lauf", "Langer Lauf", "VO2max-Intervalle")]
+                    gym = [s for s, n in timed if n in GYM_NAMES]
+                    bikes = [s for s, n in timed if n.startswith("Rad Zone")]
+                    if runs and gym:
+                        days += 1
+                        bad_run += min(runs) > min(gym)
+                    if runs and bikes and min(bikes) > min(runs) and not any(b >= 15 * 60 for b in bikes):
+                        bad_bike += 1
+        self.assertGreater(days, 50)
+        self.assertLessEqual(bad_run, days * 0.03, (bad_run, days))      # Lauf vor Kraft (Ausnahme nur bei extrem vollen Tagen)
+        self.assertLessEqual(bad_bike, 3)
 
 
 if __name__ == "__main__":

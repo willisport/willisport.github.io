@@ -275,7 +275,9 @@ class AllrounderPlanner(pl.Planner):
         hard_days = {d for d in (li, ii, ti) if d is not None}
 
         # ---------------------------------------------------------------- 5. Push / Pull
-        free_gym = [i for i in range(n) if i != legs_day and gym_ok(i, 45, 0.5, allow_easy=True)]
+        # Ein Studio-Tag nach der Fruehschicht, an dem auch ein harter Lauf ansteht, wuerde den Lauf hinter die Kraft schieben (Lauf kommt zuerst)
+        free_gym = [i for i in range(n) if i != legs_day and gym_ok(i, 45, 0.5, allow_easy=True)
+                    and not (i in (li, ii) and at_work(i))]
         forced_push = {i for i, k in forced.items() if k == "Push" and i in free_gym}
         forced_pull = {i for i, k in forced.items() if k == "Pull" and i in free_gym}
         free_pull = [i for i in free_gym if not ctxs[i].no_pull]
@@ -522,9 +524,21 @@ class AllrounderPlanner(pl.Planner):
                 km = easy_km[i] if lvl >= 1 else max(4.0, round(easy_km[i] * lvl * 2) / 2)
                 dur = run_minutes(km) + 10
                 start = self.slot_run(ctx, dur, after=(last_end[i] + 10) if last_end[i] else None)
+                gs = gym_start.get(i)
+                on_treadmill = False
+                if gs is not None and (start is None or start >= gs):
+                    # Reihenfolge: Lauf immer vor dem Krafttraining - frueh am Morgen vor der Schicht ...
+                    early = self.slot_fasted(ctx, dur)
+                    if early is not None and early + dur + 10 <= gs:
+                        start = early
+                    elif at_work(i) and ctx.shift_end is not None and start is not None and start >= gs:
+                        # ... oder (Fruehschicht) auf dem Laufband im Studio direkt nach der Schicht, danach die Kraft
+                        start = ctx.shift_end + 15
+                        gym_start[i] = start + dur + 10
+                        on_treadmill = True
                 if start is not None:
                     commit(i, mk_unit("Zone-2-Lauf", "lauf", "pflicht",
-                                      f"{fmt_km(km)} km · ganz locker, 130–140 bpm{tsuf(start)}", run_minutes(km),
+                                      f"{fmt_km(km)} km · ganz locker, 130–140 bpm" + (" · auf dem Laufband im Studio direkt nach der Schicht" if on_treadmill else "") + f"{tsuf(start)}", run_minutes(km),
                                       matchHint={"activityTypes": ["running"], "minDistanceKm": int(max(3, round(km * 0.7)))}),
                            start, dur)
 
@@ -597,7 +611,8 @@ class AllrounderPlanner(pl.Planner):
                     return False
                 if is_late(i) and ctxs[i].shift_start is not None and start + dur > ctxs[i].shift_start - 10:
                     return False                                   # Spaetschicht: vor der Schicht muss alles fertig sein
-                where = " · im Studio direkt nach der Schicht" if at_work(i) and "Nach dem Lauf" not in name and name != "Sprungübungen (5 min)" else ""
+                run_on_treadmill = any("auf dem Laufband im Studio" in p["unit"]["detail"] for p in placed[i] if p["unit"]["name"] == "Zone-2-Lauf")
+                where = " · im Studio direkt nach der Schicht" if at_work(i) and (("Nach dem Lauf" not in name and name != "Sprungübungen (5 min)") or run_on_treadmill) else ""
                 commit(i, mk_unit(name, "core", "bonus", f"{detail} · optional{where}{tsuf(start)}", dur, exercises=exercises,
                                   matchHint={"activityTypes": ["strength_training", "cardio", "walking", "running"]}), start, dur)
                 return True
