@@ -489,6 +489,13 @@ def build_day_contexts(monday: date, inputs: dict, today: date) -> list[DayCtx]:
             elif delta <= 21 and not fast:
                 ctx.sick_return_level = 0.85
 
+        bd = (st.get("bRace") or {}).get("date")
+        if bd:
+            try:
+                if 0 <= (parse_date(bd) - d).days <= 3:
+                    ctx.no_hard = True                     # letzte Tage vor dem Zwischenziel: nur locker
+            except Exception:
+                pass
         hard_from = st.get("hardFrom")
         if hard_from:
             try:
@@ -621,6 +628,7 @@ def week_params(monday: date, inputs: dict, factor_override: float | None = None
 
     # Zwischenziel (z. B. Backyard-Lauf): eine Woche Tapering davor, eine ruhige Woche danach
     b_week = 0
+    b_laps = 0
     b = st.get("bRace") or {}
     if b.get("date") and phase in ("aufbau",):
         try:
@@ -629,6 +637,9 @@ def week_params(monday: date, inputs: dict, factor_override: float | None = None
             wb = None
         if wb == 1:
             b_week = 2                      # Woche davor: weiter aufbauen, aber keine Intervalle/schweren Beine mehr
+            b_laps = 2
+        elif wb == 2:
+            b_laps = 3                      # Backyard-Simulation: 3 Runden (Rennspezifisch statt ein langer Dauerlauf)
         elif wb == 0:
             taper_factor, phase, b_week = 0.6, "taper", 1
         elif wb == -1:
@@ -689,9 +700,12 @@ def week_params(monday: date, inputs: dict, factor_override: float | None = None
     bike_min = int(round(bike_min * (0.85 if phase == "recovery" else 1.0) / 5) * 5)
     if phase in ("taper", "wettkampf", "erholung"):
         bike_min = min(bike_min, 45)
-    if phase == "wettkampf" or (phase == "erholung" and factor < 0.6) or b_week == 1:
+    if phase == "wettkampf" or (phase == "erholung" and factor < 0.6):
         reps = 0
         thr_min = 0
+    if b_week == 1:
+        reps = 0
+        thr_min = 8                      # Taper: Umfang runter, Intensitaet bleibt (ein kurzer Reiz, nicht in den letzten 3 Tagen)
     if b_week == 2:
         reps = 0
 
@@ -700,7 +714,7 @@ def week_params(monday: date, inputs: dict, factor_override: float | None = None
         "factor": round(factor, 3), "z2Km": z2_km, "longKm": long_km, "longRideMin": long_ride,
         "intervalReps": reps, "vo2Min": vo2_min, "thresholdMin": thr_min, "bikeMin": bike_min, "runDays": run_days,
         "skipHeavy": phase == "wettkampf" or (phase == "erholung" and factor < 0.6) or (allround and weeks_to_race == 1) or b_week in (1, 2),
-        "bWeek": b_week,
+        "bWeek": b_week, "bLaps": b_laps, "bLapKm": float(b.get("lapKm") or 6) if b.get("date") else 0,
         "weeksToRace": weeks_to_race, "taper": phase in ("taper", "wettkampf"),
     }
 
@@ -1217,7 +1231,7 @@ def short_label(unit: dict) -> str:
     n = unit["name"]
     return {"Rad Zone 2": "Rad", "Rad Zone 1 (locker)": "lockeres Rad", "Langes Rad Zone 2": "langes Rad",
             "VO2max-Intervalle": "VO2max-Intervalle", "Schwellentraining Rad": "Schwelle (Rad)",
-            "Zone-2-Lauf": "Lauf", "Langer Lauf": "langer Lauf", "Schweres Beintraining": "schwere Beine",
+            "Zone-2-Lauf": "Lauf", "Langer Lauf": "langer Lauf", "Backyard-Simulation": "Backyard-Simulation", "Schweres Beintraining": "schwere Beine",
             "Arme/Schultern": "Arme/Schultern", "Core (zu Hause)": "Core", "Core (Studio)": "Core"}.get(n, n)
 
 
@@ -1251,7 +1265,7 @@ def generate_week(monday: date, inputs: dict, today: date, template_library: dic
         if b_date is not None and ctx.date == b_date:
             bkm = b.get("km")
             placed[i] = [{"unit": mk_unit(f"Wettkampf: {(b.get('name') or 'Zwischenziel').strip()}", "lauf", "pflicht",
-                                          (b.get("detail") or "") + " · locker starten, jede Runde gleichmäßig, in den Pausen essen und trinken",
+                                          (b.get("detail") or "") + " · bewusst langsamer starten als es sich gut anfühlt (Zone 2), keine Zeit „sparen“ durch Tempo · direkt nach jeder Runde essen (ca. 30–60 g Kohlenhydrate pro Stunde, nur Bekanntes), 300–600 ml trinken nach Durst, Koffein erst später",
                                           int(b.get("durationMin") or 0), keySession=True,
                                           matchHint={"activityTypes": ["running"], "minDistanceKm": int(max(5, (bkm or 10) * 0.6))}),
                           "start": None, "dur": int(b.get("durationMin") or 0)}]
@@ -1300,8 +1314,8 @@ def generate_week(monday: date, inputs: dict, today: date, template_library: dic
             focus += " + ".join(dict.fromkeys(parts)) if parts else "Training"
         day = {"focus": focus.rstrip(" ·").strip(), "units": units}
         notes = [u for u in units if u.get("keySession")]
-        if notes and any(u["name"] in ("Langer Lauf", "VO2max-Intervalle", "Langes Rad Zone 2", "Schwellentraining Rad") for u in notes):
-            run_key = any(u["name"] in ("Langer Lauf", "VO2max-Intervalle") for u in notes)
+        if notes and any(u["name"] in ("Langer Lauf", "Backyard-Simulation", "VO2max-Intervalle", "Langes Rad Zone 2", "Schwellentraining Rad") for u in notes):
+            run_key = any(u["name"] in ("Langer Lauf", "Backyard-Simulation", "VO2max-Intervalle") for u in notes)
             day["fallbackNote"] = "Schlüsseleinheit – nicht durchs Rad ersetzen." if run_key else None
         days[ctx.weekday] = day
 

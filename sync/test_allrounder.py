@@ -451,8 +451,9 @@ class SecondaryGoal(unittest.TestCase):
     def test_race_week_has_no_hard_sessions_and_label(self):
         w = self.weeks()["2026-11-23"]
         for wd, u in all_units(w):
-            self.assertNotIn(u["name"], HARD, wd)
-            self.assertNotEqual(u["name"], "Schweres Beintraining")
+            self.assertNotIn(u["name"], ("VO2max-Intervalle", "Langer Lauf", "Backyard-Simulation", "Schweres Beintraining"), wd)
+            if u["name"] == "Schwellentraining Rad":           # Taper: Intensitaet bleibt (kurz), aber nicht in den letzten 3 Tagen
+                self.assertIn(wd, ("Montag", "Dienstag"))
         self.assertIn("Zwischenziel", w["meta"]["label"])
 
     def test_week_before_has_no_intervals_or_heavy_legs(self):
@@ -465,6 +466,19 @@ class SecondaryGoal(unittest.TestCase):
         for wd, u in all_units(w):
             self.assertNotIn(u["name"], HARD, wd)          # Kraft (auch Beine) laeuft normal weiter
         self.assertNotIn("keine Zeit", w["note"])             # keine irrefuehrende Meldung fuer bewusst fehlende Einheiten
+
+
+    def test_backyard_simulation_replaces_long_run_before_race(self):
+        raw = {**self.RAW, "settings": {**self.RAW["settings"], "bRace": {**self.RAW["settings"]["bRace"], "lapKm": 6}}}
+        weeks = pl.generate_plan(raw, date(2026, 11, 9), date(2026, 11, 23), self.TODAY)
+        w1, w2 = weeks["2026-11-09"], weeks["2026-11-16"]
+        sim1 = [u for _, u in all_units(w1) if u["name"] == "Backyard-Simulation"]
+        sim2 = [u for _, u in all_units(w2) if u["name"] == "Backyard-Simulation"]
+        self.assertEqual(len(sim1), 1)
+        self.assertIn("3 Runden", sim1[0]["detail"])
+        self.assertEqual(len(sim2), 1)
+        self.assertIn("2 Runden", sim2[0]["detail"])
+        self.assertNotIn("Langer Lauf", [u["name"] for _, u in all_units(w1) + all_units(w2)])
 
     def test_week_after_is_gentle(self):
         w = self.weeks()["2026-11-30"]

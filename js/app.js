@@ -1216,6 +1216,7 @@ function renderCoach(data) {
       </div>` : ""}
 
       ${canEdit() ? planStateCardHtml() : ""}
+      ${typeof planRulesCardHtml === "function" ? planRulesCardHtml() : ""}
 
       ${planHintCardHtml(data)}
 
@@ -1348,7 +1349,7 @@ function answerCoachQuestion(question, data) {
   if (/soll ich.*(laufen|trainieren|fahren)|heute.*(laufen|trainieren)|sollte ich/.test(q)) {
     return buildCoachRecommendation(data).headline;
   }
-  if (/langer lauf|lange.* lauf/.test(q)) return nextText(["Langer Lauf"], "Nächster langer Lauf");
+  if (/langer lauf|lange.* lauf/.test(q)) return nextText(["Langer Lauf", "Backyard-Simulation"], "Nächster langer Lauf");
   if (/intervall|vo2/.test(q)) return nextText(["VO2max-Intervalle"], "Nächste Intervalle");
   if (/schwelle/.test(q)) return nextText(["Schwellentraining Rad"], "Nächstes Schwellentraining");
   if (/beintraining|beine\b|leg day/.test(q)) return nextText(["Schweres Beintraining"], "Nächstes Beintraining");

@@ -292,3 +292,49 @@ function raceCountdownHtml(data) {
       </div>
     </div>`;
 }
+
+
+/* ---------------------------------------------------------------------------
+   Warum ist der Plan so? (Regeln mit Begruendung - Langfassung: docs/TRAININGSREGELN.md)
+   --------------------------------------------------------------------------- */
+
+const PLAN_RULES = [
+  ["Push, Pull, Beine – warum so?",
+   "Push 2×, Pull 2× und Beine 1× pro Woche reichen für Muskelaufbau; bei gleichem Gesamtvolumen sind 2× und 3× pro Muskelgruppe etwa gleich wirksam. Zwischen gleichen Einheiten liegen 3 freie Tage (Push Di → Sa) für volle Erholung, und Push und Pull wechseln sich ab. Beine nur 1× schwer, weil Laufen die Beine zusätzlich belastet.",
+   "https://pubmed.ncbi.nlm.nih.gov/27102172/"],
+  ["Kraft und Laufen am selben Tag?",
+   "Besser an getrennten Tagen, sonst mindestens ca. 6 Stunden Abstand und Kraft zuerst. Das gilt vor allem für Beine: direkt hintereinander leidet die Beinkraft. Oberkörper (Push/Pull) stört das Laufen kaum.",
+   "https://pmc.ncbi.nlm.nih.gov/articles/PMC11359207/"],
+  ["Laufen und Rad abwechselnd",
+   "Das Herz-Kreislauf-System erholt sich schneller als Sehnen und Gelenke. Der Wechsel hält den Ausdauerreiz hoch und die Stoßbelastung niedrig; Läufe an Folgetagen vermeidet der Plan.",
+   "https://runnersconnect.net/return-to-running/"],
+  ["Wenig hart, viel locker",
+   "Etwa 80 % der Ausdauer locker (Zone 2), der Rest hart: ein VO2max-Lauf, eine Schwelleneinheit auf dem Rad und ein langer Lauf pro Woche. Harte Einheiten kommen nie hintereinander.",
+   "https://pmc.ncbi.nlm.nih.gov/articles/PMC4621419/"],
+  ["Nach der Krankheit",
+   "Erst fieberfrei und Symptome nur oberhalb des Halses, dann die ersten Tage locker; harte Einheiten frühestens nach etwa einer Woche. Das Herz kommt schnell zurück, Sehnen brauchen länger – darum steigt der Umfang schrittweise.",
+   "https://runnersconnect.net/how-to-return-to-running-after-the-flu-or-a-fever/"],
+  ["Warum keine langen Läufe vor dem Backyard?",
+   "Beim Backyard läufst du 6 km pro Stunde mit Pause. Dafür trainiert der Plan Runden (3 Runden, eine Woche später 2) statt einen einzigen sehr langen Lauf. Das ist rennspezifisch und schont die Sehnen: ein einzelner Lauf sollte nicht viel länger sein als der längste der letzten Wochen.",
+   "https://www.inov8.com/blog/post/backyard-ultra-training-plan"],
+  ["Tapering vor dem Wettkampf",
+   "In der Woche davor sinkt der Umfang um etwa 40–60 %, die Intensität bleibt (ein kurzer Reiz früh in der Woche), in den letzten 3 Tagen nur locker. Danach ein ruhiger Tag und eine Erholungswoche.",
+   "https://www.ncbi.nlm.nih.gov/pmc/articles/PMC10171681/"],
+  ["Essen und Tempo am Renntag",
+   "Langsamer starten, als es sich gut anfühlt, keine Zeit „sparen“; in jeder Pause sofort essen (ca. 30–60 g Kohlenhydrate pro Stunde), 300–600 ml nach Durst trinken, nur Bekanntes essen und alles vorher im Training testen.",
+   "https://multidayrunning.com/nutrition/backyard-ultra-nutrition"],
+];
+
+function planRulesCardHtml() {
+  const rows = PLAN_RULES.map(([title, text, url]) => `
+    <details class="plan-rule" style="margin-bottom:6px;">
+      <summary style="cursor:pointer; font-weight:600;">${escapeHtml(title)}</summary>
+      <div class="card-note" style="margin:6px 0 4px;">${escapeHtml(text)} <a href="${url}" target="_blank" rel="noopener">Quelle</a></div>
+    </details>`).join("");
+  return `
+    <div class="card">
+      <div class="card-head"><span class="card-title">Warum ist der Plan so?</span><span class="card-note">Regeln und Begründung</span></div>
+      ${rows}
+      <div class="card-note" style="margin-top:8px;">Die Regeln stehen mit allen Quellen in <code>docs/TRAININGSREGELN.md</code>. Wo die Studienlage dünn ist, steht das dort dabei.</div>
+    </div>`;
+}

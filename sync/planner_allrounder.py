@@ -442,7 +442,18 @@ class AllrounderPlanner(pl.Planner):
             r = roles[i]          # Wiedereinstiegstag: nur Rad Zone 1 - plus Push/Pull, wenn ausdruecklich gewuenscht (gymForce)
 
             # ---- Ausdauer
-            if "long_run" in r:
+            if "long_run" in r and params.get("bLaps"):
+                laps, lap_km = int(params["bLaps"]), float(params.get("bLapKm") or 6)
+                lap_min = run_minutes(lap_km)
+                dur = (laps - 1) * 60 + lap_min + 10
+                start = self.slot_long(ctx, dur)
+                commit(i, mk_unit("Backyard-Simulation", "lauf", "pflicht",
+                                  f"{fmt_km(laps * lap_km)} km · {laps} Runden à {fmt_km(lap_km)} km, jede volle Stunde ein Start, locker (Zone 2, 130–140 bpm) · "
+                                  f"in den Pausen essen/trinken wie am Renntag, Schuhe und Verpflegung testen{tsuf(start)}", dur,
+                                  keySession=True,
+                                  matchHint={"activityTypes": ["running"], "minDistanceKm": int(max(4, round(lap_km * 0.8)))}),
+                       start, dur)
+            elif "long_run" in r:
                 km = long_km if lvl >= 1 else max(6.0, round(long_km * lvl * 2) / 2)
                 dur = run_minutes(km) + 10
                 start = self.slot_long(ctx, dur)
