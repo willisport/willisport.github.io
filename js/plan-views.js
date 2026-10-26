@@ -228,16 +228,7 @@ function futureWeekDays(monday, data) {
 }
 
 function futureUnitRowHtml(u, dateStr, days, monday) {
-  const controls = canEdit() ? `${timeOverrideHtml(u, dateStr)}${u.isExtra ? "" : moveSelectHtml(u, dateStr, days, monday)}` : "";
-  return `
-    <div class="day-mini-unit">
-      <span style="flex:1;">
-        ${escapeHtml(u.name)}${u.keySession ? ' <span class="unit-key-badge">Key</span>' : ""}${u.planLabel ? ` <span class="unit-key-badge" style="color:var(--sky-400);">${escapeHtml(u.planLabel)}</span>` : ""}
-        ${u.detail ? `<div class="unit-detail" style="margin-top:2px;">${escapeHtml(u.detail)}${u.plannedDurationMin ? ` · ~${u.plannedDurationMin} min` : ""}</div>` : ""}
-        ${u.movedFromWeekday ? `<div class="moved-note">verschoben von ${u.movedFromWeekday}</div>` : ""}
-      </span>
-      ${controls}
-    </div>`;
+  return unitAccordionHtml(u, dateStr, { weekDays: days, weekStart: monday, statusDot: false });
 }
 
 /** Laufkilometer einer Woche von Hand setzen (überschreibt die Automatik nur für diese Woche). */
@@ -295,8 +286,8 @@ function wochePreviewHtml(data) {
     <div class="day-col">
       <div class="day-col-head"><span class="day-name">${d.weekday}</span><span class="day-date">${fmtDateShort(d.date)}</span></div>
       ${(agendaByDate[d.date] || []).map(agendaItemHtml).join("")}
-      <div style="font-size:11px; color:var(--muted); margin-bottom:2px;">${escapeHtml(d.focus)}</div>
-      <div class="stack" style="gap:6px;">${d.units.map(u => futureUnitRowHtml(u, d.date, days, monday)).join("") || '<div class="card-note">Nichts geplant.</div>'}</div>
+      ${dayFocusHtml(d.focus, (agendaByDate[d.date] || []).length > 0)}
+      <div class="stack" style="gap:6px;">${sortUnitsByTime(d.units).map(u => futureUnitRowHtml(u, d.date, days, monday)).join("") || '<div class="card-note">Nichts geplant.</div>'}</div>
       ${d.fallbackNote ? `<div class="fallback-note">${escapeHtml(d.fallbackNote)}</div>` : ""}
     </div>`).join("");
   return `

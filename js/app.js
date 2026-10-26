@@ -533,10 +533,8 @@ function weekPreviewDaysHtml(days) {
   return `<div class="week-grid" style="margin-top:10px;">${days.map(d => `
     <div class="day-col">
       <div class="day-col-head"><span class="day-name">${d.weekday}</span><span class="day-date">${fmtDateShort(d.date)}</span></div>
-      <div style="font-size:11px; color:var(--muted); margin-bottom:2px;">${escapeHtml(d.focus)}</div>
-      <div class="stack" style="gap:6px;">${d.units.length ? d.units.map(u => `
-        <div class="day-mini-unit"><span style="flex:1;">${escapeHtml(u.name)}${u.keySession ? ' <span class="unit-key-badge">Key</span>' : ""}${u.detail ? `<div class="unit-detail" style="margin-top:2px;">${escapeHtml(u.detail)}</div>` : ""}</span></div>
-      `).join("") : `<div class="card-note">Nichts geplant.</div>`}</div>
+      ${dayFocusHtml(d.focus)}
+      <div class="stack" style="gap:6px;">${d.units.length ? sortUnitsByTime(d.units).map(u => unitAccordionHtml(u, d.date, { statusDot: false, controls: false })).join("") : `<div class="card-note">Nichts geplant.</div>`}</div>
     </div>`).join("")}</div>`;
 }
 
@@ -555,30 +553,97 @@ function setupWeekPlanClicks(weeks) {
 
 /* ---------- shared: full week overview (Heute + Woche + Kraft) ---------- */
 
-function unitRowHtml(u, dateStr, weekDays, weekStart) {
-  const moveControls = weekDays
-    ? `${timeOverrideHtml(u, dateStr)}${moveSelectHtml(u, dateStr, weekDays, weekStart)}${autoMoveButtonHtml(u)}`
+/* ---------- Einheiten als aufklappbare, nach Uhrzeit sortierte Liste ----------
+   Zugeklappt: Uhrzeit, Name, Kennzeichen, Dauer. Aufgeklappt: Beschreibung, Übungen, Steuerung. */
+
+const OPEN_UNITS = new Set();          // aufgeklappte Einheiten bleiben beim Neuzeichnen offen
+const UNIT_TIME_RE = / · (\d{2}):(\d{2}) Uhr(, [^·(]*)?( \(angepasst\))?/g;
+const UNIT_LIB_KEY = { "Push": "push", "Pull": "pull", "Schweres Beintraining": "heavyLegs", "Core (zu Hause)": "core", "Core (Studio)": "coreGym",
+  "Bein-Stabi": "legStabi", "Bein-Supersätze": "legSupersets", "Arme/Schultern": "armShoulders" };
+
+function unitTimeInfo(u) {
+  const detail = u.detail || "";
+  let last = null;
+  for (const m of detail.matchAll(UNIT_TIME_RE)) last = m;
+  const time = u.timeOverride || (last ? `${last[1]}:${last[2]}` : null);
+  const note = last && last[3] ? last[3].replace(/^,\s*/, "").trim() : "";
+  const body = last ? detail.replace(last[0], "") : detail;
+  return { time, note, body: body.replace(/^ · |^· /, "").trim() };
+}
+
+function sortUnitsByTime(units) {
+  const order = { rad: 0, lauf: 1, kraft: 2, core: 3, emom: 4 };
+  const key = u => { const t = unitTimeInfo(u).time; return t ? parseInt(t.slice(0, 2), 10) * 60 + parseInt(t.slice(3), 10) : 100000; };
+  return units.map((u, i) => ({ u, i })).sort((a, b) => key(a.u) - key(b.u) || (order[a.u.type] ?? 9) - (order[b.u.type] ?? 9) || a.i - b.i).map(x => x.u);
+}
+
+function unitExercisesHtml(u) {
+  let ex = u.exercises;
+  if ((!ex || !ex.length) && UNIT_LIB_KEY[u.name] && typeof currentLibrary === "function" && typeof APP_DATA !== "undefined" && APP_DATA) {
+    const entry = currentLibrary(APP_DATA)[UNIT_LIB_KEY[u.name]];
+    ex = entry && entry.exercises;
+  }
+  if (!ex || !ex.length) return "";
+  return `<ul class="uacc-ex">${ex.map(e => `<li><b>${escapeHtml(e.name)}</b> – ${escapeHtml(e.sets)} × ${escapeHtml(e.reps)}${e.rest && e.rest !== "-" ? ` · Pause ${escapeHtml(e.rest)}` : ""}${e.weightKg ? ` · ${escapeHtml(e.weightKg)} kg` : ""}</li>`).join("")}</ul>`;
+}
+
+/** opts: { weekDays, weekStart, controls: false schaltet Verschieben/Zeit ab, statusDot: false } */
+function unitAccordionHtml(u, dateStr, opts = {}) {
+  const info = unitTimeInfo(u);
+  const key = `${dateStr}|${u.name}`;
+  const showControls = opts.weekDays && opts.controls !== false && canEdit();
+  const controls = showControls
+    ? `<div class="uacc-controls">${timeOverrideHtml(u, dateStr)}${u.isExtra ? "" : moveSelectHtml(u, dateStr, opts.weekDays, opts.weekStart)}${u.isExtra ? "" : autoMoveButtonHtml(u)}</div>`
     : "";
+  const chips = `${u.keySession ? '<span class="unit-key-badge">Key</span>' : ""}${u.planLabel ? `<span class="unit-key-badge" style="color:var(--sky-400);">${escapeHtml(u.planLabel)}</span>` : ""}${info.note ? `<span class="uacc-chip">${escapeHtml(info.note)}</span>` : ""}${u.tag === "bonus" ? '<span class="uacc-chip">optional</span>' : ""}`;
   return `
-    <div class="day-mini-unit">
-      ${statusDotHtml(dateStr, u)}
-      <span style="flex:1;">
-        ${escapeHtml(u.name)}${u.keySession ? ' <span class="unit-key-badge">Key</span>' : ""}${u.planLabel ? ` <span class="unit-key-badge" style="color:var(--sky-400);">${escapeHtml(u.planLabel)}</span>` : ""}
-        ${u.detail ? `<div class="unit-detail" style="margin-top:2px;">${escapeHtml(u.detail)}${u.plannedDurationMin ? ` · ~${u.plannedDurationMin} min` : ""}</div>` : ""}
+    <details class="unit-acc ${u.status || "planned"}" data-ukey="${escapeHtml(key)}" ${OPEN_UNITS.has(key) ? "open" : ""}>
+      <summary>
+        ${opts.statusDot === false ? "" : statusDotHtml(dateStr, u)}
+        <span class="uacc-time">${info.time || "–"}</span>
+        <span class="uacc-name">${escapeHtml(u.name)}</span>
+        ${chips}
+        <span class="uacc-dur">${u.plannedDurationMin ? `${u.plannedDurationMin} min` : ""}</span>
+      </summary>
+      <div class="uacc-body">
+        ${info.body ? `<div class="unit-detail">${escapeHtml(info.body)}</div>` : ""}
+        ${unitExercisesHtml(u)}
         ${u.movedFromWeekday ? `<div class="moved-note">verschoben von ${u.movedFromWeekday}</div>` : ""}
-      </span>
-      ${moveControls}
-    </div>`;
+        ${controls}
+      </div>
+    </details>`;
+}
+
+/** Tageshinweis: erste Angabe sichtbar, der Rest (Abfahrt, Fahrzeiten ...) auf Klick */
+function dayFocusHtml(focus, hasAgenda) {
+  const parts = String(focus || "").split(" · ").filter(Boolean);
+  if (hasAgenda && parts.length && /^(Arbeit|Schule|Uni|Termin|Urlaub|Frei)/.test(parts[0])) parts.shift();   // steht schon als Kalendereintrag da
+  if (parts.length <= 1) return parts.length ? `<div class="day-focus">${escapeHtml(parts[0])}</div>` : "";
+  return `<details class="day-info"><summary>${escapeHtml(parts[0])}</summary><div class="day-focus">${escapeHtml(parts.slice(1).join(" · "))}</div></details>`;
+}
+
+document.addEventListener("toggle", (e) => {
+  const d = e.target;
+  if (d && d.classList && d.classList.contains("unit-acc") && d.dataset.ukey) {
+    if (d.open) OPEN_UNITS.add(d.dataset.ukey); else OPEN_UNITS.delete(d.dataset.ukey);
+  }
+}, true);
+document.addEventListener("click", (e) => {
+  if (e.target.closest && e.target.closest(".unit-acc > summary .status-dot")) e.preventDefault();   // Statuspunkt hakt ab, klappt aber nicht auf
+}, true);
+
+function unitRowHtml(u, dateStr, weekDays, weekStart) {
+  return unitAccordionHtml(u, dateStr, { weekDays, weekStart });
 }
 
 function buildWeekOverview(data) {
   const todayDate = data.today.date;
   return data.week.days.map(d => {
-    const unitsHtml = d.units.map(u => unitRowHtml(u, d.date, data.week.days, data.week.startDate)).join("");
+    const unitsHtml = sortUnitsByTime(d.units).map(u => unitRowHtml(u, d.date, data.week.days, data.week.startDate)).join("");
     return `
       <div class="day-col ${d.date === todayDate ? "is-today" : ""}">
         <div class="day-col-head"><span class="day-name">${d.weekday}</span><span class="day-date">${fmtDateShort(d.date)}</span></div>
-        <div style="font-size:11px; color:var(--muted); margin-bottom:2px;">${escapeHtml(d.focus)}</div>
+        ${dayFocusHtml(d.focus)}
         <div class="stack" style="gap:6px;">${unitsHtml}</div>
         ${d.fallbackNote ? `<div class="fallback-note">${escapeHtml(d.fallbackNote)}</div>` : ""}
       </div>`;
@@ -747,19 +812,7 @@ function renderHeute(data) {
   const t = data.today;
   const recoveryScore = computeRecoveryScore(t.sleep);
 
-  const unitsHtml = t.units.map(u => `
-    <div class="unit">
-      ${statusDotHtml(t.date, u)}
-      <div>
-        <div class="unit-name">${escapeHtml(u.name)}${u.keySession ? ' <span class="unit-key-badge">Key</span>' : ""}${u.planLabel ? ` <span class="unit-key-badge" style="color:var(--sky-400);">${escapeHtml(u.planLabel)}</span>` : ""}</div>
-        <div class="unit-detail">${escapeHtml(u.detail)}${u.plannedDurationMin ? ` · ~${u.plannedDurationMin} min` : ""}</div>
-        ${u.movedFromWeekday ? `<div class="moved-note">verschoben von ${u.movedFromWeekday}</div>` : ""}
-      </div>
-      <span class="tag ${u.tag}">${u.tag}</span>
-      ${timeOverrideHtml(u, t.date)}
-      ${moveSelectHtml(u, t.date, data.week.days, data.week.startDate)}
-      ${autoMoveButtonHtml(u)}
-    </div>`).join("");
+  const unitsHtml = sortUnitsByTime(t.units).map(u => unitAccordionHtml(u, t.date, { weekDays: data.week.days, weekStart: data.week.startDate })).join("");
 
   document.getElementById("tab-heute").innerHTML = `
     <div class="page-head">
@@ -783,7 +836,7 @@ function renderHeute(data) {
       </div>` : ""}
 
       <div class="card accent-teal">
-        <div class="card-head"><span class="card-title">Heutige Einheiten</span>${t.units.length ? '<span class="card-note">Kreis: geplant → erledigt → abgelehnt · Dropdown: Tag wählen · Uhr: Zeit ändern · 🪄: automatisch sinnvoll verschieben</span>' : ""}</div>
+        <div class="card-head"><span class="card-title">Heutige Einheiten</span>${t.units.length ? '<span class="card-note">Tippe eine Einheit an für Details und Übungen · Kreis: geplant → erledigt → abgelehnt · im Detail: Tag wählen, Zeit ändern, 🪄 automatisch verschieben</span>' : ""}</div>
         ${t.units.length ? `<div class="unit-list">${unitsHtml}</div>` : '<div class="card-note">Heute steht kein Training an.</div>'}
       </div>
 
