@@ -480,7 +480,7 @@ def build_day_contexts(monday: date, inputs: dict, today: date) -> list[DayCtx]:
         elif ret_to is not None and d > ret_to:
             delta = (d - ret_to).days
             fast = st.get("returnRamp") == "fast"
-            if delta <= 3:
+            if delta <= (1 if fast else 3):
                 ctx.sick_return_level = "easy"
             elif delta <= 7:
                 ctx.sick_return_level = 0.7 if fast else 0.5

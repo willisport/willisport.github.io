@@ -40,7 +40,7 @@ PREF = {
     "pull":   [1, 5],
     "core_home": [3, 6, 0, 2, 4, 1, 5],
 }
-MIN_GAP = 3        # gleiche Kraft-Einheit: mindestens 3 Tage Abstand (2 freie Tage dazwischen)
+MIN_GAP = 4        # gleiche Kraft-Einheit: 3 volle Tage Pause dazwischen (Push Di -> fruehestens Sa)
 
 
 def pref_bonus(key: str, i: int) -> int:
@@ -345,37 +345,53 @@ class AllrounderPlanner(pl.Planner):
 
         # ---------------------------------------------------------------- 6. lockere Laeufe
         n_run_target = 1 if phase == "wettkampf" else params["runDays"]
+        if any(easy_only) and n_run_target > 3:
+            n_run_target = 3          # erste Woche nach der Krankheit: drei Laeufe, dazwischen Rad (abwechselnd statt Laufen am Stueck)
         n_easy = max(0, n_run_target - (1 if li is not None else 0) - (1 if ii is not None else 0))
         z2_km = params["z2Km"]
         easy_days: list[int] = []
-        for k in range(n_easy):
-            def easy_pen(i):
-                pen = 0
-                if li is not None and (i - li) % 7 == 1:
-                    pen += 1500                        # Back-to-Back nach dem langen Lauf vermeiden (Gelenke)
-                if li is not None and i + 1 == li:
-                    pen += 150                         # kurzer lockerer Lauf am Tag davor ist ok
-                if ii is not None and i - 1 == ii:
-                    pen += 200
-                if i == legs_day:
-                    pen += 400
-                if ti is not None and i == ti:
-                    pen += 1000
-                if easy_days and any(abs(i - e) == 1 for e in easy_days):
-                    pen += 60
-                if i in push_days or i in pull_days:
-                    pen += 20
-                return pen
-            km_k = z2_km if k == 0 else max(4.0, round(z2_km * 0.7 * 2) / 2)
-            cands = [i for i in pool if i not in (li, ii, ti, legs_day) and i not in easy_days
-                     and not ctxs[i].no_run and level[i] >= 0.5]
-            ci = choose("ezrun", cands, run_minutes(km_k) + 10, self.slot_run, easy_pen)
-            if ci is None:
-                if key_pool and not any_injury:
-                    note_missing("lockerer Lauf")
-                break
-            easy_days.append(ci)
-            roles[ci].add("easy_run")
+
+        def easy_pen(i):
+            pen = 0
+            if li is not None and (i - li) % 7 == 1:
+                pen += 1500                            # Back-to-Back nach dem langen Lauf vermeiden (Gelenke)
+            if li is not None and i + 1 == li:
+                pen += 150                             # kurzer lockerer Lauf am Tag davor ist ok
+            if ii is not None and i - 1 == ii:
+                pen += 200
+            if i == legs_day:
+                pen += 400
+            if ti is not None and i == ti:
+                pen += 1000
+            if i in push_days or i in pull_days:
+                pen += 20
+            return pen
+
+        # Alle Kombinationen bewerten: Laufen und Rad moeglichst abwechselnd (keine Laufserien an Folgetagen)
+        km_min = max(4.0, round(z2_km * 0.7 * 2) / 2)
+        cand_scores = {}
+        for i in pool:
+            if i in (li, ii, ti, legs_day) or ctxs[i].no_run or level[i] < 0.5:
+                continue
+            st_ = self.slot_run(ctxs[i], run_minutes(km_min) + 10)
+            if st_ is None:
+                continue
+            sc = ctxs[i].largest_window() + pref_bonus("ezrun", i) - easy_pen(i)
+            cand_scores[i] = sc - 200 if st_ >= 18 * 60 else sc
+        if n_easy > 0:
+            k_take = min(n_easy, len(cand_scores))
+            best_combo = None
+            for combo in itertools.combinations(sorted(cand_scores), k_take):
+                adjacent = sum(1 for x, y in zip(combo, combo[1:]) if y - x == 1)
+                total = sum(cand_scores[i] for i in combo) - 1200 * adjacent
+                if best_combo is None or total > best_combo[0]:
+                    best_combo = (total, combo)
+            if best_combo is not None:
+                easy_days = sorted(best_combo[1], key=lambda i: -cand_scores[i])
+            if len(easy_days) < n_easy and key_pool and not any_injury:
+                note_missing("lockerer Lauf")
+            for ci in easy_days:
+                roles[ci].add("easy_run")
         easy_km = {easy_days[k]: (z2_km if k == 0 else max(4.0, round(z2_km * 0.7 * 2) / 2)) for k in range(len(easy_days))}
 
         # ---------------------------------------------------------------- 7. Studio direkt nach der Schicht

@@ -190,12 +190,12 @@ class RandomShifts(unittest.TestCase):
             raw = {"shifts": shifts}
             cls.cases.append((raw, plan(raw, start, 26)))
 
-    def test_same_strength_type_has_gap_of_three_days(self):
+    def test_same_strength_type_has_three_free_days_between(self):
         for raw, weeks in self.cases:
             for kind in ("Push", "Pull"):
                 dates = sorted(pl.parse_date(m) + timedelta(days=WD.index(wd)) for m in weeks for wd in WD if kind in names(weeks[m], wd))
                 for a, b in zip(dates, dates[1:]):
-                    self.assertGreaterEqual((b - a).days, 3, (kind, a, b))
+                    self.assertGreaterEqual((b - a).days, 4, (kind, a, b))
 
     def test_at_most_one_gym_session_per_day_and_max_counts(self):
         for raw, weeks in self.cases:
@@ -408,9 +408,9 @@ class ForcedGymDay(unittest.TestCase):
     def test_forced_push_tomorrow_even_on_late_shift(self):
         w = self.week({"settings": {"gymForce": {"2026-10-27": "Push"}}})
         self.assertIn("Push", names(w, "Dienstag"))
-        self.assertEqual(len(day_of(w, "Push")), 2)          # Push 2x in der Woche, Abstand >= 3 Tage
+        self.assertEqual(len(day_of(w, "Push")), 2)          # Push 2x in der Woche, 3 freie Tage dazwischen
         pushes = sorted(WD.index(d) for d in day_of(w, "Push"))
-        self.assertGreaterEqual(pushes[1] - pushes[0], pl.__dict__.get("MIN_GAP", 3) if False else 3)
+        self.assertGreaterEqual(pushes[1] - pushes[0], 4)
         self.assertLessEqual(len(day_of(w, "Pull")), 1)      # Wiedereinstieg: Pull nur 1x
         self.assertEqual(day_of(w, "Schweres Beintraining"), [])
 
