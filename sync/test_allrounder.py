@@ -419,5 +419,18 @@ class ForcedGymDay(unittest.TestCase):
         self.assertTrue(day_of(w, "Push"))
 
 
+class PushPullAlternate(unittest.TestCase):
+    def test_push_and_pull_alternate_across_weeks(self):
+        weeks = plan(start=date(2026, 11, 23), weeks=4)
+        seq = []
+        for m in sorted(weeks):
+            wk = weeks[m]
+            for wd in WD:
+                seq += [n for n in names(wk, wd) if n in ("Push", "Pull")]
+        self.assertGreaterEqual(len(seq), 12)
+        same = sum(1 for a, b in zip(seq, seq[1:]) if a == b)
+        self.assertLessEqual(same, 1, seq)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

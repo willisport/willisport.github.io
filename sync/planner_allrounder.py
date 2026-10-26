@@ -307,6 +307,17 @@ class AllrounderPlanner(pl.Planner):
                         if not forced_pull <= set(pl_):
                             continue
                         cost = pref_cost(pu, "push") + pref_cost(pl_, "pull")
+                        # Abwechselnd Push/Pull (auch ueber den Wochenwechsel): zwei gleiche Einheiten hintereinander kosten viel
+                        seq = sorted([(d, "Push") for d in pu] + [(d, "Pull") for d in pl_])
+                        last_kind = None
+                        lp, lq = carry.get("Push"), carry.get("Pull")
+                        if lp or lq:
+                            last_kind = "Push" if (lp or "") >= (lq or "") else "Pull"
+                        prev = last_kind
+                        for _d, k in seq:
+                            if prev is not None and prev == k:
+                                cost += 120
+                            prev = k
                         # harte Ausdauer am selben Tag ist ok (Oberkoerper), aber Beine-Tag und Folgetag leicht meiden
                         cost += sum(15 for d in pu + pl_ if legs_day is not None and d == legs_day + 1)
                         key = (-(np_ + nl), cost)
