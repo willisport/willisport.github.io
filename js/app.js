@@ -608,6 +608,7 @@ function unitAccordionHtml(u, dateStr, opts = {}) {
       <div class="uacc-body">
         ${info.body ? `<div class="unit-detail">${escapeHtml(info.body)}</div>` : ""}
         ${unitExercisesHtml(u)}
+        ${u.why ? `<div class="uacc-why"><b>Warum:</b> ${escapeHtml(u.why)}</div>` : ""}
         ${u.movedFromWeekday ? `<div class="moved-note">verschoben von ${u.movedFromWeekday}</div>` : ""}
         ${controls}
       </div>

@@ -1466,7 +1466,7 @@ def compact_week(week: dict) -> dict:
         units = []
         for u in d["units"]:
             cu = {k: u[k] for k in ("name", "type", "tag", "detail", "plannedDurationMin") if k in u}
-            for k in ("keySession", "planLabel"):
+            for k in ("keySession", "planLabel", "why"):
                 if u.get(k):
                     cu[k] = u[k]
             units.append(cu)

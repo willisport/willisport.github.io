@@ -777,3 +777,6 @@ body.is-viewer .note-box { opacity: .7; cursor: not-allowed; }
 .day-info > summary::-webkit-details-marker { display: none; }
 .day-info > summary::after { content: " ▾"; font-size: 10px; }
 .day-focus { font-size: 11px; color: var(--muted); margin-bottom: 4px; }
+
+.uacc-why { font-size: 12px; color: var(--text-dim); border-left: 2px solid var(--ocean-500); padding-left: 8px; }
+.uacc-why b { color: var(--ice-300); }

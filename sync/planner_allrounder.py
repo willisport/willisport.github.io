@@ -444,11 +444,22 @@ class AllrounderPlanner(pl.Planner):
         if want_core >= 1 and phase != "wettkampf":
             # Studio-Core: an einem Studio-Tag (Pull bevorzugt), direkt hinter der Einheit
             gym_days = [d for d in list(pull_days) + list(push_days) if not ctxs[d].no_core]
-            if gym_days and want_core >= 1:
-                core_gym_day = gym_days[0]
             # Core zu Hause: Tag ohne Studio und ohne harte Einheit
             cands = [i for i in pool if i not in gym_start and i not in hard_days and not ctxs[i].no_core and level[i] >= 0.7]
-            core_home_day = choose("core_home", cands, 12, self.slot_core)
+            # Regel: die beiden Core-Einheiten liegen mindestens 3 Tage auseinander (Bauch/Rumpf brauchen Erholung), sonst 2 Tage
+            core_gym_day = None
+            for min_gap in (3, 2, 0):
+                for gd in gym_days:
+                    near = [c for c in cands if abs(c - gd) >= min_gap]
+                    if near:
+                        core_gym_day, core_home_day = gd, choose("core_home", near, 12, self.slot_core)
+                        break
+                if core_gym_day is not None and core_home_day is not None:
+                    break
+            if core_gym_day is None and gym_days:
+                core_gym_day = gym_days[0]
+            if core_home_day is None:
+                core_home_day = choose("core_home", cands, 12, self.slot_core)
             if want_core == 1 and core_home_day is not None:
                 core_gym_day = None
 
@@ -662,6 +673,91 @@ class AllrounderPlanner(pl.Planner):
                                     f"10 min Laufband, {incline} % Steigung, {back_speed} km/h rückwärts (Handlauf nur leicht berühren) – schont das Knie und kräftigt die Oberschenkel",
                                     10, ex, gym_end):
                             n_back += 1
+
+
+        # ---------------------------------------------------------------- Begruendung je Einheit ("Warum heute?")
+        def prev_date(kind, i):
+            ds = [dates[k] for k in {"Push": push_days, "Pull": pull_days, "Legs": [legs_day] if legs_day is not None else []}[kind] if k < i]
+            if carry.get(kind):
+                try:
+                    ds.append(pl.parse_date(carry[kind]))
+                except Exception:
+                    pass
+            return max(ds) if ds else None
+
+        def nth(kind, i):
+            days_ = sorted({"Push": push_days, "Pull": pull_days}[kind])
+            return days_.index(i) + 1 if i in days_ else 1
+
+        def time_reason(i, name, start, detail):
+            c = ctxs[i]
+            if start is None:
+                return ""
+            if "auf dem Laufband im Studio" in detail:
+                return "Zeit: direkt nach der Schicht auf dem Laufband im Studio, danach das Krafttraining."
+            if name in ("Push", "Pull", "Schweres Beintraining"):
+                if "direkt vor der Schicht" in detail:
+                    return "Zeit: Spätschicht – deshalb das Studio direkt vor der Schicht."
+                if "direkt nach der Schicht" in detail:
+                    return "Zeit: direkt nach der Schicht im Studio (alles nach der Arbeit)."
+                return "Zeit: freier Tag, passt hinter die anderen Einheiten."
+            if name.startswith("Rad Zone") and c.shift_end is not None and start >= c.shift_end:
+                return "Zeit: nach der Schicht und dem Krafttraining, zu Hause."
+            if name.startswith("Rad Zone") and start < 10 * 60 and c.shift_start is not None:
+                return "Zeit: früh und nüchtern, bevor die Fahrt zur Schicht beginnt."
+            if name.startswith("Rad Zone") and start < 10 * 60:
+                return "Zeit: früh am Morgen, nüchtern."
+            if name in ("Zone-2-Lauf", "Langer Lauf", "VO2max-Intervalle") and c.shift_start is not None and start < c.shift_start - 60:
+                return "Zeit: vor der Schicht – der Lauf kommt immer vor dem Krafttraining."
+            if name in ("Zone-2-Lauf", "Langer Lauf", "VO2max-Intervalle") and c.shift_end is not None and start > c.shift_end:
+                return "Zeit: nach der Schicht, weil der Morgen nicht reicht."
+            return ""
+
+        for i in range(n):
+            for entry in placed[i]:
+                u = entry["unit"]
+                if u.get("why"):
+                    continue
+                name, reason = u["name"], ""
+                if name == "Push" or name == "Pull":
+                    prev = prev_date(name, i)
+                    gap = (dates[i] - prev).days if prev else None
+                    k = nth(name, i)
+                    reason = (f"{k}. {name} dieser Woche" + (f", der letzte war vor {gap} Tagen (Regel: mindestens 3 freie Tage dazwischen)." if gap else ", ausgeruht."))
+                elif name == "Schweres Beintraining":
+                    reason = "Beine nur 1× pro Woche und nie direkt vor oder nach einer harten Einheit – so sind sie für Läufe und Intervalle frisch."
+                elif name == "Core (Studio)":
+                    gap = abs(core_home_day - i) if core_home_day is not None else None
+                    reason = "Direkt im Anschluss an die Kraft im Studio (Maschinen)" + (f"; das zweite Core (zu Hause) liegt {gap} Tage entfernt." if gap else ".")
+                elif name == "Core (zu Hause)":
+                    gap = abs(core_gym_day - i) if core_gym_day is not None else None
+                    reason = "Tag ohne Krafttraining und ohne harte Einheit" + (f", {gap} Tage vom Studio-Core entfernt (mindestens 2–3 Tage Abstand)." if gap else ".")
+                elif name == "Zone-2-Lauf":
+                    reason = "Lockerer Lauf (Zone 2): Grundlage für Marathon und Backyard. Laufen und Rad wechseln sich ab, das schont Sehnen und Gelenke."
+                elif name == "VO2max-Intervalle":
+                    reason = "Die harte Laufeinheit der Woche (nur 1×): trainiert die maximale Sauerstoffaufnahme. Vorher und nachher nur locker."
+                elif name == "Schwellentraining Rad":
+                    reason = "Zweite harte Einheit der Woche – auf dem Rad statt beim Laufen, das schont die Gelenke."
+                elif name == "Langer Lauf":
+                    reason = "Längster Lauf der Woche: baut die Ausdauer auf. Nie direkt nach den Intervallen."
+                elif name == "Backyard-Simulation":
+                    reason = "Rennspezifisch: mehrere Runden mit Pausen wie am Renntag, statt eines einzigen sehr langen Laufs (schont die Sehnen)."
+                elif name == "Rad Zone 2":
+                    reason = "Ausdauer-Grundlage an einem Tag ohne Lauf – Laufen und Rad wechseln sich ab."
+                elif name == "Rad Zone 1 (locker)":
+                    reason = "Wiedereinstieg nach der Krankheit: erst nur locker bewegen, damit der Körper nicht überfordert wird."
+                elif name.startswith("Nach dem Lauf"):
+                    reason = "Nach jedem Lauf: schützt Knie und Achillessehne."
+                elif name == "Rückwärtsgehen am Berg":
+                    reason = "Knieschonend, kräftigt die Oberschenkel; 2× pro Woche, direkt im Studio hinter dem Krafttraining."
+                elif name.startswith("Stairmaster"):
+                    reason = "Gelenkschonender Ausdauerreiz, 2× pro Woche, locker."
+                elif name.startswith("Sprungübungen"):
+                    reason = "Federnde Beine für bessere Laufökonomie; 2× pro Woche, nur nach lockeren Läufen."
+                elif name.startswith("Wettkampf") or name == "Lockeres Auslaufen" or name.startswith("Regeneration"):
+                    reason = ""
+                t = time_reason(i, name, entry.get("start"), u.get("detail", ""))
+                u["why"] = (reason + (" " if reason and t else "") + t).strip()
 
         # Uebergabe an die naechste Woche
         run_idx = [i for i in range(n) if roles[i] & {"easy_run", "long_run", "intervals"}]

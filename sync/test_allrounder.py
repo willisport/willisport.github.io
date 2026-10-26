@@ -580,5 +580,28 @@ class OrderOfTheDay(unittest.TestCase):
         self.assertLessEqual(bad_bike, 3)
 
 
+class CoreSpacingAndWhy(unittest.TestCase):
+    def test_core_sessions_are_spaced_and_every_unit_is_explained(self):
+        rnd = random.Random(5)
+        pairs = checked = 0
+        for _ in range(15):
+            start = date(2026, 11, 2)
+            shifts = {}
+            for k in range(6):
+                shifts.update(random_shifts(rnd, start + timedelta(days=7 * k)))
+            for m, w in plan({"shifts": shifts}, start, 6).items():
+                studio = [i for i, wd in enumerate(WD) if "Core (Studio)" in names(w, wd)]
+                home = [i for i, wd in enumerate(WD) if "Core (zu Hause)" in names(w, wd)]
+                if studio and home:
+                    pairs += 1
+                    self.assertGreaterEqual(abs(studio[0] - home[0]), 2, (m, studio, home))
+                for _, u in all_units(w):
+                    if not u["name"].startswith(("Wettkampf", "Lockeres", "Regeneration")):
+                        checked += 1
+                        self.assertTrue(u.get("why"), u["name"])
+        self.assertGreater(pairs, 20)
+        self.assertGreater(checked, 500)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

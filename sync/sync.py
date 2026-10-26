@@ -227,6 +227,7 @@ def build_day(plan_day: dict, date: datetime, activities: list, today: datetime,
             **({"keySession": True} if pu.get("keySession") else {}),
             **({"plannedDurationMin": pu["plannedDurationMin"]} if pu.get("plannedDurationMin") else {}),
             **({"planLabel": pu["planLabel"]} if pu.get("planLabel") else {}),
+            **({"why": pu["why"]} if pu.get("why") else {}),
             **({"exercises": pu["exercises"]} if pu.get("exercises") else {}),
         })
     out = {"date": date_str, "weekday": plan_day["weekday"], "focus": plan_day["focus"], "units": units}
