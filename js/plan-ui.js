@@ -311,6 +311,7 @@ function renderDienstplan() {
             <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
               <input type="date" id="dp-set-brace-date" class="text-input" value="${escapeHtml((st.bRace || {}).date || "")}" style="max-width:160px;" />
               <input type="text" id="dp-set-brace-name" class="text-input" placeholder="Name" value="${escapeHtml((st.bRace || {}).name || "")}" style="max-width:200px;" />
+              <input type="time" id="dp-set-brace-start" class="text-input" title="Startzeit" value="${escapeHtml((st.bRace || {}).start || "")}" style="max-width:110px;" />
               <input type="number" id="dp-set-brace-km" class="text-input" placeholder="km" value="${escapeHtml((st.bRace || {}).km || "")}" style="max-width:90px;" />
             </div>
             <label class="card-note">Harte Einheiten (Intervalle, Schwelle, langer Lauf, schwere Beine) erst ab
@@ -452,7 +453,7 @@ function dpBindDienstplan(panel) {
       ref5kSec: (() => { const m = ($("dp-set-5k").value || "").trim().match(/^(\d{1,2}):(\d{2})$/); return m ? Number(m[1]) * 60 + Number(m[2]) : null; })(),
       miniSessions: $("dp-set-mini").checked,
       planMode: $("dp-set-mode").value, coreSessions: Number($("dp-set-core").value), gymOnLateShift: $("dp-set-gymlate").checked,
-      bRace: $("dp-set-brace-date").value ? { ...((dpSettings().bRace) || {}), date: $("dp-set-brace-date").value, name: ($("dp-set-brace-name").value || "Zwischenziel").trim(), km: Number($("dp-set-brace-km").value) || null } : null,
+      bRace: $("dp-set-brace-date").value ? { ...((dpSettings().bRace) || {}), date: $("dp-set-brace-date").value, name: ($("dp-set-brace-name").value || "Zwischenziel").trim(), start: $("dp-set-brace-start").value || null, km: Number($("dp-set-brace-km").value) || null } : null,
       hardFrom: $("dp-set-hardfrom").value || null, returnRamp: $("dp-set-fastramp").checked ? "fast" : "normal",
       includeLongRide: $("dp-set-longride").checked, includeLegStabi: $("dp-set-stabi").checked, includeLegSupersets: $("dp-set-super").checked,
     };

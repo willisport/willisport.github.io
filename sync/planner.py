@@ -1266,11 +1266,15 @@ def generate_week(monday: date, inputs: dict, today: date, template_library: dic
     for i, ctx in enumerate(ctxs):
         if b_date is not None and ctx.date == b_date:
             bkm = b.get("km")
+            try:
+                b_start = hm_to_min(b["start"]) if b.get("start") else None
+            except Exception:
+                b_start = None
             placed[i] = [{"unit": mk_unit(f"Wettkampf: {(b.get('name') or 'Zwischenziel').strip()}", "lauf", "pflicht",
-                                          (b.get("detail") or "") + " · bewusst langsamer starten als es sich gut anfühlt (Zone 2), keine Zeit „sparen“ durch Tempo · direkt nach jeder Runde essen (ca. 30–60 g Kohlenhydrate pro Stunde, nur Bekanntes), 300–600 ml trinken nach Durst, Koffein erst später",
+                                          (f"Start {b['start']} Uhr · " if b_start is not None else "") + (b.get("detail") or "") + " · bewusst langsamer starten als es sich gut anfühlt (Zone 2), keine Zeit „sparen“ durch Tempo · direkt nach jeder Runde essen (ca. 30–60 g Kohlenhydrate pro Stunde, nur Bekanntes), 300–600 ml trinken nach Durst, Koffein erst später",
                                           int(b.get("durationMin") or 0), keySession=True,
                                           matchHint={"activityTypes": ["running"], "minDistanceKm": int(max(5, (bkm or 10) * 0.6))}),
-                          "start": None, "dur": int(b.get("durationMin") or 0)}]
+                          "start": b_start, "dur": int(b.get("durationMin") or 0)}]
             roles[i] = {"race"}
             run_km += float(bkm or 0)
         elif b_date is not None and ctx.date == b_date + timedelta(days=1):
