@@ -231,6 +231,7 @@ def normalize_inputs(raw: dict | None) -> dict:
                 "end": ev.get("end") or None,
                 "travelMin": ev.get("travelMin"),
                 "note": ev.get("note") or "",
+                "load": "hard" if ev.get("load") == "hard" else None,     # koerperlich harter Termin (z. B. Les-Mills-Kurse): kein Studio-Kraft/Beine/Core am Tag
             }
             if e["start"]:
                 hm_to_min(e["start"])
@@ -310,7 +311,7 @@ class DayCtx:
         self.return_: int | None = None
         self.focus_prefix = ""
         self.sick_return_level = None   # None | "rest" | "easy" | float Faktor
-        self.no_run = self.no_hard = self.no_legs = self.no_core = self.no_pull = self.bike_easy = False
+        self.no_run = self.no_hard = self.no_legs = self.no_core = self.no_pull = self.bike_easy = self.no_gym = False
         self.injury_label = None
         self.shift_start: int | None = None
         self.shift_end: int | None = None
@@ -373,11 +374,18 @@ def build_day_contexts(monday: date, inputs: dict, today: date) -> list[DayCtx]:
     inj_until = inj_to or ((max(today, inj_from) + timedelta(days=7 if inj_spec['run'] else 2)) if inj_from else None)
     ret_to, ret_len = recovery_info(inputs)
 
+    load_dates = {ev["date"] for ev in inputs["events"] if ev.get("load") == "hard"}
+
     ctxs = []
     for i in range(7):
         d = monday + timedelta(days=i)
         ctx = DayCtx(d)
         ds = iso(d)
+        if ds in load_dates:
+            ctx.no_hard = ctx.no_legs = ctx.no_core = ctx.no_gym = True
+            ctx.focus_prefix += "Harter Kurstag (kein Kraft/Beine/Core extra) · "
+        elif iso(d - timedelta(days=1)) in load_dates:
+            ctx.no_legs = True                      # Beine sind nach den Kursen noch muede
 
         for sh in inputs["shifts"].get(ds, []):
             s, e = hm_to_min(sh["start"]), hm_to_min(sh["end"])

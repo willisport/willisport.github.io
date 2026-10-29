@@ -121,7 +121,7 @@ class AllrounderPlanner(pl.Planner):
             usable = i in pool or (allow_easy and (i in forced or fast_ramp) and ctxs[i].kind != "krank")
             lv = 1.0 if fast_ramp else level[i]
             return (usable and lv >= min_level and (gym_late_ok or not is_late(i) or i in forced)
-                    and gym_slot(i, dur) is not None)
+                    and not ctxs[i].no_gym and gym_slot(i, dur) is not None)
 
         # ---------------------------------------------------------------- Auswahlhelfer
         def choose(key, cands, dur, slot_fn, penalty=None):

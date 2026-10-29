@@ -436,6 +436,26 @@ class ForcedGymDay(unittest.TestCase):
         self.assertTrue(wall["why"])
 
 
+class HardCourseDays(unittest.TestCase):
+    """Les-Mills-Kurse aus der Ausbildung (Termin mit load=hard): an dem Tag kein Studio-Kraft/Beine/Core, am Folgetag keine schweren Beine."""
+    MON = date(2026, 11, 2)
+
+    def week(self, load):
+        ev = [{"date": "2026-11-04", "title": "Kurse", "kind": "schule", "start": "17:00", "end": "21:00", "travelMin": 0, "load": load},
+              {"date": "2026-11-09", "title": "Kurse", "kind": "schule", "start": "17:00", "end": "19:30", "travelMin": 0, "load": load}]
+        raw = {"events": ev, "shifts": {"2026-11-03": [{"start": "16:00", "end": "22:00"}], "2026-11-05": [{"start": "16:00", "end": "22:00"}]}}
+        return pl.generate_plan(raw, self.MON, self.MON + timedelta(days=7), date(2026, 11, 1))
+
+    def test_no_strength_core_or_legs_on_course_day_and_no_legs_next_day(self):
+        weeks = self.week("hard")
+        w1, w2 = weeks["2026-11-02"], weeks["2026-11-09"]
+        for wd in ("Mittwoch",):
+            self.assertFalse([n for n in names(w1, wd) if n in GYM_NAMES or n.startswith("Core")], names(w1, wd))
+        self.assertNotIn("Schweres Beintraining", names(w1, "Donnerstag"))
+        self.assertFalse([n for n in names(w2, "Montag") if n in GYM_NAMES or n.startswith("Core")], names(w2, "Montag"))
+        self.assertNotIn("Schweres Beintraining", names(w2, "Dienstag"))
+
+
 class PushPullAlternate(unittest.TestCase):
     def test_push_and_pull_alternate_across_weeks(self):
         weeks = plan(start=date(2026, 11, 23), weeks=4)
