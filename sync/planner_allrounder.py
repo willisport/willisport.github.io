@@ -443,9 +443,9 @@ class AllrounderPlanner(pl.Planner):
         want_core = int(st.get("coreSessions", 2) or 0)
         if want_core >= 1 and phase != "wettkampf":
             # Studio-Core: an einem Studio-Tag (Pull bevorzugt), direkt hinter der Einheit
-            gym_days = [d for d in list(pull_days) + list(push_days) if not ctxs[d].no_core]
+            gym_days = [d for d in list(pull_days) + list(push_days) if not ctxs[d].no_core and dates[d] >= today]    # nie auf einen vergangenen Tag
             # Core zu Hause: Tag ohne Studio und ohne harte Einheit
-            cands = [i for i in pool if i not in gym_start and i not in hard_days and not ctxs[i].no_core and level[i] >= 0.7]
+            cands = [i for i in pool if i not in gym_start and i not in hard_days and not ctxs[i].no_core and level[i] >= 0.7 and dates[i] >= today]
             # Regel: die beiden Core-Einheiten liegen mindestens 3 Tage auseinander (Bauch/Rumpf brauchen Erholung), sonst 2 Tage
             core_gym_day = None
             for min_gap in (3, 2, 0):
