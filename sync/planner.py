@@ -60,6 +60,7 @@ DEFAULT_SETTINGS = {
     "miniStart": "2026-10-26",  # ab dieser Woche steigern sich Laufband-Steigung und Wandsitzen-Dauer
     "miniSessions": True,       # kleine Zusatzreize (Wandsitzen/Waden nach dem Lauf, Rueckwaertsgehen, Stairmaster, Spruenge) - je Woche begrenzt
     "gymForce": {},             # ausdruecklich gewuenschte Studio-Tage {"2026-10-27": "Push"} - gelten auch an Spaetschicht-/Wiedereinstiegstagen
+    "wallSitAfterBike": [],     # Tage ohne Lauf, an denen Wandsitzen + Waden stattdessen direkt nach dem Rad kommen, z. B. ["2026-10-29"]
     "coreSessions": 2,          # Core pro Woche (eine im Studio an Maschinen, eine zu Hause) - optional
     "runScalePct": 100,         # Regler fuer den Laufumfang (Z2- und langer Lauf), 50-130 %
     "longRunMaxKm": 32,         # Obergrenze fuer den langen Lauf (Marathon-Aufbau)

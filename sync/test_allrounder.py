@@ -424,6 +424,17 @@ class ForcedGymDay(unittest.TestCase):
         w = self.week({"settings": {"gymForce": {"2026-10-24": "Push", "2026-10-25": "Pull"}}})   # Tage liegen nicht in der Woche
         self.assertTrue(day_of(w, "Push"))
 
+    def test_pull_wish_moves_pull_and_wall_sit_follows_the_bike(self):
+        s = {"gymForce": {"2026-10-27": "Push", "2026-10-30": "Pull"}, "wallSitAfterBike": ["2026-10-29"]}
+        w = self.week({"settings": s})
+        self.assertIn("Pull", names(w, "Freitag"))
+        self.assertNotIn("Pull", names(w, "Mittwoch"))
+        thu = w["days"]["Donnerstag"]["units"]
+        bike = next(u for u in thu if u["name"].startswith("Rad Zone"))
+        wall = next(u for u in thu if u["name"] == "Nach dem Rad: Wandsitzen + Waden")
+        self.assertLess(hm_in(bike["detail"]), hm_in(wall["detail"]))
+        self.assertTrue(wall["why"])
+
 
 class PushPullAlternate(unittest.TestCase):
     def test_push_and_pull_alternate_across_weeks(self):

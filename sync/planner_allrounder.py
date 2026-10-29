@@ -642,6 +642,14 @@ class AllrounderPlanner(pl.Planner):
                     add_mini(i, "Nach dem Lauf: Wandsitzen + Waden",
                              f"2× {wall_s} s Wandsitzen + 2× {calf_reps} langsame Wadenheben – Knie und Achillessehne stabilisieren",
                              5, ex, run_end)
+                elif pl.iso(dates[i]) in (st.get("wallSitAfterBike") or []):
+                    bike_end = max([p["start"] + p["dur"] for p in placed[i] if p["unit"]["name"].startswith("Rad Zone") and p["start"] is not None] or [0]) or None
+                    if bike_end:                                     # ausdruecklich gewuenscht: Wandsitzen/Waden statt nach dem Lauf direkt nach dem Rad
+                        ex = [{"name": "Wandsitzen (Knie 90°, Rücken an der Wand)", "sets": 2, "reps": f"{wall_s} s", "rest": "30 s"},
+                              {"name": "Wadenheben auf der Stufe, 3 s langsam absenken", "sets": 2, "reps": str(calf_reps), "rest": "30 s"}]
+                        add_mini(i, "Nach dem Rad: Wandsitzen + Waden",
+                                 f"2× {wall_s} s Wandsitzen + 2× {calf_reps} langsame Wadenheben – Knie und Achillessehne stabilisieren",
+                                 5, ex, bike_end)
                 # 2) Sprungübungen: nur wenn harte Einheiten erlaubt sind, nicht in der Rennwoche, max. 2x
                 if (run_end is not None and not legs_today and not near_race and n_plyo < 2 and not ctxs[i].no_hard
                         and (level[i] >= 0.85) and "Zone-2-Lauf" in day_names):
@@ -748,6 +756,8 @@ class AllrounderPlanner(pl.Planner):
                     reason = "Wiedereinstieg nach der Krankheit: erst nur locker bewegen, damit der Körper nicht überfordert wird."
                 elif name.startswith("Nach dem Lauf"):
                     reason = "Nach jedem Lauf: schützt Knie und Achillessehne."
+                elif name.startswith("Nach dem Rad"):
+                    reason = "Auf deinen Wunsch hierher gelegt, weil die Einheit nach dem Lauf diese Woche ausfällt: schützt Knie und Achillessehne."
                 elif name == "Rückwärtsgehen am Berg":
                     reason = "Knieschonend, kräftigt die Oberschenkel; 2× pro Woche, direkt im Studio hinter dem Krafttraining."
                 elif name.startswith("Stairmaster"):
