@@ -456,6 +456,28 @@ class HardCourseDays(unittest.TestCase):
         self.assertNotIn("Schweres Beintraining", names(w2, "Dienstag"))
 
 
+class RestDay(unittest.TestCase):
+    """Ausdruecklich gewuenschter Ruhetag: nichts geplant, der Rest der Woche bleibt regelkonform."""
+    TODAY = date(2026, 10, 30)
+    RAW = {"shifts": {"2026-10-31": [{"start": "08:00", "end": "14:00"}], "2026-11-01": [{"start": "10:00", "end": "16:00"}]},
+           "settings": {"gymForce": {"2026-10-27": "Push", "2026-10-30": "Pull"}, "restDays": ["2026-10-31"]}}
+
+    def week(self):
+        return pl.generate_plan(self.RAW, date(2026, 10, 26), date(2026, 10, 26), self.TODAY)["2026-10-26"]
+
+    def test_rest_day_has_no_units_and_says_so(self):
+        w = self.week()
+        self.assertEqual(w["days"]["Samstag"]["units"], [])
+        self.assertIn("Ruhetag", w["days"]["Samstag"]["focus"])
+        self.assertNotIn("Krank", w["days"]["Samstag"]["focus"])
+        self.assertNotIn("Krankheit", w.get("note", ""))
+
+    def test_other_days_unaffected_by_missing_rest(self):
+        raw = {**self.RAW, "settings": {**self.RAW["settings"], "restDays": []}}
+        w = pl.generate_plan(raw, date(2026, 10, 26), date(2026, 10, 26), self.TODAY)["2026-10-26"]
+        self.assertTrue(w["days"]["Samstag"]["units"])
+
+
 class PushPullAlternate(unittest.TestCase):
     def test_push_and_pull_alternate_across_weeks(self):
         weeks = plan(start=date(2026, 11, 23), weeks=4)

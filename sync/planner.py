@@ -60,6 +60,7 @@ DEFAULT_SETTINGS = {
     "miniStart": "2026-10-26",  # ab dieser Woche steigern sich Laufband-Steigung und Wandsitzen-Dauer
     "miniSessions": True,       # kleine Zusatzreize (Wandsitzen/Waden nach dem Lauf, Rueckwaertsgehen, Stairmaster, Spruenge) - je Woche begrenzt
     "gymForce": {},             # ausdruecklich gewuenschte Studio-Tage {"2026-10-27": "Push"} - gelten auch an Spaetschicht-/Wiedereinstiegstagen
+    "restDays": [],             # ausdruecklich gewuenschte Ruhetage, z. B. ["2026-10-31"]: an dem Tag ist nichts geplant, der Rest der Woche wird neu verteilt
     "wallSitAfterBike": [],     # Tage ohne Lauf, an denen Wandsitzen + Waden stattdessen direkt nach dem Rad kommen, z. B. ["2026-10-29"]
     "coreSessions": 2,          # Core pro Woche (eine im Studio an Maschinen, eine zu Hause) - optional
     "runScalePct": 100,         # Regler fuer den Laufumfang (Z2- und langer Lauf), 50-130 %
@@ -312,6 +313,7 @@ class DayCtx:
         self.focus_prefix = ""
         self.sick_return_level = None   # None | "rest" | "easy" | float Faktor
         self.no_run = self.no_hard = self.no_legs = self.no_core = self.no_pull = self.bike_easy = self.no_gym = False
+        self.rest = False           # Ruhetag auf Wunsch (wird im Planer wie ein trainingsfreier Tag behandelt)
         self.injury_label = None
         self.shift_start: int | None = None
         self.shift_end: int | None = None
@@ -464,6 +466,10 @@ def build_day_contexts(monday: date, inputs: dict, today: date) -> list[DayCtx]:
         if is_sick:
             ctx.kind = "krank"
             ctx.agenda.append({"kind": "krank", "title": "Krank", "start": None, "end": None})
+        elif ds in (st.get("restDays") or []):
+            ctx.kind = "krank"                      # fuer den Planer: kein Training; angezeigt wird es als Ruhetag
+            ctx.rest = True
+            ctx.agenda.append({"kind": "frei", "title": "Ruhetag", "start": None, "end": None})
 
         # Verletzung / Beschwerden
         if inj_from and inj_from <= d <= inj_until and not is_sick:
@@ -1314,6 +1320,9 @@ def generate_week(monday: date, inputs: dict, today: date, template_library: dic
         focus = ctx.focus_prefix
         if roles[i] == {"race"}:
             focus += "WETTKAMPFTAG"
+        elif ctx.kind == "krank" and ctx.rest:
+            focus += "Ruhetag – Erholung, kein Training"
+            units = []
         elif ctx.kind == "krank":
             focus += "Krank – Training pausiert"
             if ctx.date == today:
@@ -1357,14 +1366,14 @@ def generate_week(monday: date, inputs: dict, today: date, template_library: dic
     }
     label = phase_label(params)
     note_bits = []
-    if any(c.kind == "krank" for c in ctxs):
+    if any(c.kind == "krank" and not c.rest for c in ctxs):
         note_bits.append("Krankheit – Plan pausiert")
     inj_labels = sorted({c.injury_label for c in ctxs if c.injury_label})
     if inj_labels:
         note_bits.append("Beschwerden (" + ", ".join(inj_labels) + ") – Plan angepasst")
     if params["phase"] == "wettkampf":
         note_bits.append("Wettkampfwoche (Termin im Plan hinterlegt)")
-    if missing and not any(c.kind == "krank" for c in ctxs):
+    if missing and not any(c.kind == "krank" and not c.rest for c in ctxs):
         note_bits.append("keine Zeit für: " + ", ".join(missing))
     known = any(c.agenda for c in ctxs)
     if not known:
