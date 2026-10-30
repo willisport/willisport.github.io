@@ -25,6 +25,7 @@ function dpStage(mutator) {
   const o = loadOverrides();
   o.__plan = o.__plan || { version: 1 };
   mutator(o.__plan);
+  PLAN_LOCAL_CHANGE_AT = Date.now();
   saveOverrides(o, { push: false });
   DPUI.dirty = true;
   const bar = document.getElementById("dp-dirty-bar");

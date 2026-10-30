@@ -105,10 +105,23 @@ async function initOverridesFromServer() {
   catch { CACHED_OVERRIDES = {}; }
 }
 
+let PLAN_LOCAL_CHANGE_AT = 0;          // letzte Aenderung der Plan-Eingaben (__plan) auf DIESER Seite (applyPlanChange / dpStage)
+
 async function pushOverridesToServer(overrides) {
   if (typeof IS_HOSTED === "undefined" || !IS_HOSTED || typeof CURRENT_DEK === "undefined" || !CURRENT_DEK) return;
   if (!canEdit() || !OVERRIDES_SERVER_LOADED) return;
   try {
+    // Abhaken/Notiz/Verschieben aendern __plan nie. Eine laenger offene Seite hat aber einen aelteren __plan im Speicher (z. B. ohne
+    // Ruhetag/Dienstplan, die zwischendurch ausserhalb der Seite geaendert wurden) und wuerde ihn sonst zurueckschreiben: vorher den Serverstand holen.
+    if (Date.now() - PLAN_LOCAL_CHANGE_AT > 10 * 60 * 1000) {
+      try {
+        const server = await decryptDataFile(CURRENT_DEK, await fetchFreshFile("data/overrides.enc.json"));
+        if (server && server.__plan) {
+          overrides.__plan = server.__plan;
+          try { localStorage.setItem(OVERRIDES_KEY, JSON.stringify(overrides)); } catch { /* ignore */ }
+        }
+      } catch { /* Serverstand nicht lesbar -> wie bisher */ }
+    }
     const encrypted = await encryptJson(CURRENT_DEK, overrides);
     await fetch(HOSTED_SYNC_WORKER_URL, {
       method: "POST",
