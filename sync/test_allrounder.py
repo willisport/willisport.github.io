@@ -451,6 +451,7 @@ class HardCourseDays(unittest.TestCase):
         w1, w2 = weeks["2026-11-02"], weeks["2026-11-09"]
         for wd in ("Mittwoch",):
             self.assertFalse([n for n in names(w1, wd) if n in GYM_NAMES or n.startswith("Core")], names(w1, wd))
+        self.assertFalse([n for n in names(w1, "Mittwoch") if n.startswith("Zone-2-Lauf") or n.startswith("VO2")], names(w1, "Mittwoch"))
         self.assertNotIn("Schweres Beintraining", names(w1, "Donnerstag"))
         self.assertFalse([n for n in names(w2, "Montag") if n in GYM_NAMES or n.startswith("Core")], names(w2, "Montag"))
         self.assertNotIn("Schweres Beintraining", names(w2, "Dienstag"))

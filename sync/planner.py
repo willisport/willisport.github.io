@@ -384,8 +384,8 @@ def build_day_contexts(monday: date, inputs: dict, today: date) -> list[DayCtx]:
         ctx = DayCtx(d)
         ds = iso(d)
         if ds in load_dates:
-            ctx.no_hard = ctx.no_legs = ctx.no_core = ctx.no_gym = True
-            ctx.focus_prefix += "Harter Kurstag (kein Kraft/Beine/Core extra) · "
+            ctx.no_hard = ctx.no_legs = ctx.no_core = ctx.no_gym = ctx.no_run = True     # die Kurse sind die Einheit des Tages; nur locker Rad davor
+            ctx.focus_prefix += "Harter Kurstag (kein Kraft/Beine/Core/Lauf extra) · "
         elif iso(d - timedelta(days=1)) in load_dates:
             ctx.no_legs = True                      # Beine sind nach den Kursen noch muede
 
