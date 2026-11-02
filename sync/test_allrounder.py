@@ -506,6 +506,17 @@ class LegsAndDayWishes(unittest.TestCase):
         self.assertEqual(len([u for u in w["days"]["Montag"]["units"] if u["name"].startswith("Rückwärts")]), 1)
         self.assertEqual(len([u for u in w["days"]["Montag"]["units"] if u["name"].startswith("Stairmaster")]), 1)
 
+    def test_run_wish_and_departure_text_hold_after_illness_ramp(self):
+        raw = {"sick": {"from": "2026-10-05", "to": "2026-10-26"}, "settings": {**self.SETTINGS, "returnRamp": "fast"},
+               "shifts": {d: [{"start": s, "end": e}] for d, (s, e) in self.SHIFTS.items()},
+               "events": [{"date": "2026-11-03", "title": "Webinar", "kind": "schule", "start": "10:00", "end": "11:30", "travelMin": 0}]}
+        w = pl.generate_plan(raw, date(2026, 11, 2), date(2026, 11, 2), self.TODAY)["2026-11-02"]
+        self.assertIn("6 km", self.unit(w, "Montag", "Zone-2-Lauf")["detail"])
+        pull_start = hm_in(self.unit(w, "Dienstag", "Pull")["detail"]) if "Pull" in names(w, "Dienstag") else None
+        if pull_start:
+            m = re.search(r"Abfahrt (\d{2}):(\d{2})", w["days"]["Dienstag"]["focus"])
+            self.assertLessEqual(int(m.group(1)) * 60 + int(m.group(2)), pull_start - 60)
+
     def test_leg_accessory_max_twice_and_never_next_to_heavy_legs_or_hard_run(self):
         w = self.week()
         acc = [wd for wd in WD if "Beine ergänzend" in names(w, wd)]

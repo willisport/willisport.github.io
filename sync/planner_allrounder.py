@@ -464,6 +464,10 @@ class AllrounderPlanner(pl.Planner):
                     c.allocate(new_dep, c.depart - new_dep)
                     c.focus_prefix = re.sub(r"Abfahrt \d{2}:\d{2}", f"Abfahrt {min_to_hm(new_dep)} (Studio vor der Schicht)", c.focus_prefix)
                     c.depart = new_dep
+                else:                                                   # Abfahrt war durch einen frueheren Termin schon frueher blockiert: nur den Hinweistext korrigieren
+                    m = re.search(r"Abfahrt (\d{2}):(\d{2})", c.focus_prefix)
+                    if m and new_dep < int(m.group(1)) * 60 + int(m.group(2)):
+                        c.focus_prefix = re.sub(r"Abfahrt \d{2}:\d{2}", f"Abfahrt {min_to_hm(new_dep)} (Studio vor der Schicht)", c.focus_prefix)
             if at_work(d) and gym_start[d] is not None:
                 c = ctxs[d]
                 extra = (gym_start[d] + block + c.travel) - c.return_
@@ -566,6 +570,10 @@ class AllrounderPlanner(pl.Planner):
                                   dur - 10, keySession=True, matchHint={"activityTypes": ["running"]}), start, dur)
             if "easy_run" in r:
                 km = easy_km[i] if lvl >= 1 else max(4.0, round(easy_km[i] * lvl * 2) / 2)
+                try:
+                    km = float((st.get("runKmDay") or {}).get(pl.iso(dates[i])) or km)        # ausdruecklich gewuenschte Laenge gilt auch im Wiedereinstieg
+                except Exception:
+                    pass
                 dur = run_minutes(km) + 10
                 start = self.slot_run(ctx, dur, after=(last_end[i] + 10) if last_end[i] else None)
                 gs = gym_start.get(i)
