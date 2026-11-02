@@ -418,22 +418,55 @@ class AllrounderPlanner(pl.Planner):
             for ci in easy_days:
                 roles[ci].add("easy_run")
         easy_km = {easy_days[k]: (z2_km if k == 0 else max(4.0, round(z2_km * 0.7 * 2) / 2)) for k in range(len(easy_days))}
+        for ci in easy_days:
+            try:
+                want_km = (st.get("runKmDay") or {}).get(pl.iso(dates[ci]))
+                if want_km:
+                    easy_km[ci] = float(want_km)                    # ausdruecklich gewuenschte Lauflaenge fuer diesen Tag
+            except Exception:
+                pass
 
         # ---------------------------------------------------------------- 7. Studio direkt nach der Schicht
         gym_start = {}
+        # Beine ergaenzend: knieschonende Zusatz-Beinkraft nach Push/Pull, max. 2x pro Woche, nie direkt vor/nach schweren Beinen oder vor harten Laeufen
+        acc_dur = int((lib.get("legAccessory") or {}).get("durationMin") or 25)
+        acc_days: set = set()
+        if st.get("legAccessory") and phase == "aufbau" and not light_week and not params.get("skipHeavy"):
+            taken: list[int] = []
+            for d in sorted(list(push_days) + list(pull_days)):
+                ok = (not ctxs[d].no_legs and not ctxs[d].no_gym and dates[d] >= today and level[d] >= 0.85
+                      and (legs_day is None or abs(d - legs_day) > 1)
+                      and (d + 1) not in hard_days and all(abs(d - t) >= 2 for t in taken))
+                gap = carry_gap("Legs", d)
+                if ok and (gap is None or gap >= 2):
+                    taken.append(d)
+                    acc_days.add(d)
+                    if len(taken) >= 2:
+                        break
+        pre_minis = {pl.parse_date(k): v for k, v in (st.get("preMini") or {}).items() if isinstance(v, list)}
+        pre_durs = {"Rückwärtsgehen am Berg": 10, "Stairmaster (15 min)": 15}
+        premini_total: dict[int, int] = {}
         for d in list(push_days) + list(pull_days) + ([legs_day] if legs_day is not None else []):
             kind = "Push" if d in push_days else ("Pull" if d in pull_days else "Legs")
-            gym_start[d] = gym_slot(d, gym_dur[kind])
+            block = gym_dur[kind] + (acc_dur + 5 if d in acc_days else 0)
+            pre_total = 0
+            if dates[d] in pre_minis and kind in ("Push", "Pull"):
+                names_ = [n for n in pre_minis[dates[d]] if n in pre_durs]
+                pre_total = sum(pre_durs[n] for n in names_) + 5 * len(names_)
+            gym_start[d] = gym_slot(d, block + pre_total)
+            if gym_start[d] is not None and pre_total:
+                gym_start[d] += pre_total                               # Krafttraining beginnt nach den Mini-Einheiten
+                premini_total[d] = pre_total
             if is_late(d) and gym_start[d] is not None:
                 c = ctxs[d]
-                new_dep = gym_start[d] - c.travel - 10                   # frueher losfahren, damit das Studio vor der Schicht passt
+                new_dep = gym_start[d] - premini_total.get(d, 0) - c.travel - 10                   # frueher losfahren, damit das Studio vor der Schicht passt
                 if c.depart is not None and new_dep < c.depart:
                     c.allocate(new_dep, c.depart - new_dep)
                     c.focus_prefix = re.sub(r"Abfahrt \d{2}:\d{2}", f"Abfahrt {min_to_hm(new_dep)} (Studio vor der Schicht)", c.focus_prefix)
                     c.depart = new_dep
             if at_work(d) and gym_start[d] is not None:
                 c = ctxs[d]
-                extra = (gym_start[d] + gym_dur[kind] + c.travel) - c.return_
+                extra = (gym_start[d] + block + c.travel) - c.return_
                 if extra > 0:
                     c.allocate(c.return_, extra)       # Heimweg verschiebt sich um die Studio-Zeit
 
@@ -575,12 +608,22 @@ class AllrounderPlanner(pl.Planner):
                 commit(i, mk_unit(name, "kraft", "pflicht", f"{detail}{where}{tsuf(start)}", dur,
                                   exercises=exercises_for(lib, libkey), matchHint={"activityTypes": ["strength_training"]}),
                        start, dur)
+                core_after = start + dur + 5
+                if i in acc_days and kind in ("Push", "Pull") and start + dur + 5 + acc_dur <= st["dayEndMin"] + 30:
+                    la = lib.get("legAccessory") or {}
+                    la_detail = la.get("detail") or "Beine ergänzend"
+                    if lighter:
+                        la_detail += " · leichter: 1 Satz weniger je Übung"
+                    commit(i, mk_unit("Beine ergänzend", "kraft", "pflicht", f"{la_detail}{where}{tsuf(start + dur + 5)}", acc_dur,
+                                      exercises=exercises_for(lib, "legAccessory"), matchHint={"activityTypes": ["strength_training"]}),
+                           start + dur + 5, acc_dur)
+                    core_after = start + dur + 5 + acc_dur + 5
                 if i == core_gym_day:
                     cg = lib.get("coreGym") or {}
                     cdur = int(cg.get("durationMin") or 15)
-                    commit(i, mk_unit("Core (Studio)", "core", "bonus", f"{cg.get('detail') or '15 min'} · optional{' · im Studio direkt nach der Schicht' if at_work(i) else ''}{tsuf(start + dur + 5)}", cdur,
+                    commit(i, mk_unit("Core (Studio)", "core", "bonus", f"{cg.get('detail') or '15 min'} · optional{' · im Studio direkt nach der Schicht' if at_work(i) else ''}{tsuf(core_after)}", cdur,
                                       exercises=exercises_for(lib, "coreGym"),
-                                      matchHint={"activityTypes": ["strength_training", "cardio"]}), start + dur + 5, cdur)
+                                      matchHint={"activityTypes": ["strength_training", "cardio"]}), core_after, cdur)
             if i == core_home_day:
                 ch = lib.get("core") or {}
                 cdur = int(ch.get("durationMin") or 12)
@@ -628,6 +671,28 @@ class AllrounderPlanner(pl.Planner):
                                   matchHint={"activityTypes": ["strength_training", "cardio", "walking", "running"]}), start, dur)
                 return True
 
+            premini_done: set = set()
+            for i, total in premini_total.items():
+                if ctxs[i].kind == "krank" or i not in gym_start or gym_start[i] is None:
+                    continue
+                t = gym_start[i] - total
+                for name_ in pre_minis[dates[i]]:
+                    if name_ == "Rückwärtsgehen am Berg":
+                        ex = [{"name": f"Rückwärtsgehen, Laufband {incline} % Steigung, {back_speed} km/h", "sets": 1, "reps": "10 min", "rest": "-"}]
+                        commit(i, mk_unit(name_, "core", "bonus",
+                                          f"10 min Laufband, {incline} % Steigung, {back_speed} km/h rückwärts (Handlauf nur leicht berühren) – schont das Knie und kräftigt die Oberschenkel · optional · im Studio vor dem Krafttraining{tsuf(t)}",
+                                          10, exercises=ex, matchHint={"activityTypes": ["strength_training", "cardio", "walking", "running"]}), t, 10)
+                        t += 15
+                        n_back += 1
+                    elif name_ == "Stairmaster (15 min)":
+                        ex = [{"name": "Stairmaster, Puls ca. 125–140, du kannst noch sprechen", "sets": 1, "reps": "15 min", "rest": "-"}]
+                        commit(i, mk_unit(name_, "core", "bonus",
+                                          f"15 min gleichmäßig, Puls ca. 125–140 (du kannst noch sprechen), nicht am Geländer abstützen – gelenkschonendes Ausdauerplus · optional · im Studio vor dem Krafttraining{tsuf(t)}",
+                                          15, exercises=ex, matchHint={"activityTypes": ["strength_training", "cardio", "walking", "running"]}), t, 15)
+                        t += 20
+                        n_stairs += 1
+                premini_done.add(i)
+
             for i in range(n):
                 if ctxs[i].kind == "krank" or roles[i] == {"race"} or "race" in roles[i]:
                     continue
@@ -659,7 +724,9 @@ class AllrounderPlanner(pl.Planner):
                                 max(e for e in [entry_end(i, ("Nach dem Lauf: Wandsitzen + Waden",)), run_end] if e)):
                         n_plyo += 1
                 # 3) Studio-Tage (Push/Pull): Rückwärtsgehen am Berg bzw. Stairmaster hinter der Kraft
-                gym_end = entry_end(i, gym_names + ("Core (Studio)",)) if entry_end(i, gym_names) is not None else None
+                gym_end = entry_end(i, gym_names + ("Beine ergänzend", "Core (Studio)")) if entry_end(i, gym_names) is not None else None
+                if i in premini_done:
+                    gym_end = None                                   # Rückwärtsgehen/Stairmaster liegen heute schon vor dem Krafttraining
                 if gym_end is None and at_work(i) and ctxs[i].shift_end is not None:
                     gym_end = ctxs[i].shift_end + 15            # Arbeitsplatz = Studio: direkt nach der Fruehschicht auf Laufband/Stairmaster
                 if gym_end is not None and not near_race:
@@ -759,7 +826,10 @@ class AllrounderPlanner(pl.Planner):
                 elif name.startswith("Nach dem Rad"):
                     reason = "Auf deinen Wunsch hierher gelegt, weil die Einheit nach dem Lauf diese Woche ausfällt: schützt Knie und Achillessehne."
                 elif name == "Rückwärtsgehen am Berg":
-                    reason = "Knieschonend, kräftigt die Oberschenkel; 2× pro Woche, direkt im Studio hinter dem Krafttraining."
+                    reason = "Knieschonend, kräftigt die Oberschenkel; 2× pro Woche, im Studio direkt vor oder nach dem Krafttraining."
+                elif name == "Beine ergänzend":
+                    reason = ("Mehr Beinkraft für das Backyard-Ziel: Der Lauf selbst ist locker, begrenzt ist die Muskulatur. Knieschonende Übungen (Beinrückseite, Gesäß, Beinpresse "
+                              "mit begrenzter Beugung) direkt nach Push/Pull, höchstens 2× pro Woche und nie neben den schweren Beinen oder vor einem harten Lauf.")
                 elif name.startswith("Stairmaster"):
                     reason = "Gelenkschonender Ausdauerreiz, 2× pro Woche, locker."
                 elif name.startswith("Sprungübungen"):

@@ -479,6 +479,55 @@ class RestDay(unittest.TestCase):
         self.assertTrue(w["days"]["Samstag"]["units"])
 
 
+class LegsAndDayWishes(unittest.TestCase):
+    """Wunsch 2.11.: 6 km Lauf zu Hause, Rueckwaertsgehen + Stairmaster VOR dem Push, mehr Beinkraft, Rad 60 min."""
+    TODAY = date(2026, 11, 2)
+    SHIFTS = {"2026-11-02": ("16:00", "22:00"), "2026-11-03": ("16:00", "22:00"), "2026-11-05": ("16:00", "22:00"),
+              "2026-11-06": ("16:00", "22:00"), "2026-11-07": ("09:30", "15:30"), "2026-11-08": ("09:30", "15:30")}
+    SETTINGS = {"gymOnLateShift": True, "legAccessory": True, "bikeFixedMin": 60, "runDays": 4,
+                "runKmDay": {"2026-11-02": 6}, "preMini": {"2026-11-02": ["Rückwärtsgehen am Berg", "Stairmaster (15 min)"]}}
+
+    def week(self, settings=None):
+        raw = {"shifts": {d: [{"start": s, "end": e}] for d, (s, e) in self.SHIFTS.items()},
+               "settings": settings if settings is not None else self.SETTINGS}
+        return pl.generate_plan(raw, date(2026, 11, 2), date(2026, 11, 2), self.TODAY)["2026-11-02"]
+
+    def unit(self, w, wd, name):
+        return next(u for u in w["days"][wd]["units"] if u["name"] == name)
+
+    def test_monday_run_is_6_km_and_minis_come_before_push_in_order(self):
+        w = self.week()
+        self.assertIn("6 km", self.unit(w, "Montag", "Zone-2-Lauf")["detail"])
+        back = hm_in(self.unit(w, "Montag", "Rückwärtsgehen am Berg")["detail"])
+        stairs = hm_in(self.unit(w, "Montag", "Stairmaster (15 min)")["detail"])
+        push = hm_in(self.unit(w, "Montag", "Push")["detail"])
+        self.assertLess(back + 10, stairs + 1)
+        self.assertLess(stairs + 15, push + 1)
+        self.assertEqual(len([u for u in w["days"]["Montag"]["units"] if u["name"].startswith("Rückwärts")]), 1)
+        self.assertEqual(len([u for u in w["days"]["Montag"]["units"] if u["name"].startswith("Stairmaster")]), 1)
+
+    def test_leg_accessory_max_twice_and_never_next_to_heavy_legs_or_hard_run(self):
+        w = self.week()
+        acc = [wd for wd in WD if "Beine ergänzend" in names(w, wd)]
+        legs = [WD.index(wd) for wd in WD if "Schweres Beintraining" in names(w, wd)]
+        self.assertTrue(1 <= len(acc) <= 2, acc)
+        for wd in acc:
+            self.assertTrue(all(abs(WD.index(wd) - lg) > 1 for lg in legs), (acc, legs))
+            self.assertTrue(set(names(w, wd)) & {"Push", "Pull"})
+        self.assertNotIn("Beine ergänzend", names(w, "Montag"))        # Montag: Muskelkater-Tag/Minis, kein zweiter Reiz
+
+    def test_without_wishes_nothing_changes(self):
+        w = self.week({"gymOnLateShift": True})
+        self.assertFalse([wd for wd in WD if "Beine ergänzend" in names(w, wd)])
+        self.assertFalse([u for wd in WD for u in w["days"][wd]["units"] if "vor dem Krafttraining" in u["detail"]])
+
+    def test_bike_duration_fixed(self):
+        w = self.week()
+        bikes = [u for wd in WD for u in w["days"][wd]["units"] if u["name"] == "Rad Zone 2"]
+        self.assertTrue(bikes)
+        self.assertTrue(all("60 min" in u["detail"] for u in bikes), [u["detail"] for u in bikes])
+
+
 class PushPullAlternate(unittest.TestCase):
     def test_push_and_pull_alternate_across_weeks(self):
         weeks = plan(start=date(2026, 11, 23), weeks=4)

@@ -60,6 +60,10 @@ DEFAULT_SETTINGS = {
     "miniStart": "2026-10-26",  # ab dieser Woche steigern sich Laufband-Steigung und Wandsitzen-Dauer
     "miniSessions": True,       # kleine Zusatzreize (Wandsitzen/Waden nach dem Lauf, Rueckwaertsgehen, Stairmaster, Spruenge) - je Woche begrenzt
     "gymForce": {},             # ausdruecklich gewuenschte Studio-Tage {"2026-10-27": "Push"} - gelten auch an Spaetschicht-/Wiedereinstiegstagen
+    "runKmDay": {},             # Lauflaenge eines bestimmten Tages in km, z. B. {"2026-11-02": 6}
+    "preMini": {},              # Mini-Einheiten VOR dem Krafttraining an diesem Studio-Tag, z. B. {"2026-11-02": ["Rückwärtsgehen am Berg", "Stairmaster (15 min)"]}
+    "legAccessory": False,      # zusaetzliche knieschonende Beinkraft (Beine ergaenzend) an bis zu 2 Push-/Pull-Tagen pro Woche
+    "bikeFixedMin": None,       # feste Dauer fuer Rad Zone 2 in Minuten (sonst automatisch 45-60)
     "restDays": [],             # ausdruecklich gewuenschte Ruhetage, z. B. ["2026-10-31"]: an dem Tag ist nichts geplant, der Rest der Woche wird neu verteilt
     "wallSitAfterBike": [],     # Tage ohne Lauf, an denen Wandsitzen + Waden stattdessen direkt nach dem Rad kommen, z. B. ["2026-10-29"]
     "coreSessions": 2,          # Core pro Woche (eine im Studio an Maschinen, eine zu Hause) - optional
@@ -91,6 +95,12 @@ DEFAULT_LIBRARY = {
                                 {"name": "Adduktoren Außenseite", "sets": 2, "reps": "6–8", "rest": "3–4 min"},
                                 {"name": "Wadenheben", "sets": 2, "reps": "6–8", "rest": "3–4 min"},
                                 {"name": "Beinbeuger", "sets": 2, "reps": "6–8", "rest": "3–4 min"}]},
+    "legAccessory": {"name": "Beine ergänzend", "durationMin": 25,
+                     "detail": "Rumänisches Kreuzheben, Beinpresse, Beinbeuger, Hip Thrust · knieschonend, 3 Sätze, kontrolliert absenken",
+                     "exercises": [{"name": "Rumänisches Kreuzheben (Kurzhanteln)", "sets": 3, "reps": "10", "rest": "90 s"},
+                                   {"name": "Beinpresse (Knie höchstens 90°, 3 s absenken)", "sets": 3, "reps": "12", "rest": "90 s"},
+                                   {"name": "Beinbeuger (Maschine, 3 s absenken)", "sets": 3, "reps": "12", "rest": "60 s"},
+                                   {"name": "Hip Thrust", "sets": 3, "reps": "12", "rest": "60 s"}]},
     "legStabi": {"name": "Bein-Stabi", "durationMin": 20,
                  "detail": "Einbeinstand, Copenhagen Plank, Ausfallschritte, seitliches Beinheben",
                  "exercises": [{"name": "Einbeinstand", "sets": 3, "reps": "30–45 s", "rest": "30 s"},
@@ -716,6 +726,8 @@ def week_params(monday: date, inputs: dict, factor_override: float | None = None
     thr_min = int(round(thr_min * (0.7 if phase == "recovery" else 1.0) * min(1.0, taper_factor + 0.1)))
     thr_min = thr_min if thr_min >= 8 else 0
     bike_min = int(round(bike_min * (0.85 if phase == "recovery" else 1.0) / 5) * 5)
+    if st.get("bikeFixedMin"):
+        bike_min = max(20, min(120, int(st["bikeFixedMin"])))
     if phase in ("taper", "wettkampf", "erholung"):
         bike_min = min(bike_min, 45)
     if phase == "wettkampf" or (phase == "erholung" and factor < 0.6):
