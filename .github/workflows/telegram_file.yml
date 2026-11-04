@@ -1,0 +1,30 @@
+name: Telegram Datei senden
+
+on:
+  workflow_dispatch:
+    inputs:
+      path:
+        description: "Pfad zur verschluesselten Datei (data/outbox/...enc.json)"
+        required: true
+      caption:
+        description: "Beschriftung"
+        default: ""
+
+jobs:
+  send:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install requests cryptography
+      - name: Datei senden
+        working-directory: sync
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          DATA_ENCRYPTION_KEY: ${{ secrets.DATA_ENCRYPTION_KEY }}
+          FILE_PATH: ${{ inputs.path }}
+          CAPTION: ${{ inputs.caption }}
+        run: python send_file.py "../$FILE_PATH" "$CAPTION"
