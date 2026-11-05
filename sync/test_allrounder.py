@@ -532,6 +532,12 @@ class LegsAndDayWishes(unittest.TestCase):
         self.assertFalse([wd for wd in WD if "Beine ergänzend" in names(w, wd)])
         self.assertFalse([u for wd in WD for u in w["days"][wd]["units"] if "vor dem Krafttraining" in u["detail"]])
 
+    def test_no_legs_week_and_rest_day_are_respected(self):
+        w = self.week({**self.SETTINGS, "noLegsWeeks": ["2026-11-02"], "restDays": ["2026-11-07"]})
+        self.assertFalse([wd for wd in WD if "Schweres Beintraining" in names(w, wd)])
+        self.assertEqual(w["days"]["Samstag"]["units"], [])
+        self.assertIn("Ruhetag", w["days"]["Samstag"]["focus"])
+
     def test_bike_duration_fixed(self):
         w = self.week()
         bikes = [u for wd in WD for u in w["days"][wd]["units"] if u["name"] == "Rad Zone 2"]

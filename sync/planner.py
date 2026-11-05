@@ -64,6 +64,7 @@ DEFAULT_SETTINGS = {
     "preMini": {},              # Mini-Einheiten VOR dem Krafttraining an diesem Studio-Tag, z. B. {"2026-11-02": ["Rückwärtsgehen am Berg", "Stairmaster (15 min)"]}
     "legAccessory": False,      # zusaetzliche knieschonende Beinkraft (Beine ergaenzend) an bis zu 2 Push-/Pull-Tagen pro Woche
     "bikeFixedMin": None,       # feste Dauer fuer Rad Zone 2 in Minuten (sonst automatisch 45-60)
+    "noLegsWeeks": [],          # Montage von Wochen ohne schweres Beintraining (z. B. weil Kurse die Beine schon belasten), z. B. ["2026-11-02"]
     "restDays": [],             # ausdruecklich gewuenschte Ruhetage, z. B. ["2026-10-31"]: an dem Tag ist nichts geplant, der Rest der Woche wird neu verteilt
     "wallSitAfterBike": [],     # Tage ohne Lauf, an denen Wandsitzen + Waden stattdessen direkt nach dem Rad kommen, z. B. ["2026-10-29"]
     "coreSessions": 2,          # Core pro Woche (eine im Studio an Maschinen, eine zu Hause) - optional

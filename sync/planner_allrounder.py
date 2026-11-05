@@ -153,7 +153,7 @@ class AllrounderPlanner(pl.Planner):
         want = {"Push": 2, "Pull": 2, "Legs": 1}
         if phase == "wettkampf":
             want = {"Push": 1, "Pull": 1, "Legs": 0}
-        if params.get("skipHeavy"):
+        if params.get("skipHeavy") or pl.iso(monday) in (st.get("noLegsWeeks") or []):
             want["Legs"] = 0
         if any(c.sick_return_level is not None for c in ctxs) and st.get("returnRamp") != "fast":
             want["Pull"] = min(want["Pull"], 1)       # Wiedereinstieg: Push 2x, Pull nur 1x in dieser Woche

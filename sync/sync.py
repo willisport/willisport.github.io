@@ -231,6 +231,21 @@ def build_day(plan_day: dict, date: datetime, activities: list, today: datetime,
             **({"why": pu["why"]} if pu.get("why") else {}),
             **({"exercises": pu["exercises"]} if pu.get("exercises") else {}),
         })
+    # Aktivitaeten, die zu keiner geplanten Einheit passen (z. B. spontaner Lauf statt Rad): als erledigte Zusatzeinheit zeigen
+    if date.date() <= today.date():
+        names = {"lauf": "Lauf", "rad": "Rad", "kraft": "Krafttraining"}
+        for a in day_acts:
+            if a.get("type") not in names or (a.get("durationMin") or 0) < 10:
+                continue
+            if any(unit_matches_activity(pu, a) for pu in plan_day["units"]):
+                continue
+            km = f"{a['distanceKm']:.1f}".rstrip("0").rstrip(".") + " km · " if a.get("distanceKm") else ""
+            hr = f" · Ø {round(a['avgHr'])} bpm" if a.get("avgHr") else ""
+            units.append({
+                "name": f"{names[a['type']]} (zusätzlich)", "type": a["type"], "tag": "extra", "status": "done",
+                "detail": f"{km}{round(a['durationMin'])} min{hr} · nicht im Plan, von Garmin erkannt",
+                "why": "Hast du zusätzlich oder statt einer geplanten Einheit gemacht; zählt für die Wochensumme.",
+            })
     out = {"date": date_str, "weekday": plan_day["weekday"], "focus": plan_day["focus"], "units": units}
     if plan_day.get("fallbackNote"):
         out["fallbackNote"] = plan_day["fallbackNote"]
