@@ -40,7 +40,8 @@ class UnplannedActivity(unittest.TestCase):
     def test_short_or_other_activities_are_ignored(self):
         short = {**RUN, "durationMin": 5}
         walk = {**RUN, "type": "sonstiges"}
-        out = self.build([BIKE], [short, walk])
+        backwards = {**RUN, "durationMin": 10, "distanceKm": 0.29}     # Rueckwaertsgehen auf dem Laufband
+        out = self.build([BIKE], [short, walk, backwards])
         self.assertEqual([u["name"] for u in out["units"]], ["Rad Zone 2"])
 
     def test_future_days_get_no_extras(self):

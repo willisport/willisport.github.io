@@ -237,6 +237,8 @@ def build_day(plan_day: dict, date: datetime, activities: list, today: datetime,
         for a in day_acts:
             if a.get("type") not in names or (a.get("durationMin") or 0) < 10:
                 continue
+            if a["type"] == "lauf" and (a.get("distanceKm") or 0) < 1.0:
+                continue                                      # z. B. Rueckwaertsgehen auf dem Laufband, das Garmin als Lauf aufzeichnet
             if any(unit_matches_activity(pu, a) for pu in plan_day["units"]):
                 continue
             km = f"{a['distanceKm']:.1f}".rstrip("0").rstrip(".") + " km · " if a.get("distanceKm") else ""
