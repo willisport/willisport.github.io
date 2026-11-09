@@ -1,14 +1,9 @@
 {
  "items": {
-  "2026-11-10|VO2max-Intervalle": {
-   "hash": "6534572f5a39",
-   "scheduleId": 1836026236,
-   "workoutId": 1757045024
-  },
-  "2026-11-12|Langer Lauf": {
+  "2026-11-13|Langer Lauf": {
    "hash": "b32edb084d14",
-   "scheduleId": 1836026238,
-   "workoutId": 1757045027
+   "scheduleId": 1836123541,
+   "workoutId": 1757141573
   },
   "2026-11-20|Backyard-Simulation": {
    "hash": "a20d261a4bfc",
