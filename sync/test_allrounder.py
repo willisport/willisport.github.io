@@ -799,11 +799,11 @@ if __name__ == "__main__":
 
 
 class TrackIntervals(unittest.TestCase):
-    """Wunsch 9.11.: 6x400 m ALL OUT auf der Bahn am Mittwoch statt der Zeit-Intervalle am Dienstag; Lauf am Montag statt Rad."""
+    """Wunsch 9.11.: 6x400 m ALL OUT auf der Bahn am Dienstag statt der Zeit-Intervalle; Lauf am Montag statt Rad."""
 
     def test_track_day_and_run_instead_of_bike(self):
         raw = {"settings": {"bRace": {"date": "2026-11-28", "name": "Backyard-Lauf", "km": 30, "lapKm": 6, "start": "12:00"}, "gymOnLateShift": True,
-                            "hardFrom": "2026-11-09", "noRecoveryWeeks": ["2026-11-09"], "vo2Track": {"2026-11-11": 6},
+                            "hardFrom": "2026-11-09", "noRecoveryWeeks": ["2026-11-09"], "vo2Track": {"2026-11-10": 6},
                             "runForceDays": ["2026-11-09"], "runKmDay": {"2026-11-09": 7}},
                "shifts": {"2026-11-10": [{"start": "16:00", "end": "22:00"}], "2026-11-11": [{"start": "16:00", "end": "22:00"}]},
                "events": [{"date": "2026-11-09", "title": "Kurse", "kind": "schule", "start": "17:00", "end": "19:30", "travelMin": 0, "load": "hard"},
@@ -813,7 +813,8 @@ class TrackIntervals(unittest.TestCase):
         mon = names(wk, "Montag")
         self.assertIn("Zone-2-Lauf", mon)
         self.assertFalse([n for n in mon if n.startswith("Rad Zone")])
-        self.assertNotIn("VO2max-Intervalle", names(wk, "Dienstag"))
-        vo2 = next(u for u in wk["days"]["Mittwoch"]["units"] if u["name"] == "VO2max-Intervalle")
+        self.assertNotIn("VO2max-Intervalle", names(wk, "Mittwoch"))
+        vo2 = next(u for u in wk["days"]["Dienstag"]["units"] if u["name"] == "VO2max-Intervalle")
         self.assertIn("6×400 m ALL OUT", vo2["detail"])
         self.assertIn("Tartanbahn", vo2["detail"])
+        self.assertIn("3 min Pause", vo2["detail"])

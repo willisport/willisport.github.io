@@ -596,13 +596,13 @@ class AllrounderPlanner(pl.Planner):
                 track_reps = (st.get("vo2Track") or {}).get(pl.iso(dates[i]))
                 if track_reps:
                     rp, vm = int(track_reps), 2                  # 400 m ~ 1,5-2 min + 400 m Traben ~ 2,5 min
-                    dur = 25 + rp * 4
+                    dur = 25 + rp * 5
                 start = self.slot_run(ctx, dur, after=(last_end[i] + 10) if last_end[i] else None)
                 if track_reps:
                     p5 = self.tg.get("pace5kSec")
                     fast = f" (schneller als dein 5-km-Tempo von {pl.fmt_pace(p5)} min/km, also schneller als {pl.fmt_pace(p5 * 0.4)} pro Runde)" if p5 else ""
                     text = (f"{rp}×400 m ALL OUT auf der Tartanbahn{fast} – jede Runde so schnell, wie du alle {rp} halten kannst · "
-                            f"dazwischen 400 m (ca. 2–3 min) locker traben · davor einlaufen (mind. 10 min, bis du an der Bahn bist), danach auslaufen{tsuf(start)}, nicht nüchtern")
+                            f"dazwischen genau 3 min Pause (erst ca. 1 min gehen, dann locker traben, nicht stehen bleiben – so schaffst du alle {rp} gleich schnell) · davor einlaufen (mind. 10 min, bis du an der Bahn bist), danach auslaufen{tsuf(start)}, nicht nüchtern")
                 else:
                     text = (f"{rp}×{vm} min ALL OUT" + (f" · {vo2_pace_text(self.tg, vm)}" if vo2_pace_text(self.tg, vm) else " (deutlich schneller als dein Schwellentempo)")
                             + f" · je {vo2_rest_min(vm)} min locker traben · davor einlaufen (mind. 10 min, bis du am Platz bist), danach auslaufen{tsuf(start)}, nicht nüchtern")
