@@ -610,7 +610,7 @@ function unitAccordionHtml(u, dateStr, opts = {}) {
     : "";
   const chips = `${u.keySession ? '<span class="unit-key-badge">Key</span>' : ""}${u.planLabel ? `<span class="unit-key-badge" style="color:var(--sky-400);">${escapeHtml(u.planLabel)}</span>` : ""}${info.note ? `<span class="uacc-chip">${escapeHtml(info.note)}</span>` : ""}${u.tag === "bonus" ? '<span class="uacc-chip">optional</span>' : ""}`;
   return `
-    <details class="unit-acc ${u.status || "planned"}" data-ukey="${escapeHtml(key)}" ${OPEN_UNITS.has(key) ? "open" : ""}>
+    <details class="unit-acc ${u.status || "planned"} t-${escapeHtml(u.type || "x")}" data-ukey="${escapeHtml(key)}" ${OPEN_UNITS.has(key) ? "open" : ""}>
       <summary>
         ${opts.statusDot === false ? "" : statusDotHtml(dateStr, u)}
         <span class="uacc-time">${info.time || "–"}</span>
@@ -822,6 +822,15 @@ function renderHeuteAgendaBody(data) {
   return `<div class="card-head"><span class="card-title">Heute im Kalender</span><span class="card-note">Dienstplan &amp; Termine</span></div>${todayHtml}${upcomingHtml}`;
 }
 
+/** Kleiner Tagesfortschritt: wie viele der heutigen Einheiten sind erledigt (ausgefallene zaehlen nicht mit). */
+function dayProgressHtml(units) {
+  const open = units.filter(u => u.status !== "skipped");
+  if (!open.length) return "";
+  const done = open.filter(u => u.status === "done").length;
+  const pct = Math.round(done / open.length * 100);
+  return `<div class="day-progress"><div class="day-progress-track"><div class="day-progress-fill" style="width:${pct}%"></div></div><span class="day-progress-label">${done} von ${open.length} erledigt</span></div>`;
+}
+
 function renderHeute(data) {
   const t = data.today;
   const recoveryScore = computeRecoveryScore(t.sleep);
@@ -850,7 +859,8 @@ function renderHeute(data) {
       </div>` : ""}
 
       <div class="card accent-teal">
-        <div class="card-head"><span class="card-title">Heutige Einheiten</span>${t.units.length ? '<span class="card-note">Tippe eine Einheit an für Details und Übungen · Kreis: geplant → erledigt → abgelehnt · im Detail: Tag wählen, Zeit ändern, 🪄 automatisch verschieben</span>' : ""}</div>
+        <div class="card-head"><span class="card-title">Heutige Einheiten</span>${t.units.length ? '<span class="card-note" title="Kreis antippen: geplant → erledigt → ausgefallen · im Detail: Tag wählen, Zeit ändern, 🪄 automatisch verschieben">Antippen für Details · Kreis: geplant → erledigt → ausgefallen</span>' : ""}</div>
+        ${t.units.length ? dayProgressHtml(t.units) : ""}
         ${t.units.length ? `<div class="unit-list">${unitsHtml}</div>` : '<div class="card-note">Heute steht kein Training an.</div>'}
       </div>
 

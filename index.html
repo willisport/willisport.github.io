@@ -3,7 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<meta name="theme-color" content="#070c13">
+<meta name="theme-color" content="#0b1016">
+<meta name="color-scheme" content="dark">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Willis Dashboard">
@@ -11,10 +12,7 @@
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <link rel="manifest" href="manifest.webmanifest">
 <title>Willis Dashboard</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/styles.css?v=20261109a">
+<link rel="stylesheet" href="css/styles.css?v=20261109b">
 <script type="module">
   import * as pdfjsLib from "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/6.3.289/pdf.min.mjs";
   pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/6.3.289/pdf.worker.min.mjs";
@@ -32,31 +30,31 @@
 
     <div class="sport-nav" id="sport-nav">
       <button class="nav-item is-active" data-tab="heute">
-        <span class="nav-icon" aria-hidden="true">◐</span><span>Heute</span>
+        <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2.5v2.2M12 19.3v2.2M2.5 12h2.2M19.3 12h2.2M5.3 5.3l1.6 1.6M17.1 17.1l1.6 1.6M18.7 5.3l-1.6 1.6M6.9 17.1l-1.6 1.6"/></svg></span><span>Heute</span>
       </button>
       <button class="nav-item" data-tab="woche">
-        <span class="nav-icon" aria-hidden="true">▦</span><span>Woche</span>
+        <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15.5" rx="3"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg></span><span>Woche</span>
       </button>
       <button class="nav-item" data-tab="verlauf">
-        <span class="nav-icon" aria-hidden="true">↺</span><span>Verlauf</span>
+        <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg></span><span>Verlauf</span>
       </button>
       <button class="nav-item" data-tab="performance">
-        <span class="nav-icon" aria-hidden="true">⤴</span><span>Performance</span>
+        <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3.5 17l5.5-5.5 4 4L20.5 7.5"/><path d="M15 7.5h5.5V13"/></svg></span><span>Performance</span>
       </button>
       <button class="nav-item" data-tab="coach">
-        <span class="nav-icon" aria-hidden="true">◆</span><span>Coach</span>
+        <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6.5A2.5 2.5 0 0 1 6.5 4h11A2.5 2.5 0 0 1 20 6.5v7a2.5 2.5 0 0 1-2.5 2.5H11l-4.5 3.5V16H6.5A2.5 2.5 0 0 1 4 13.5z"/></svg></span><span>Coach</span>
       </button>
       <button class="nav-item" data-tab="kraft">
-        <span class="nav-icon" aria-hidden="true">💪</span><span>Kraft</span>
+        <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6.5 8v8M17.5 8v8M3.5 10v4M20.5 10v4M6.5 12h11"/></svg></span><span>Kraft</span>
       </button>
       <button class="nav-item" data-tab="planaenderungen">
-        <span class="nav-icon" aria-hidden="true">✎</span><span>Anfragen</span>
+        <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20h4l10.5-10.5a2.1 2.1 0 0 0-3-3L5 17z"/><path d="M13.5 8.5l2 2"/></svg></span><span>Anfragen</span>
       </button>
       <button class="nav-item" data-tab="dienstplan">
-        <span class="nav-icon" aria-hidden="true">🗓</span><span>Dienstplan</span>
+        <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="4" width="14" height="17" rx="3"/><path d="M9 4.5h6M9 10h6M9 14h6"/></svg></span><span>Dienstplan</span>
       </button>
       <button class="nav-item" data-tab="logins" hidden>
-        <span class="nav-icon" aria-hidden="true">🔑</span><span>Logins</span>
+        <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8.5" cy="12" r="3.5"/><path d="M12 12h8.5M17.5 12v3M20.5 12v2"/></svg></span><span>Logins</span>
       </button>
     </div>
 
@@ -82,15 +80,15 @@
 
   <nav class="bottomnav" aria-label="Hauptnavigation mobil">
     <div class="bottomnav-row" id="bottomnav-row">
-      <button class="bn-item is-active" data-tab="heute"><span class="nav-icon" aria-hidden="true">◐</span><span>Heute</span></button>
-      <button class="bn-item" data-tab="woche"><span class="nav-icon" aria-hidden="true">▦</span><span>Woche</span></button>
-      <button class="bn-item" data-tab="verlauf"><span class="nav-icon" aria-hidden="true">↺</span><span>Verlauf</span></button>
-      <button class="bn-item" data-tab="performance"><span class="nav-icon" aria-hidden="true">⤴</span><span>Perf.</span></button>
-      <button class="bn-item" data-tab="coach"><span class="nav-icon" aria-hidden="true">◆</span><span>Coach</span></button>
-      <button class="bn-item" data-tab="kraft"><span class="nav-icon" aria-hidden="true">💪</span><span>Kraft</span></button>
-      <button class="bn-item" data-tab="planaenderungen"><span class="nav-icon" aria-hidden="true">✎</span><span>Anfragen</span></button>
-      <button class="bn-item" data-tab="dienstplan"><span class="nav-icon" aria-hidden="true">🗓</span><span>Dienst</span></button>
-      <button class="bn-item" data-tab="logins" hidden><span class="nav-icon" aria-hidden="true">🔑</span><span>Logins</span></button>
+      <button class="bn-item is-active" data-tab="heute"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2.5v2.2M12 19.3v2.2M2.5 12h2.2M19.3 12h2.2M5.3 5.3l1.6 1.6M17.1 17.1l1.6 1.6M18.7 5.3l-1.6 1.6M6.9 17.1l-1.6 1.6"/></svg></span><span>Heute</span></button>
+      <button class="bn-item" data-tab="woche"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15.5" rx="3"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg></span><span>Woche</span></button>
+      <button class="bn-item" data-tab="verlauf"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg></span><span>Verlauf</span></button>
+      <button class="bn-item" data-tab="performance"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3.5 17l5.5-5.5 4 4L20.5 7.5"/><path d="M15 7.5h5.5V13"/></svg></span><span>Perf.</span></button>
+      <button class="bn-item" data-tab="coach"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6.5A2.5 2.5 0 0 1 6.5 4h11A2.5 2.5 0 0 1 20 6.5v7a2.5 2.5 0 0 1-2.5 2.5H11l-4.5 3.5V16H6.5A2.5 2.5 0 0 1 4 13.5z"/></svg></span><span>Coach</span></button>
+      <button class="bn-item" data-tab="kraft"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6.5 8v8M17.5 8v8M3.5 10v4M20.5 10v4M6.5 12h11"/></svg></span><span>Kraft</span></button>
+      <button class="bn-item" data-tab="planaenderungen"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20h4l10.5-10.5a2.1 2.1 0 0 0-3-3L5 17z"/><path d="M13.5 8.5l2 2"/></svg></span><span>Anfragen</span></button>
+      <button class="bn-item" data-tab="dienstplan"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="4" width="14" height="17" rx="3"/><path d="M9 4.5h6M9 10h6M9 14h6"/></svg></span><span>Dienst</span></button>
+      <button class="bn-item" data-tab="logins" hidden><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8.5" cy="12" r="3.5"/><path d="M12 12h8.5M17.5 12v3M20.5 12v2"/></svg></span><span>Logins</span></button>
     </div>
   </nav>
 
@@ -105,11 +103,11 @@
 <div id="sync-panel" class="sync-panel" hidden></div>
 <div id="sync-status" class="sync-status" hidden></div>
 
-<script src="js/auth.js?v=20261109a"></script>
-<script src="js/app.js?v=20261109a"></script>
-<script src="js/plan.js?v=20261109a"></script>
-<script src="js/plan-ui.js?v=20261109a"></script>
-<script src="js/plan-views.js?v=20261109a"></script>
-<script src="js/plan-extras.js?v=20261109a"></script>
+<script src="js/auth.js?v=20261109b"></script>
+<script src="js/app.js?v=20261109b"></script>
+<script src="js/plan.js?v=20261109b"></script>
+<script src="js/plan-ui.js?v=20261109b"></script>
+<script src="js/plan-views.js?v=20261109b"></script>
+<script src="js/plan-extras.js?v=20261109b"></script>
 </body>
 </html>
