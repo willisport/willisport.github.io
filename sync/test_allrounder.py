@@ -564,6 +564,7 @@ class WeekWishes(unittest.TestCase):
         self.assertEqual(sims, [("2026-11-16", "Freitag")])
         sim = next(u for u in w["2026-11-16"]["days"]["Freitag"]["units"] if u["name"] == "Backyard-Simulation")
         self.assertIn("3 Runden", sim["detail"])
+        self.assertFalse({"Push", "Pull", "Schweres Beintraining"} & set(names(w["2026-11-16"], "Freitag")))     # am Sim-Tag keine Kraft
 
     def test_plyo_off_and_backwards_walking_fixed(self):
         w = self.weeks({"plyoMinis": False, "backIncline": 10, "backSpeed": "4"})

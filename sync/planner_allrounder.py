@@ -282,7 +282,8 @@ class AllrounderPlanner(pl.Planner):
         # ---------------------------------------------------------------- 5. Push / Pull
         # Ein Studio-Tag nach der Fruehschicht, an dem auch ein harter Lauf ansteht, wuerde den Lauf hinter die Kraft schieben (Lauf kommt zuerst)
         free_gym = [i for i in range(n) if i != legs_day and gym_ok(i, 45, 0.5, allow_easy=True)
-                    and not (i in (li, ii) and at_work(i))]
+                    and not (i in (li, ii) and at_work(i))
+                    and not (i == li and params.get("bLaps"))]         # am Tag der Backyard-Simulation kein Krafttraining danach
         forced_push = {i for i, k in forced.items() if k == "Push" and i in free_gym}
         forced_pull = {i for i, k in forced.items() if k == "Pull" and i in free_gym}
         free_pull = [i for i in free_gym if not ctxs[i].no_pull]

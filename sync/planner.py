@@ -1447,6 +1447,8 @@ def phase_label(params: dict) -> str:
     if ph == "erholung":
         return "Erholung nach dem Wettkampf"
     pos = params["p"] % BLOCK
+    if pos >= 3:
+        return "Aufbau (statt Recovery-Woche)"
     return f"Woche {pos + 1} von 3 · Aufbau"
 
 
