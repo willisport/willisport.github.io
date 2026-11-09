@@ -64,6 +64,7 @@ DEFAULT_SETTINGS = {
     "preMini": {},              # Mini-Einheiten VOR dem Krafttraining an diesem Studio-Tag, z. B. {"2026-11-02": ["Rückwärtsgehen am Berg", "Stairmaster (15 min)"]}
     "legAccessory": False,      # zusaetzliche knieschonende Beinkraft (Beine ergaenzend) an bis zu 2 Push-/Pull-Tagen pro Woche
     "bikeFixedMin": None,       # feste Dauer fuer Rad Zone 2 in Minuten (sonst automatisch 45-60)
+    "vo2Track": {},             # Datum -> Anzahl 400-m-Wiederholungen auf der Bahn statt Zeit-Intervalle (Tag der VO2max-Einheit)
     "legsForce": [],            # Tage, an denen schwere Beine ausdruecklich stattfinden sollen (auch in Wochen mit noLegsWeeks)
     "runForceDays": [],         # Tage, an denen ausdruecklich gelaufen werden soll (Laenge automatisch; mit Laenge siehe runKmDay)
     "noGymDays": [],            # Tage ohne Studio-Kraft (Push/Pull/Beine)

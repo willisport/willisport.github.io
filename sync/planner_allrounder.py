@@ -204,6 +204,11 @@ class AllrounderPlanner(pl.Planner):
                         lambda c: not c.no_run and not c.no_hard)
         thr_opts = opts(want_thr, "thr", threshold_total_min(thr) if thr else 0, self.slot_bike_pm, lambda i: carry_hard_pen(i),
                         lambda c: not c.no_hard)
+        track_idx = [i for i in range(n) if pl.iso(dates[i]) in (st.get("vo2Track") or {})]
+        for ti_ in track_idx:
+            if ti_ in vo2_opts:
+                vo2_opts = {ti_: vo2_opts[ti_]}               # ausdruecklich gewuenschter Tag fuer die 400-m-Intervalle auf der Bahn
+                break
         sim_iso = params.get("bSimDate")
         if sim_iso and params.get("bLaps"):
             sim_i = next((i for i in range(n) if pl.iso(dates[i]) == sim_iso), None)
@@ -584,10 +589,20 @@ class AllrounderPlanner(pl.Planner):
                 rp = reps if lvl >= 0.85 else max(3, reps - 1)
                 vm = params["vo2Min"]
                 dur = interval_total_min(rp, vm)
+                track_reps = (st.get("vo2Track") or {}).get(pl.iso(dates[i]))
+                if track_reps:
+                    rp, vm = int(track_reps), 2                  # 400 m ~ 1,5-2 min + 400 m Traben ~ 2,5 min
+                    dur = 25 + rp * 4
                 start = self.slot_run(ctx, dur, after=(last_end[i] + 10) if last_end[i] else None)
-                commit(i, mk_unit("VO2max-Intervalle", "lauf", "pflicht",
-                                  f"{rp}×{vm} min ALL OUT" + (f" · {vo2_pace_text(self.tg, vm)}" if vo2_pace_text(self.tg, vm) else " (deutlich schneller als dein Schwellentempo)")
-                                  + f" · je {vo2_rest_min(vm)} min locker traben · davor einlaufen (mind. 10 min, bis du am Platz bist), danach auslaufen{tsuf(start)}, nicht nüchtern",
+                if track_reps:
+                    p5 = self.tg.get("pace5kSec")
+                    fast = f" (schneller als dein 5-km-Tempo von {pl.fmt_pace(p5)} min/km, also schneller als {pl.fmt_pace(p5 * 0.4)} pro Runde)" if p5 else ""
+                    text = (f"{rp}×400 m ALL OUT auf der Tartanbahn{fast} – jede Runde so schnell, wie du alle {rp} halten kannst · "
+                            f"dazwischen 400 m (ca. 2–3 min) locker traben · davor einlaufen (mind. 10 min, bis du an der Bahn bist), danach auslaufen{tsuf(start)}, nicht nüchtern")
+                else:
+                    text = (f"{rp}×{vm} min ALL OUT" + (f" · {vo2_pace_text(self.tg, vm)}" if vo2_pace_text(self.tg, vm) else " (deutlich schneller als dein Schwellentempo)")
+                            + f" · je {vo2_rest_min(vm)} min locker traben · davor einlaufen (mind. 10 min, bis du am Platz bist), danach auslaufen{tsuf(start)}, nicht nüchtern")
+                commit(i, mk_unit("VO2max-Intervalle", "lauf", "pflicht", text,
                                   dur - 10, keySession=True, matchHint={"activityTypes": ["running"]}), start, dur)
             if "easy_run" in r:
                 km = easy_km[i] if lvl >= 1 else max(4.0, round(easy_km[i] * lvl * 2) / 2)
