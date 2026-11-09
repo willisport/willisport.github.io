@@ -428,7 +428,7 @@ class AllrounderPlanner(pl.Planner):
             k_take = min(n_easy, len(cand_scores))
             best_combo = None
             # lieber einen lockeren Lauf weniger als drei Lauftage hintereinander (kostet 2500 je fehlendem Lauf)
-            for k in range(k_take, max(0, k_take - 2), -1):
+            for k in range(k_take, max(-1, k_take - 2), -1):
                 for combo in itertools.combinations(sorted(cand_scores), k):
                     total = sum(cand_scores[i] for i in combo) - run_penalty(combo) - 2500 * (k_take - k)
                     if best_combo is None or total > best_combo[0]:
