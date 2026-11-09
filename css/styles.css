@@ -92,13 +92,14 @@ summary:focus-visible { outline-offset: -2px; border-radius: var(--r-md); }
 .shell {
   display: grid;
   grid-template-columns: 236px 1fr;
-  min-height: 100vh;
+  min-height: calc(100vh / var(--z, 1));
+  zoom: var(--z, 1);          /* grosse Bildschirme: alles proportional groesser (siehe unten), statt leerer Flaeche rechts */
 }
 
 .sidenav {
   position: sticky;
   top: 0;
-  height: 100vh;
+  height: calc(100vh / var(--z, 1));
   border-right: 1px solid var(--border-soft);
   background: rgba(20, 27, 36, 0.72);
   -webkit-backdrop-filter: saturate(160%) blur(24px);
@@ -144,7 +145,14 @@ summary:focus-visible { outline-offset: -2px; border-radius: var(--r-md); }
 
 .sidenav-footer { margin-top: auto; padding: 14px 12px 4px; border-top: 1px solid var(--border-soft); }
 
-.content { padding: 34px 48px 64px; max-width: 1920px; width: 100%; }
+.content { padding: 34px 48px 64px; width: 100%; min-width: 0; }
+
+/* Grosse Bildschirme: die ganze Flaeche nutzen. Alles waechst mit der Fensterbreite (zoom), der Inhalt wird nie schmaler als ~1500 px breit. */
+@media (min-width: 1800px) { :root { --z: 1.15; } }
+@media (min-width: 2200px) { :root { --z: 1.35; } }
+@media (min-width: 2700px) { :root { --z: 1.6; } }
+@media (min-width: 3300px) { :root { --z: 1.9; } }
+@media (min-width: 1700px) { .unit-list { grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; } }
 
 @media (min-width: 1600px) {
   .content { padding: 44px 64px 80px; }
