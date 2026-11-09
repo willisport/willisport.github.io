@@ -372,6 +372,10 @@ class AllrounderPlanner(pl.Planner):
         if any(easy_only) and n_run_target > 3:
             n_run_target = 3          # erste Woche nach der Krankheit: drei Laeufe, dazwischen Rad (abwechselnd statt Laufen am Stueck)
         n_easy = max(0, n_run_target - (1 if li is not None else 0) - (1 if ii is not None else 0))
+        wished_run = set(st.get("runKmDay") or {}) | set(st.get("runForceDays") or [])
+        forced_runs = {i for i in range(n) if pl.iso(dates[i]) in wished_run and i in pool
+                       and i not in (li, ii, ti, legs_day) and not ctxs[i].no_run}
+        n_easy = max(0, n_easy - len(forced_runs))          # ausdruecklich gewuenschte Lauftage zaehlen zu den Laeufen der Woche
         z2_km = params["z2Km"]
         easy_days: list[int] = []
 
@@ -393,7 +397,7 @@ class AllrounderPlanner(pl.Planner):
 
         # Alle Kombinationen bewerten: Laufen und Rad moeglichst abwechselnd (keine Laufserien an Folgetagen)
         km_min = max(4.0, round(z2_km * 0.7 * 2) / 2)
-        hard_runs = {d for d in (li, ii) if d is not None}
+        hard_runs = {d for d in (li, ii) if d is not None} | forced_runs
 
         def run_penalty(combo):
             """Laufserien: nie drei Lauftage hintereinander; zwei lockere Laeufe hintereinander vermeiden (auch ueber den Wochenwechsel)."""
@@ -413,7 +417,7 @@ class AllrounderPlanner(pl.Planner):
             return pen
         cand_scores = {}
         for i in pool:
-            if i in (li, ii, ti, legs_day) or ctxs[i].no_run or level[i] < 0.5:
+            if i in (li, ii, ti, legs_day) or i in forced_runs or ctxs[i].no_run or level[i] < 0.5:
                 continue
             st_ = self.slot_run(ctxs[i], run_minutes(km_min) + 10)
             if st_ is None:
