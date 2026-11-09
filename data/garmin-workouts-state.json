@@ -1,19 +1,19 @@
 {
  "items": {
-  "2026-11-13|VO2max-Intervalle": {
-   "hash": "3900fd2f550f",
-   "scheduleId": 1835309755,
-   "workoutId": 1756337503
+  "2026-11-10|VO2max-Intervalle": {
+   "hash": "6534572f5a39",
+   "scheduleId": 1836026236,
+   "workoutId": 1757045024
   },
-  "2026-11-15|Backyard-Simulation": {
-   "hash": "a20d261a4bfc",
-   "scheduleId": 1823928822,
-   "workoutId": 1744954890
+  "2026-11-12|Langer Lauf": {
+   "hash": "b32edb084d14",
+   "scheduleId": 1836026238,
+   "workoutId": 1757045027
   },
   "2026-11-20|Backyard-Simulation": {
-   "hash": "3bd257c60570",
-   "scheduleId": 1832121929,
-   "workoutId": 1753159244
+   "hash": "a20d261a4bfc",
+   "scheduleId": 1836026241,
+   "workoutId": 1757045029
   }
  }
 }
