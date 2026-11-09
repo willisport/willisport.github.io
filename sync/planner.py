@@ -64,6 +64,12 @@ DEFAULT_SETTINGS = {
     "preMini": {},              # Mini-Einheiten VOR dem Krafttraining an diesem Studio-Tag, z. B. {"2026-11-02": ["Rückwärtsgehen am Berg", "Stairmaster (15 min)"]}
     "legAccessory": False,      # zusaetzliche knieschonende Beinkraft (Beine ergaenzend) an bis zu 2 Push-/Pull-Tagen pro Woche
     "bikeFixedMin": None,       # feste Dauer fuer Rad Zone 2 in Minuten (sonst automatisch 45-60)
+    "noRecoveryWeeks": [],      # Montage von Wochen, die trotz Wochenrhythmus KEINE Recovery-Woche sein sollen, z. B. ["2026-11-09"]
+    "bSimDate": None,           # fester Tag der Backyard-Simulation (z. B. mit Freunden), z. B. "2026-11-20"; nur in dieser Woche, sonst keine Simulation
+    "bSimLaps": 3,              # Runden der Backyard-Simulation an diesem Tag
+    "plyoMinis": True,          # Sprungübungen (Pogo/Skippings) nach lockeren Läufen
+    "backIncline": None,        # feste Steigung beim Rückwärtsgehen in % (sonst steigend 6 -> 12)
+    "backSpeed": None,          # feste Geschwindigkeit beim Rückwärtsgehen in km/h als Text, z. B. "4"
     "noLegsWeeks": [],          # Montage von Wochen ohne schweres Beintraining (z. B. weil Kurse die Beine schon belasten), z. B. ["2026-11-02"]
     "restDays": [],             # ausdruecklich gewuenschte Ruhetage, z. B. ["2026-10-31"]: an dem Tag ist nichts geplant, der Rest der Woche wird neu verteilt
     "wallSitAfterBike": [],     # Tage ohne Lauf, an denen Wandsitzen + Waden stattdessen direkt nach dem Rad kommen, z. B. ["2026-10-29"]
@@ -632,7 +638,7 @@ def week_params(monday: date, inputs: dict, factor_override: float | None = None
     rec_end = recovery_end(inputs)
     if rec_end and monday > rec_end:
         p -= sick_pause_weeks(inputs)
-    recovery = is_recovery(p)
+    recovery = is_recovery(p) and iso(monday) not in (st.get("noRecoveryWeeks") or [])
     s = progression_step(p)
     race_for_step = monday_of(parse_date(st["raceDate"]))
     if monday > race_for_step:
@@ -673,6 +679,17 @@ def week_params(monday: date, inputs: dict, factor_override: float | None = None
             taper_factor, phase, b_week = 0.6, "taper", 1
         elif wb == -1:
             taper_factor, phase, b_week = 0.5, "erholung", -1
+
+    b_sim_date = None
+    if st.get("bSimDate") and phase in ("aufbau", "recovery"):
+        try:
+            if monday == monday_of(parse_date(st["bSimDate"])):
+                b_laps = max(1, int(st.get("bSimLaps") or 3))
+                b_sim_date = iso(parse_date(st["bSimDate"]))
+            else:
+                b_laps = 0                      # nur der gewaehlte Tag hat die Simulation
+        except Exception:
+            pass
 
     base_factor = 1.0
     if recovery and phase == "aufbau":
@@ -745,7 +762,7 @@ def week_params(monday: date, inputs: dict, factor_override: float | None = None
         "factor": round(factor, 3), "z2Km": z2_km, "longKm": long_km, "longRideMin": long_ride,
         "intervalReps": reps, "vo2Min": vo2_min, "thresholdMin": thr_min, "bikeMin": bike_min, "runDays": run_days,
         "skipHeavy": phase == "wettkampf" or (phase == "erholung" and factor < 0.6) or (allround and weeks_to_race == 1) or b_week in (1, 2),
-        "bWeek": b_week, "bLaps": b_laps, "bLapKm": float(b.get("lapKm") or 6) if b.get("date") else 0,
+        "bWeek": b_week, "bLaps": b_laps, "bSimDate": b_sim_date, "bLapKm": float(b.get("lapKm") or 6) if b.get("date") else 0,
         "weeksToRace": weeks_to_race, "taper": phase in ("taper", "wettkampf"),
     }
 

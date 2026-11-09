@@ -206,10 +206,15 @@ function futureWeekDays(monday, data) {
   const wk = PLAN_DATA && PLAN_DATA.weeks && PLAN_DATA.weeks[monday];
   if (!wk) return null;
   const lib = currentLibrary(data);
+  const past = monday < data.week.startDate;       // vergangene Woche: Status (erledigt/ausgefallen) kommt aus dem Sync
+  const ovAll = loadOverrides();
   const days = WD_NAMES.map((wd, i) => {
     const src = (wk.days || {})[wd] || { focus: "", units: [] };
-    const units = JSON.parse(JSON.stringify(src.units || [])).map(u => ({ ...u, status: "planned", homeWeekday: wd }));
-    return { weekday: wd, date: isoAddDays(monday, i), focus: src.focus || "", units, fallbackNote: src.fallbackNote };
+    const date = isoAddDays(monday, i);
+    const units = JSON.parse(JSON.stringify(src.units || [])).map(u => ({
+      ...u, status: past ? (((ovAll[date] || {}).units || {})[u.name] || u.status || "planned") : "planned", homeWeekday: wd,
+    }));
+    return { weekday: wd, date, focus: src.focus || "", units, fallbackNote: src.fallbackNote };
   });
   const moves = loadOverrides().__moves || {};
   Object.entries(moves).forEach(([key, target]) => {
@@ -227,8 +232,8 @@ function futureWeekDays(monday, data) {
   return days;
 }
 
-function futureUnitRowHtml(u, dateStr, days, monday) {
-  return unitAccordionHtml(u, dateStr, { weekDays: days, weekStart: monday, statusDot: false });
+function futureUnitRowHtml(u, dateStr, days, monday, past = false) {
+  return unitAccordionHtml(u, dateStr, { weekDays: past ? null : days, weekStart: monday, statusDot: past });   // Rückblick: kein Verschieben
 }
 
 /** Laufkilometer einer Woche von Hand setzen (überschreibt die Automatik nur für diese Woche). */
@@ -272,9 +277,10 @@ function wochePreviewHtml(data) {
     return `<div class="card"><div class="card-head"><span class="card-title">Plan im Voraus</span></div>
       <div class="card-note">Der Langzeitplan bis September 2027 wird beim nächsten Sync erzeugt – dann kannst du hier Woche für Woche vorblättern.</div></div>`;
   }
-  const keys = Object.keys(weeks).sort().filter(m => m > thisMonday);
+  const keys = Object.keys(weeks).sort().filter(m => m !== thisMonday);       // auch vergangene Wochen (Rückblick), die aktuelle steht oben
   if (!keys.length) return "";
-  const monday = keys.includes(WOCHE_VIEW.monday) ? WOCHE_VIEW.monday : keys[0];
+  const monday = keys.includes(WOCHE_VIEW.monday) ? WOCHE_VIEW.monday : (keys.find(m => m > thisMonday) || keys[keys.length - 1]);
+  const isPast = monday < thisMonday;
   WOCHE_VIEW.monday = monday;
   const idx = keys.indexOf(monday);
   const wk = weeks[monday], meta = wk.meta || {};
@@ -287,14 +293,14 @@ function wochePreviewHtml(data) {
       <div class="day-col-head"><span class="day-name">${d.weekday}</span><span class="day-date">${fmtDateShort(d.date)}</span></div>
       ${(agendaByDate[d.date] || []).map(agendaItemHtml).join("")}
       ${dayFocusHtml(d.focus, (agendaByDate[d.date] || []).length > 0)}
-      <div class="stack" style="gap:6px;">${sortUnitsByTime(d.units).map(u => futureUnitRowHtml(u, d.date, days, monday)).join("") || '<div class="card-note">Nichts geplant.</div>'}</div>
+      <div class="stack" style="gap:6px;">${sortUnitsByTime(d.units).map(u => futureUnitRowHtml(u, d.date, days, monday, isPast)).join("") || '<div class="card-note">Nichts geplant.</div>'}</div>
       ${d.fallbackNote ? `<div class="fallback-note">${escapeHtml(d.fallbackNote)}</div>` : ""}
     </div>`).join("");
   return `
     <div class="card" id="woche-preview">
       <div class="card-head">
-        <span class="card-title">Plan im Voraus</span>
-        <span class="card-note">${idx + 1} / ${keys.length} · bis ${fmtDateShort(keys[keys.length - 1])}</span>
+        <span class="card-title">${isPast ? "Rückblick" : "Plan im Voraus"}</span>
+        <span class="card-note">${idx + 1} / ${keys.length} · ${fmtDateShort(keys[0])} bis ${fmtDateShort(keys[keys.length - 1])}</span>
       </div>
       <div style="display:flex; gap:8px; align-items:center; justify-content:space-between; margin-bottom:6px;">
         <button class="btn-small" type="button" id="wp-prev" ${idx === 0 ? "disabled" : ""}>◀</button>
@@ -316,7 +322,7 @@ function bindWochePreview(data) {
   bindRunControls(document.getElementById("tab-woche"));
   const card = document.getElementById("woche-preview");
   if (!card || !PLAN_DATA) return;
-  const keys = Object.keys(PLAN_DATA.weeks).sort().filter(m => m > data.week.startDate);
+  const keys = Object.keys(PLAN_DATA.weeks).sort().filter(m => m !== data.week.startDate);
   const go = (m) => { WOCHE_VIEW.monday = m; renderWoche(APP_DATA); };
   const idx = keys.indexOf(WOCHE_VIEW.monday);
   const prev = document.getElementById("wp-prev"), next = document.getElementById("wp-next");

@@ -545,6 +545,40 @@ class LegsAndDayWishes(unittest.TestCase):
         self.assertTrue(all("60 min" in u["detail"] for u in bikes), [u["detail"] for u in bikes])
 
 
+class WeekWishes(unittest.TestCase):
+    """Wunsch 9.11.: feste Rueckwaerts-Einstellung, keine Sprunguebungen, keine Recovery-Woche, Backyard-Simulation am 20.11."""
+    TODAY = date(2026, 11, 9)
+    S = {"bRace": {"date": "2026-11-28", "name": "Backyard-Lauf", "km": 30, "lapKm": 6, "start": "12:00"}, "gymOnLateShift": True, "hardFrom": "2026-11-09"}
+
+    def weeks(self, extra):
+        raw = {"settings": {**self.S, **extra}}
+        return pl.generate_plan(raw, date(2026, 11, 9), date(2026, 11, 23), self.TODAY)
+
+    def test_recovery_week_can_be_switched_off(self):
+        self.assertEqual(self.weeks({})["2026-11-09"]["meta"]["phase"], "recovery")
+        self.assertEqual(self.weeks({"noRecoveryWeeks": ["2026-11-09"]})["2026-11-09"]["meta"]["phase"], "aufbau")
+
+    def test_backyard_sim_only_on_the_chosen_day(self):
+        w = self.weeks({"bSimDate": "2026-11-20", "bSimLaps": 3})
+        sims = [(m, wd) for m, wk in w.items() for wd in WD for n in names(wk, wd) if n == "Backyard-Simulation"]
+        self.assertEqual(sims, [("2026-11-16", "Freitag")])
+        sim = next(u for u in w["2026-11-16"]["days"]["Freitag"]["units"] if u["name"] == "Backyard-Simulation")
+        self.assertIn("3 Runden", sim["detail"])
+
+    def test_plyo_off_and_backwards_walking_fixed(self):
+        w = self.weeks({"plyoMinis": False, "backIncline": 10, "backSpeed": "4"})
+        units = [u for wk in w.values() for wd in WD for u in wk["days"][wd]["units"]]
+        self.assertFalse([u for u in units if u["name"].startswith("Sprung")])
+        back = [u for u in units if u["name"] == "Rückwärtsgehen am Berg"]
+        self.assertTrue(back)
+        self.assertTrue(all("10 % Steigung, 4 km/h" in u["detail"] for u in back), [u["detail"] for u in back][:2])
+
+    def test_plyo_on_by_default(self):
+        w = self.weeks({})
+        units = [u for wk in w.values() for wd in WD for u in wk["days"][wd]["units"]]
+        self.assertTrue([u for u in units if u["name"].startswith("Sprung")])
+
+
 class PushPullAlternate(unittest.TestCase):
     def test_push_and_pull_alternate_across_weeks(self):
         weeks = plan(start=date(2026, 11, 23), weeks=4)

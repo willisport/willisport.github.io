@@ -497,7 +497,9 @@ def main():
         metrics["pace5kSec"] = prev_metrics["pace5kSec"]
     plan_inputs["metrics"] = metrics
 
-    gen_from = max(this_monday.date(), planner.PROGRAM_START_MONDAY)
+    # 4 Wochen zurueck mitplanen: Push/Pull/Beine-Abstand und Lauffolgen kennen so die Vorwoche (sonst Pull am Dienstag nach Pull am Sonntag),
+    # und die Website kann zurueckblaettern
+    gen_from = max(this_monday.date() - timedelta(days=28), planner.PROGRAM_START_MONDAY)
     generated = planner.generate_plan(plan_inputs, gen_from, MACRO_GOAL_DATE.date(), today_d, plan.get("library"))
     plan["weekOverrides"] = {**plan.get("weekOverrides", {}), **generated}
     print(f"  Plan: {len(generated)} Wochen generiert ab {gen_from} "
@@ -724,8 +726,26 @@ def main():
         save_json(ENCRYPTED_OUTPUT_PATH, encrypted)
         print(f"  Verschluesselte Fassung -> {ENCRYPTED_OUTPUT_PATH}")
 
+        plan_weeks = {m: planner.compact_week(w) for m, w in generated.items()}
+        # Vergangene Wochen (zum Zurueckblaettern): erledigt/ausgefallen/zusaetzlich aus den Garmin-Aktivitaeten
+        for m in plan_weeks:
+            if m >= iso_date(this_monday):
+                continue
+            try:
+                past_days = build_week_days(plan, datetime.strptime(m, "%Y-%m-%d"), activities, today, steps_history)
+                for d in past_days:
+                    cu_list = []
+                    for u in d["units"]:
+                        cu = {k: u[k] for k in ("name", "type", "tag", "status", "detail", "plannedDurationMin") if k in u}
+                        for k in ("keySession", "planLabel", "why"):
+                            if u.get(k):
+                                cu[k] = u[k]
+                        cu_list.append(cu)
+                    plan_weeks[m]["days"][d["weekday"]] = {**plan_weeks[m]["days"].get(d["weekday"], {"focus": d["focus"]}), "units": cu_list}
+            except Exception as e:  # noqa: BLE001 - Rueckblick ist ein Extra
+                print(f"  [warn] Vergangene Woche {m} ohne Status: {type(e).__name__}: {e}")
         plan_out = {
-            "weeks": {m: planner.compact_week(w) for m, w in generated.items()},
+            "weeks": plan_weeks,
             "agenda": planner.build_agenda_all(plan_inputs),
         }
         if write_encrypted_if_changed(PLAN_OUT_PATH, plan_out, dek):

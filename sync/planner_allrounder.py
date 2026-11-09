@@ -201,6 +201,11 @@ class AllrounderPlanner(pl.Planner):
                         lambda c: not c.no_run and not c.no_hard)
         thr_opts = opts(want_thr, "thr", threshold_total_min(thr) if thr else 0, self.slot_bike_pm, lambda i: carry_hard_pen(i),
                         lambda c: not c.no_hard)
+        sim_iso = params.get("bSimDate")
+        if sim_iso and params.get("bLaps"):
+            sim_i = next((i for i in range(n) if pl.iso(dates[i]) == sim_iso), None)
+            if sim_i is not None and sim_i in long_opts:
+                long_opts = {sim_i: long_opts[sim_i]}            # ausdruecklich gewuenschter Tag (z. B. mit Freunden)
         legs_opts = {}
         if want["Legs"]:
             for i in key_pool:
@@ -655,6 +660,10 @@ class AllrounderPlanner(pl.Planner):
             back_speed = "3" if mini_week < 2 else ("3,5" if mini_week < 4 else "4")
             wall_s = "45" if mini_week < 2 else ("60" if mini_week < 4 else "75")
             calf_reps = 15 if mini_week < 4 else 20
+            if st.get("backIncline"):
+                incline = int(st["backIncline"])                          # feste Steigung statt Steigerung
+            if st.get("backSpeed"):
+                back_speed = str(st["backSpeed"])
 
             def entry_end(i, names):
                 ends = [p["start"] + p["dur"] for p in placed[i] if p["unit"]["name"] in names and p["start"] is not None]
@@ -724,7 +733,7 @@ class AllrounderPlanner(pl.Planner):
                                  f"2× {wall_s} s Wandsitzen + 2× {calf_reps} langsame Wadenheben – Knie und Achillessehne stabilisieren",
                                  5, ex, bike_end)
                 # 2) Sprungübungen: nur wenn harte Einheiten erlaubt sind, nicht in der Rennwoche, max. 2x
-                if (run_end is not None and not legs_today and not near_race and n_plyo < 2 and not ctxs[i].no_hard
+                if (st.get("plyoMinis", True) and run_end is not None and not legs_today and not near_race and n_plyo < 2 and not ctxs[i].no_hard
                         and (level[i] >= 0.85) and "Zone-2-Lauf" in day_names):
                     ex = [{"name": "Pogo-Sprünge (kurzer Bodenkontakt)", "sets": 2, "reps": "15", "rest": "30 s"},
                           {"name": "Skippings", "sets": 2, "reps": "20 m", "rest": "30 s"}]
