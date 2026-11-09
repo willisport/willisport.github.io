@@ -444,16 +444,22 @@ async function bootWithAuth(onData) {
     CURRENT_DEK = dekRawBytes;
     document.body.classList.toggle("is-viewer", role === "viewer");
     try {
-      const encFile = await fetch(`${RAW_DATA_BASE}/data/training-data.enc.json`, { cache: "no-store" }).then(r => r.json());
-      const data = await decryptDataFile(dekRawBytes, encFile);
-      await initOverridesFromServer();
+      // Alles gleichzeitig holen (Trainingsdaten, Overrides, Langzeitplan) statt nacheinander: der Start wartet nur auf die langsamste Datei.
+      const dataFileP = fetch(`${RAW_DATA_BASE}/data/training-data.enc.json`, { cache: "no-store" }).then(r => r.json());
+      const overridesP = initOverridesFromServer();
+      const planP = fetch(`${RAW_DATA_BASE}/data/plan.enc.json`, { cache: "no-store" })
+        .then(r => { if (!r.ok) throw new Error("plan.enc.json fehlt noch"); return r.json(); })
+        .then(f => decryptDataFile(dekRawBytes, f))
+        .catch(() => null);                   // erster Sync mit Planer steht evtl. noch aus
+      const data = await decryptDataFile(dekRawBytes, await dataFileP);
+      await overridesP;
       onData(data);
       setupLogoutControl();
       setupHostedSyncButton(onData);
       setupAutoRefresh(onData);
       setupLoginsNavItem();
       showSyncStatus(data.syncedAt);
-      reloadPlanData(false).catch(() => { /* erster Sync mit Planer steht evtl. noch aus */ });
+      planP.then(plan => { if (plan && typeof setPlanData === "function") setPlanData(plan); });
     } catch (err) {
       document.getElementById("tab-heute").innerHTML =
         `<div class="card accent-amber"><b>Konnte Daten nicht entschlüsseln.</b><br>${err}</div>`;

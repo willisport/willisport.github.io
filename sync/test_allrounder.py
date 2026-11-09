@@ -597,6 +597,19 @@ class WeekWishes(unittest.TestCase):
         nxt = w["2026-11-16"]
         self.assertFalse([wd for wd in ("Montag", "Dienstag") if "Pull" in names(nxt, wd)])
 
+    def test_text_command_settings_legs_run_and_no_gym(self):
+        base = {"gymOnLateShift": True, "noRecoveryWeeks": ["2026-11-09"], "noLegsWeeks": ["2026-11-09"]}
+        raw = {"settings": {**self.S, **base, "legsForce": ["2026-11-11"], "runForceDays": ["2026-11-09"], "noGymDays": ["2026-11-12"]},
+               "shifts": {"2026-11-10": [{"start": "16:00", "end": "22:00"}], "2026-11-11": [{"start": "16:00", "end": "22:00"}]},
+               "events": [{"date": "2026-11-09", "title": "Kurse", "kind": "schule", "start": "17:00", "end": "19:30", "travelMin": 0, "load": "hard"}]}
+        wk = pl.generate_plan(raw, date(2026, 11, 9), date(2026, 11, 9), self.TODAY)["2026-11-09"]
+        self.assertIn("Schweres Beintraining", names(wk, "Mittwoch"))            # trotz noLegsWeeks, weil ausdruecklich gewuenscht
+        self.assertIn("Zone-2-Lauf", names(wk, "Montag"))                         # Lauf an einem Kurstag, weil gewuenscht
+        self.assertFalse({"Push", "Pull", "Schweres Beintraining"} & set(names(wk, "Donnerstag")))
+        raw2 = {"settings": {**self.S, **base}, "shifts": raw["shifts"], "events": raw["events"]}
+        wk2 = pl.generate_plan(raw2, date(2026, 11, 9), date(2026, 11, 9), self.TODAY)["2026-11-09"]
+        self.assertNotIn("Schweres Beintraining", [n for wd in WD for n in names(wk2, wd)])   # ohne Wunsch bleibt es bei noLegsWeeks
+
     def test_plyo_on_by_default(self):
         w = self.weeks({})
         units = [u for wk in w.values() for wd in WD for u in wk["days"][wd]["units"]]

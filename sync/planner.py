@@ -64,6 +64,9 @@ DEFAULT_SETTINGS = {
     "preMini": {},              # Mini-Einheiten VOR dem Krafttraining an diesem Studio-Tag, z. B. {"2026-11-02": ["Rückwärtsgehen am Berg", "Stairmaster (15 min)"]}
     "legAccessory": False,      # zusaetzliche knieschonende Beinkraft (Beine ergaenzend) an bis zu 2 Push-/Pull-Tagen pro Woche
     "bikeFixedMin": None,       # feste Dauer fuer Rad Zone 2 in Minuten (sonst automatisch 45-60)
+    "legsForce": [],            # Tage, an denen schwere Beine ausdruecklich stattfinden sollen (auch in Wochen mit noLegsWeeks)
+    "runForceDays": [],         # Tage, an denen ausdruecklich gelaufen werden soll (Laenge automatisch; mit Laenge siehe runKmDay)
+    "noGymDays": [],            # Tage ohne Studio-Kraft (Push/Pull/Beine)
     "coreStudioOffWeeks": [],   # Montage von Wochen ohne Core im Studio (Core zu Hause bleibt), z. B. ["2026-11-09"]
     "noRecoveryWeeks": [],      # Montage von Wochen, die trotz Wochenrhythmus KEINE Recovery-Woche sein sollen, z. B. ["2026-11-09"]
     "bSimDate": None,           # fester Tag der Backyard-Simulation (z. B. mit Freunden), z. B. "2026-11-20"; nur in dieser Woche, sonst keine Simulation
@@ -395,6 +398,8 @@ def build_day_contexts(monday: date, inputs: dict, today: date) -> list[DayCtx]:
     ret_to, ret_len = recovery_info(inputs)
 
     load_dates = {ev["date"] for ev in inputs["events"] if ev.get("load") == "hard"}
+    forced_run_dates = set((st.get("runKmDay") or {}).keys()) | set(st.get("runForceDays") or [])
+    no_gym_dates = set(st.get("noGymDays") or [])
 
     ctxs = []
     for i in range(7):
@@ -403,10 +408,12 @@ def build_day_contexts(monday: date, inputs: dict, today: date) -> list[DayCtx]:
         ds = iso(d)
         if ds in load_dates:
             ctx.no_hard = ctx.no_legs = ctx.no_core = ctx.no_gym = True
-            ctx.no_run = ds not in (st.get("runKmDay") or {})     # die Kurse sind die Einheit des Tages; nur locker Rad davor (ausser Lauf ist ausdruecklich gewuenscht)
+            ctx.no_run = ds not in forced_run_dates     # die Kurse sind die Einheit des Tages; nur locker Rad davor (ausser Lauf ist ausdruecklich gewuenscht)
             ctx.focus_prefix += "Harter Kurstag (kein Kraft/Beine/Core/Lauf extra) · "
         elif iso(d - timedelta(days=1)) in load_dates:
             ctx.no_legs = True                      # Beine sind nach den Kursen noch muede
+        if ds in no_gym_dates:
+            ctx.no_gym = True                       # ausdruecklich kein Studio an diesem Tag
 
         for sh in inputs["shifts"].get(ds, []):
             s, e = hm_to_min(sh["start"]), hm_to_min(sh["end"])

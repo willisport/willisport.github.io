@@ -397,7 +397,7 @@ def compute_shoes(raw_shoes, activities, previous_shoes, window_start_iso):
     return out
 
 
-def write_encrypted_if_changed(path: Path, obj, dek: bytes) -> bool:
+def write_encrypted_if_changed(path: Path, obj, dek: bytes, compress: bool = False) -> bool:
     """Schreibt nur, wenn sich der Klartext geaendert hat - sonst wuerde jeder Lauf
     (zufaelliger IV) einen neuen, nutzlosen Commit erzeugen und das Repo aufblaehen."""
     new_json = json.dumps(obj, ensure_ascii=False, sort_keys=True)
@@ -408,7 +408,7 @@ def write_encrypted_if_changed(path: Path, obj, dek: bytes) -> bool:
                 return False
         except Exception:
             pass
-    save_json(path, crypto_utils.encrypt_json_bytes(dek, new_json.encode("utf-8")))
+    save_json(path, crypto_utils.encrypt_json_bytes(dek, new_json.encode("utf-8"), compress=compress))
     return True
 
 
@@ -722,7 +722,7 @@ def main():
 
     if dek:
         plaintext_bytes = json.dumps(output, ensure_ascii=False).encode("utf-8")
-        encrypted = crypto_utils.encrypt_json_bytes(dek, plaintext_bytes)
+        encrypted = crypto_utils.encrypt_json_bytes(dek, plaintext_bytes, compress=True)
         save_json(ENCRYPTED_OUTPUT_PATH, encrypted)
         print(f"  Verschluesselte Fassung -> {ENCRYPTED_OUTPUT_PATH}")
 
@@ -748,7 +748,7 @@ def main():
             "weeks": plan_weeks,
             "agenda": planner.build_agenda_all(plan_inputs),
         }
-        if write_encrypted_if_changed(PLAN_OUT_PATH, plan_out, dek):
+        if write_encrypted_if_changed(PLAN_OUT_PATH, plan_out, dek, compress=True):
             print(f"  Langzeitplan aktualisiert -> {PLAN_OUT_PATH}")
 
 

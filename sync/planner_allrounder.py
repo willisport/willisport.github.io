@@ -155,6 +155,9 @@ class AllrounderPlanner(pl.Planner):
             want = {"Push": 1, "Pull": 1, "Legs": 0}
         if params.get("skipHeavy") or pl.iso(monday) in (st.get("noLegsWeeks") or []):
             want["Legs"] = 0
+        legs_force_idx = [i for i in range(n) if pl.iso(dates[i]) in (st.get("legsForce") or [])]
+        if legs_force_idx and phase != "wettkampf":
+            want["Legs"] = 1                          # ausdruecklich gewuenschte schwere Beine
         if any(c.sick_return_level is not None for c in ctxs) and st.get("returnRamp") != "fast":
             want["Pull"] = min(want["Pull"], 1)       # Wiedereinstieg: Push 2x, Pull nur 1x in dieser Woche
         light_week = params["recovery"] or params["factor"] < 0.85 or phase in ("taper", "erholung", "wettkampf")
@@ -211,6 +214,10 @@ class AllrounderPlanner(pl.Planner):
             for i in key_pool:
                 if not ctxs[i].no_legs and i not in forced and gym_ok(i, gym_dur["Legs"], 0.85):     # ausdruecklich gewuenschter Push/Pull-Tag geht vor
                     legs_opts[i] = base_score("legs", i, gym_slot(i, gym_dur["Legs"]))
+            for fi in legs_force_idx:
+                if fi in legs_opts:
+                    legs_opts = {fi: legs_opts[fi]}               # der gewuenschte Tag, wenn er machbar ist
+                    break
 
         def cyc_adj(a, b):
             return a is not None and b is not None and (a - b) % 7 in (1, 6)
@@ -424,7 +431,8 @@ class AllrounderPlanner(pl.Planner):
             for ci in easy_days:
                 roles[ci].add("easy_run")
         for i in range(n):                                   # Tage mit ausdruecklich gewuenschter Lauflaenge sind Lauftage
-            if (pl.iso(dates[i]) in (st.get("runKmDay") or {}) and i in pool and i not in easy_days
+            if ((pl.iso(dates[i]) in (st.get("runKmDay") or {}) or pl.iso(dates[i]) in (st.get("runForceDays") or []))
+                    and i in pool and i not in easy_days
                     and i not in (li, ii, ti, legs_day) and not ctxs[i].no_run):
                 easy_days.append(i)
                 roles[i].add("easy_run")

@@ -241,8 +241,22 @@ function dpInterpretNotes(lines, kz) {
   return { events, status };
 }
 
+let PDFJS_PROMISE = null;
+/** PDF-Bibliothek erst laden, wenn wirklich ein Dienstplan hochgeladen wird (spart beim Start ca. 1 MB). */
+function ensurePdfJs() {
+  if (typeof pdfjsLib !== "undefined") return Promise.resolve(pdfjsLib);
+  if (!PDFJS_PROMISE) {
+    PDFJS_PROMISE = import("https://cdnjs.cloudflare.com/ajax/libs/pdf.js/6.3.289/pdf.min.mjs").then(m => {
+      m.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/6.3.289/pdf.worker.min.mjs";
+      window.pdfjsLib = m;
+      return m;
+    }).catch(() => { PDFJS_PROMISE = null; throw new Error("PDF-Bibliothek nicht geladen (Internetverbindung prüfen)"); });
+  }
+  return PDFJS_PROMISE;
+}
+
 async function dpExtractPdfPages(file) {
-  if (typeof pdfjsLib === "undefined") throw new Error("PDF-Bibliothek nicht geladen (Internetverbindung prüfen)");
+  await ensurePdfJs();
   const buf = await file.arrayBuffer();
   const pdf = await pdfjsLib.getDocument({ data: buf }).promise;
   const pages = [];

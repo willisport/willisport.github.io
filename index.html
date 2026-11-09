@@ -12,12 +12,7 @@
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <link rel="manifest" href="manifest.webmanifest">
 <title>Willis Dashboard</title>
-<link rel="stylesheet" href="css/styles.css?v=20261109b">
-<script type="module">
-  import * as pdfjsLib from "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/6.3.289/pdf.min.mjs";
-  pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/6.3.289/pdf.worker.min.mjs";
-  window.pdfjsLib = pdfjsLib;
-</script>
+<link rel="stylesheet" href="css/styles.css?v=20261109c">
 </head>
 <body>
 
@@ -103,11 +98,23 @@
 <div id="sync-panel" class="sync-panel" hidden></div>
 <div id="sync-status" class="sync-status" hidden></div>
 
-<script src="js/auth.js?v=20261109b"></script>
-<script src="js/app.js?v=20261109b"></script>
-<script src="js/plan.js?v=20261109b"></script>
-<script src="js/plan-ui.js?v=20261109b"></script>
-<script src="js/plan-views.js?v=20261109b"></script>
-<script src="js/plan-extras.js?v=20261109b"></script>
+<script src="js/auth.js?v=20261109c"></script>
+<script src="js/app.js?v=20261109c"></script>
+<script src="js/plan.js?v=20261109c"></script>
+<script src="js/plan-ui.js?v=20261109c"></script>
+<script src="js/plan-views.js?v=20261109c"></script>
+<script src="js/plan-extras.js?v=20261109c"></script>
+<script src="js/plan-command.js?v=20261109c"></script>
+<script>
+  // Offline-Cache / schneller Start (Ausschalten: Seite mit ?nosw=1 oeffnen)
+  if ("serviceWorker" in navigator && /^https?:$/.test(location.protocol)) {
+    if (/[?&]nosw=1/.test(location.search)) {
+      navigator.serviceWorker.getRegistrations().then(rs => rs.forEach(r => r.unregister()));
+      if (window.caches) caches.keys().then(ks => ks.forEach(k => caches.delete(k)));
+    } else {
+      window.addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(() => {}));
+    }
+  }
+</script>
 </body>
 </html>

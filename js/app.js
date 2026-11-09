@@ -690,6 +690,13 @@ function buildSleepTips(sleep) {
 
 let LAST_SPORT_TAB = "heute";
 
+/** Netzwerk-Aufrufe eines Tabs erst ausfuehren, wenn der Tab offen ist. */
+const DEFERRED_TAB_LOADS = {};
+function deferTabLoad(tab, fn) {
+  const panel = document.getElementById("tab-" + tab);
+  if (panel && panel.classList.contains("is-active")) fn(); else DEFERRED_TAB_LOADS[tab] = fn;
+}
+
 function setupTabs() {
   document.querySelectorAll("[data-tab]").forEach(btn => {
     btn.addEventListener("click", () => {
@@ -698,6 +705,8 @@ function setupTabs() {
       document.querySelectorAll("[data-tab]").forEach(b => b.classList.toggle("is-active", b.dataset.tab === tab));
       document.querySelectorAll("[data-tab-panel]").forEach(p => p.classList.toggle("is-active", p.dataset.tabPanel === tab));
       window.scrollTo({ top: 0 });
+      const pending = DEFERRED_TAB_LOADS[tab];
+      if (pending) { delete DEFERRED_TAB_LOADS[tab]; pending(); }
     });
   });
 }
@@ -1000,6 +1009,7 @@ function renderWoche(data) {
     </div>
 
     <div class="stack">
+      ${typeof planCommandCardHtml === "function" ? planCommandCardHtml() : ""}
       <div class="card">
         <div class="card-head"><span class="card-title">Wochenfortschritt im Detail</span></div>
         <div class="grid grid-2" style="gap:16px;">
@@ -1929,7 +1939,7 @@ function renderPlanaenderungen() {
   if (PLAN_REQUESTS_CACHE) {
     renderRequestsList(PLAN_REQUESTS_CACHE);
   } else if (repoConfigured) {
-    loadAndRender();
+    deferTabLoad("planaenderungen", loadAndRender);      // erst beim Oeffnen des Tabs (schont das GitHub-Limit, startet schneller)
   }
 }
 
@@ -2140,7 +2150,7 @@ function renderLogins() {
   });
 
   if (LOGIN_REQUESTS_CACHE) renderLoginRequestsList(LOGIN_REQUESTS_CACHE);
-  else loadAndRender();
+  else deferTabLoad("logins", loadAndRender);
 }
 
 async function revokeUser(username, statusEl, btn) {

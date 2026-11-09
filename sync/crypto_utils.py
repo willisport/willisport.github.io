@@ -45,7 +45,11 @@ def wrap_key(dek: bytes, password: str) -> dict:
     return {"salt": b64(salt), "iv": b64(iv), "wrappedKey": b64(wrapped)}
 
 
-def encrypt_json_bytes(dek: bytes, plaintext_bytes: bytes) -> dict:
+def encrypt_json_bytes(dek: bytes, plaintext_bytes: bytes, compress: bool = False) -> dict:
+    """compress=True: Nutzlast vor dem Verschluesseln gzip-packen (der Browser erkennt das am Header 1f 8b).
+    Verschluesselte Daten lassen sich nicht komprimieren - deshalb VOR dem Verschluesseln: Plan/Trainingsdaten werden ca. 8-10x kleiner."""
+    if compress:
+        plaintext_bytes = gzip.compress(plaintext_bytes, compresslevel=9, mtime=0)
     iv = os.urandom(12)
     ciphertext = AESGCM(dek).encrypt(iv, plaintext_bytes, None)
     return {"iv": b64(iv), "ciphertext": b64(ciphertext)}
