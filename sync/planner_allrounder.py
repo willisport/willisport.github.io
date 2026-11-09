@@ -209,7 +209,7 @@ class AllrounderPlanner(pl.Planner):
         legs_opts = {}
         if want["Legs"]:
             for i in key_pool:
-                if not ctxs[i].no_legs and gym_ok(i, gym_dur["Legs"], 0.85):
+                if not ctxs[i].no_legs and i not in forced and gym_ok(i, gym_dur["Legs"], 0.85):     # ausdruecklich gewuenschter Push/Pull-Tag geht vor
                     legs_opts[i] = base_score("legs", i, gym_slot(i, gym_dur["Legs"]))
 
         def cyc_adj(a, b):
@@ -423,6 +423,11 @@ class AllrounderPlanner(pl.Planner):
                 note_missing("lockerer Lauf")
             for ci in easy_days:
                 roles[ci].add("easy_run")
+        for i in range(n):                                   # Tage mit ausdruecklich gewuenschter Lauflaenge sind Lauftage
+            if (pl.iso(dates[i]) in (st.get("runKmDay") or {}) and i in pool and i not in easy_days
+                    and i not in (li, ii, ti, legs_day) and not ctxs[i].no_run):
+                easy_days.append(i)
+                roles[i].add("easy_run")
         easy_km = {easy_days[k]: (z2_km if k == 0 else max(4.0, round(z2_km * 0.7 * 2) / 2)) for k in range(len(easy_days))}
         for ci in easy_days:
             try:
@@ -505,6 +510,8 @@ class AllrounderPlanner(pl.Planner):
                 core_home_day = choose("core_home", cands, 12, self.slot_core)
             if want_core == 1 and core_home_day is not None:
                 core_gym_day = None
+            if pl.iso(monday) in (st.get("coreStudioOffWeeks") or []):
+                core_gym_day = None                          # diese Woche kein Core im Studio (Core zu Hause bleibt)
 
         for i, ctx in enumerate(ctxs):
             if ctx.kind == "krank":

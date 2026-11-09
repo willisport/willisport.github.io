@@ -574,6 +574,29 @@ class WeekWishes(unittest.TestCase):
         self.assertTrue(back)
         self.assertTrue(all("10 % Steigung, 4 km/h" in u["detail"] for u in back), [u["detail"] for u in back][:2])
 
+    def test_run_on_course_day_pull_on_saturday_core_studio_off_minis_before_push(self):
+        raw = {"settings": {**self.S, "runKmDay": {"2026-11-09": 6}, "gymForce": {"2026-11-11": "Push", "2026-11-14": "Pull"}, "coreStudioOffWeeks": ["2026-11-09"],
+                            "preMini": {"2026-11-11": ["Rückwärtsgehen am Berg"]}, "noRecoveryWeeks": ["2026-11-09"], "legAccessory": False},
+               "shifts": {"2026-11-10": [{"start": "16:00", "end": "22:00"}], "2026-11-11": [{"start": "16:00", "end": "22:00"}]},
+               "events": [{"date": "2026-11-09", "title": "Kurse", "kind": "schule", "start": "17:00", "end": "19:30", "travelMin": 0, "load": "hard"},
+                          {"date": "2026-11-12", "title": "Seminar", "kind": "schule", "start": "09:00", "end": "17:00", "travelMin": 0}]}
+        w = pl.generate_plan(raw, date(2026, 11, 9), date(2026, 11, 16), self.TODAY)
+        wk = w["2026-11-09"]
+        mon = names(wk, "Montag")
+        self.assertIn("Zone-2-Lauf", mon)
+        self.assertFalse([n for n in mon if n.startswith("Rad Zone")])
+        self.assertIn("6 km", next(u for u in wk["days"]["Montag"]["units"] if u["name"] == "Zone-2-Lauf")["detail"])
+        self.assertIn("Pull", names(wk, "Samstag"))
+        self.assertNotIn("Pull", names(wk, "Donnerstag"))
+        self.assertFalse([wd for wd in WD if "Core (Studio)" in names(wk, wd)])
+        wed = wk["days"]["Mittwoch"]["units"]
+        back = next(u for u in wed if u["name"] == "Rückwärtsgehen am Berg")
+        push = next(u for u in wed if u["name"] == "Push")
+        self.assertLess(hm_in(back["detail"]), hm_in(push["detail"]))
+        # naechster Pull fruehestens 4 Tage nach dem Samstag (14.11.) -> nicht vor Mittwoch 18.11.
+        nxt = w["2026-11-16"]
+        self.assertFalse([wd for wd in ("Montag", "Dienstag") if "Pull" in names(nxt, wd)])
+
     def test_plyo_on_by_default(self):
         w = self.weeks({})
         units = [u for wk in w.values() for wd in WD for u in wk["days"][wd]["units"]]
