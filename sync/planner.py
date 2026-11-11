@@ -64,6 +64,7 @@ DEFAULT_SETTINGS = {
     "preMini": {},              # Mini-Einheiten VOR dem Krafttraining an diesem Studio-Tag, z. B. {"2026-11-02": ["Rückwärtsgehen am Berg", "Stairmaster (15 min)"]}
     "legAccessory": False,      # zusaetzliche knieschonende Beinkraft (Beine ergaenzend) an bis zu 2 Push-/Pull-Tagen pro Woche
     "bikeFixedMin": None,       # feste Dauer fuer Rad Zone 2 in Minuten (sonst automatisch 45-60)
+    "noHardDays": [],           # Tage ohne harte Einheiten (langer Lauf, VO2max, Schwelle, schwere Beine)
     "vo2Track": {},             # Datum -> Anzahl 400-m-Wiederholungen auf der Bahn statt Zeit-Intervalle (Tag der VO2max-Einheit)
     "legsForce": [],            # Tage, an denen schwere Beine ausdruecklich stattfinden sollen (auch in Wochen mit noLegsWeeks)
     "runForceDays": [],         # Tage, an denen ausdruecklich gelaufen werden soll (Laenge automatisch; mit Laenge siehe runKmDay)
@@ -548,6 +549,8 @@ def build_day_contexts(monday: date, inputs: dict, today: date) -> list[DayCtx]:
                     ctx.no_hard = True                     # bis dahin nur Umfang: keine Intervalle/Schwelle/langer Lauf (Kraft bleibt normal)
             except Exception:
                 pass
+        if iso(d) in (st.get("noHardDays") or []):
+            ctx.no_hard = True                             # z. B. bereits vergangene Tage: keine Schluesseleinheit neu dorthin planen
         ctx.compute_free(st)
         ctxs.append(ctx)
     return ctxs
