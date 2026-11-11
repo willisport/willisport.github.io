@@ -198,8 +198,9 @@ class AllrounderPlanner(pl.Planner):
         def streak_pen(i):
             return 3000 if i == 0 and streak_in >= 2 else 0          # kein dritter Lauftag in Folge ueber den Wochenwechsel
 
+        wished_run_days = set(st.get("runKmDay") or {}) | set(st.get("runForceDays") or [])        # ausdruecklich gewuenschte (kuerzere) Laeufe
         long_opts = opts(want_long, "long", long_dur, self.slot_long, lambda i: carry_hard_pen(i, 1500) + streak_pen(i),
-                         lambda c: not c.no_run and not c.no_hard)
+                         lambda c: not c.no_run and not c.no_hard and pl.iso(c.date) not in wished_run_days)
         vo2_opts = opts(want_vo2, "vo2", iv_dur, self.slot_run, lambda i: carry_hard_pen(i) + streak_pen(i),
                         lambda c: not c.no_run and not c.no_hard)
         thr_opts = opts(want_thr, "thr", threshold_total_min(thr) if thr else 0, self.slot_bike_pm, lambda i: carry_hard_pen(i),
