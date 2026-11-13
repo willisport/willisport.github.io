@@ -306,6 +306,11 @@ summary:focus-visible { outline-offset: -2px; border-radius: var(--r-md); }
 .day-col-head { display: flex; flex-direction: column; gap: 1px; margin-bottom: 4px; padding: 0 4px; }
 .day-name { font-family: var(--font-display); font-weight: 700; font-size: 15px; letter-spacing: -0.01em; }
 .day-date { color: var(--muted); font-size: 11.5px; }
+.rec-chip { display: inline-flex; align-items: center; gap: 5px; margin-top: 3px; font-size: 11px; color: var(--muted); }
+.rec-dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; flex: none; }
+.rec-blue .rec-dot { background: #3b82f6; }
+.rec-yellow .rec-dot { background: #eab308; }
+.rec-green .rec-dot { background: #22c55e; }
 .day-col.is-today .day-name { color: var(--sky-400); }
 .day-mini-unit {
   font-size: 12px; padding: 8px 9px; border-radius: 10px;

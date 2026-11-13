@@ -629,6 +629,31 @@ function unitAccordionHtml(u, dateStr, opts = {}) {
 }
 
 /** Tageshinweis: erste Angabe sichtbar, der Rest (Abfahrt, Fahrzeiten ...) auf Klick */
+
+/* ---------- Boots-Empfehlung pro Tag (Blackroll: Blau = Standard-Regeneration, Gelb = Mix, Gruen = locker/pulsierend) ---------- */
+function recoveryForDay(units) {
+  const list = (units || []).filter(u => u && u.status !== "skipped");
+  let load = 0;
+  list.forEach(u => {
+    const n = String(u.name || "");
+    const km = parseFloat(String(u.detail || "").replace(",", "."));
+    if (/Langer Lauf|VO2|Intervall|Schwelle|Backyard|schwere?s? Bein|Beintraining/i.test(n)) load += 4;
+    else if (u.type === "lauf") load += (km >= 10 ? 4 : 1.5);
+    else if (u.type === "kraft") load += 1.5;
+    else if (u.type === "rad") load += 1;
+    else if (u.type === "emom") load += 1.5;
+    else load += 0.25;
+  });
+  if (load >= 4) return { color: "blue", name: "Blau", min: "45–60 min", why: "Harter Tag: Standard-Regeneration nach der Einheit (Kammern von unten nach oben)." };
+  if (load >= 1.5) return { color: "yellow", name: "Gelb", min: "30–45 min", why: "Mittlerer Tag: Mix aus Regeneration und Durchblutung." };
+  return { color: "green", name: "Grün", min: "30 min", why: list.length ? "Lockerer Tag: leichte, pulsierende Durchblutung." : "Ruhetag: lockeres Durchbluten, Beine hoch." };
+}
+
+function recoveryChipHtml(units) {
+  const r = recoveryForDay(units);
+  return `<span class="rec-chip rec-${r.color}" title="${escapeHtml("Boots: " + r.name + " · " + r.min + " – " + r.why)}"><i class="rec-dot"></i>Boots ${r.name} · ${r.min}</span>`;
+}
+
 function dayFocusHtml(focus, hasAgenda) {
   const parts = String(focus || "").split(" · ").filter(Boolean);
   if (hasAgenda && parts.length && /^(Arbeit|Schule|Uni|Termin|Urlaub|Frei)/.test(parts[0])) parts.shift();   // steht schon als Kalendereintrag da
@@ -656,7 +681,7 @@ function buildWeekOverview(data) {
     const unitsHtml = sortUnitsByTime(d.units).map(u => unitRowHtml(u, d.date, data.week.days, data.week.startDate)).join("");
     return `
       <div class="day-col ${d.date === todayDate ? "is-today" : ""}">
-        <div class="day-col-head"><span class="day-name">${d.weekday}</span><span class="day-date">${fmtDateShort(d.date)}</span></div>
+        <div class="day-col-head"><span class="day-name">${d.weekday}</span><span class="day-date">${fmtDateShort(d.date)}</span>${recoveryChipHtml(d.units)}</div>
         ${dayFocusHtml(d.focus)}
         <div class="stack" style="gap:6px;">${unitsHtml}</div>
         ${d.fallbackNote ? `<div class="fallback-note">${escapeHtml(d.fallbackNote)}</div>` : ""}
@@ -851,6 +876,7 @@ function renderHeute(data) {
       <div class="page-eyebrow">${data.week.label}</div>
       <div class="page-title">${fmtDateLong(t.date)}</div>
       <div class="page-sub">${escapeHtml(t.dayFocus)}</div>
+      <div class="page-sub">${recoveryChipHtml(t.units)}</div>
     </div>
 
     <div class="stack">

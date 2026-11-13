@@ -290,7 +290,7 @@ function wochePreviewHtml(data) {
   const t = meta.targets || {};
   const cols = days.map(d => `
     <div class="day-col">
-      <div class="day-col-head"><span class="day-name">${d.weekday}</span><span class="day-date">${fmtDateShort(d.date)}</span></div>
+      <div class="day-col-head"><span class="day-name">${d.weekday}</span><span class="day-date">${fmtDateShort(d.date)}</span>${recoveryChipHtml(d.units)}</div>
       ${(agendaByDate[d.date] || []).map(agendaItemHtml).join("")}
       ${dayFocusHtml(d.focus, (agendaByDate[d.date] || []).length > 0)}
       <div class="stack" style="gap:6px;">${sortUnitsByTime(d.units).map(u => futureUnitRowHtml(u, d.date, days, monday, isPast)).join("") || '<div class="card-note">Nichts geplant.</div>'}</div>
