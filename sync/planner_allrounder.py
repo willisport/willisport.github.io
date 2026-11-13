@@ -248,7 +248,7 @@ class AllrounderPlanner(pl.Planner):
             return pen
 
         best = None
-        for L in [None] + sorted(long_opts):
+        for L in ([] if long_force else [None]) + sorted(long_opts):
             for V in [None] + sorted(vo2_opts):
                 if V is not None and V == L:
                     continue
