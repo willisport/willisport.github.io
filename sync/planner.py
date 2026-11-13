@@ -65,6 +65,7 @@ DEFAULT_SETTINGS = {
     "legAccessory": False,      # zusaetzliche knieschonende Beinkraft (Beine ergaenzend) an bis zu 2 Push-/Pull-Tagen pro Woche
     "bikeFixedMin": None,       # feste Dauer fuer Rad Zone 2 in Minuten (sonst automatisch 45-60)
     "noRunDays": [],            # Tage ohne Lauf (z. B. Tag war schon Rad/Studio, Lauf bewusst ausgelassen)
+    "noThrDays": [],            # an diesen Tagen keine Schwellen-Einheit (alles andere bleibt moeglich)
     "noHardDays": [],           # Tage ohne harte Einheiten (langer Lauf, VO2max, Schwelle, schwere Beine)
     "vo2Track": {},             # Datum -> Anzahl 400-m-Wiederholungen auf der Bahn statt Zeit-Intervalle (Tag der VO2max-Einheit)
     "legsForce": [],            # Tage, an denen schwere Beine ausdruecklich stattfinden sollen (auch in Wochen mit noLegsWeeks)

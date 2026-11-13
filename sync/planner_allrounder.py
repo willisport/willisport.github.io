@@ -204,7 +204,7 @@ class AllrounderPlanner(pl.Planner):
         vo2_opts = opts(want_vo2, "vo2", iv_dur, self.slot_run, lambda i: carry_hard_pen(i) + streak_pen(i),
                         lambda c: not c.no_run and not c.no_hard and (pl.iso(c.date) not in wished_run_days or pl.iso(c.date) in (st.get("vo2Track") or {})))
         thr_opts = opts(want_thr, "thr", threshold_total_min(thr) if thr else 0, self.slot_bike_pm, lambda i: carry_hard_pen(i),
-                        lambda c: not c.no_hard and pl.iso(c.date) not in wished_run_days)
+                        lambda c: not c.no_hard and pl.iso(c.date) not in wished_run_days and pl.iso(c.date) not in (st.get("noThrDays") or []))
         track_idx = [i for i in range(n) if pl.iso(dates[i]) in (st.get("vo2Track") or {})]
         for ti_ in track_idx:
             if ti_ in vo2_opts:
