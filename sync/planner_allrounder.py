@@ -210,6 +210,9 @@ class AllrounderPlanner(pl.Planner):
             if ti_ in vo2_opts:
                 vo2_opts = {ti_: vo2_opts[ti_]}               # ausdruecklich gewuenschter Tag fuer die 400-m-Intervalle auf der Bahn
                 break
+        long_force = [i for i in range(n) if pl.iso(dates[i]) in (st.get("longForce") or []) and i in long_opts]
+        if long_force:
+            long_opts = {long_force[0]: long_opts[long_force[0]]}        # ausdruecklich gewuenschter Tag fuer den langen Lauf
         sim_iso = params.get("bSimDate")
         if sim_iso and params.get("bLaps"):
             sim_i = next((i for i in range(n) if pl.iso(dates[i]) == sim_iso), None)
