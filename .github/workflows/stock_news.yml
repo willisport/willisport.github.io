@@ -1,0 +1,56 @@
+name: Aktien-News per Telegram
+
+on:
+  schedule:
+    # Mo-Fr alle 30 Min, Sa/So stuendlich (UTC; das Skript prueft selbst die Berliner Zeit:
+    # Zusammenfassung 08:00 und 22:15, Alarme nur 08:00-23:00). Krumme Minuten: GitHub verzoegert runde Zeiten.
+    - cron: "13,43 6-21 * * 1-5"
+    - cron: "23 6-21 * * 0,6"
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "auto, digest (Zusammenfassung sofort), alert (Alarme sofort) oder test (nur Log)"
+        default: "digest"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: stock-news
+  cancel-in-progress: false
+
+jobs:
+  stocks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Nachrichten holen und senden
+        working-directory: sync
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          STOCK_WATCHLIST: ${{ vars.STOCK_WATCHLIST }}
+          PYTHONIOENCODING: utf-8
+        run: |
+          pip install requests tzdata --quiet
+          python stock_news.py "${{ inputs.mode || 'auto' }}"
+
+      - name: Status committen (damit nichts doppelt gesendet wird)
+        if: ${{ !cancelled() }}
+        run: |
+          git config user.name "basis-sync-bot"
+          git config user.email "actions@users.noreply.github.com"
+          if [ -f data/stocks-state.json ]; then git add data/stocks-state.json; fi
+          git diff --staged --quiet && exit 0
+          git commit -m "Aktien-News Status"
+          for i in 1 2 3 4 5; do
+            git push && exit 0
+            git fetch origin main
+            git rebase -X ours origin/main
+          done
+          git push
