@@ -5,25 +5,20 @@
    "scheduleId": 1843851964,
    "workoutId": 1764862199
   },
-  "2026-12-08|VO2max-Intervalle": {
-   "hash": "43209cfff2e5",
-   "scheduleId": 1852309254,
-   "workoutId": 1773315170
+  "2026-12-07|Langer Lauf": {
+   "hash": "8e9221a92eb2",
+   "scheduleId": 1853010523,
+   "workoutId": 1774022322
   },
-  "2026-12-13|Langer Lauf": {
-   "hash": "c2ba2f5b15a5",
-   "scheduleId": 1848120535,
-   "workoutId": 1769156722
+  "2026-12-09|VO2max-Intervalle": {
+   "hash": "c862fbced7c1",
+   "scheduleId": 1853010524,
+   "workoutId": 1774022323
   },
-  "2026-12-15|VO2max-Intervalle": {
-   "hash": "c5e561ba9edb",
-   "scheduleId": 1852309256,
-   "workoutId": 1773315174
-  },
-  "2026-12-17|Langer Lauf": {
-   "hash": "d9392afda46e",
-   "scheduleId": 1852998026,
-   "workoutId": 1774009625
+  "2026-12-14|VO2max-Intervalle": {
+   "hash": "cc3913e72440",
+   "scheduleId": 1853010526,
+   "workoutId": 1774022325
   }
  }
 }
