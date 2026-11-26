@@ -802,14 +802,14 @@ class AllrounderPlanner(pl.Planner):
                                       exercises=exercises_for(lib, "coreGym"),
                                       matchHint={"activityTypes": ["strength_training", "cardio"]}), core_after, cdur)
             if i in upper_days:
-                ukey = ("upperEmom1", "upperEmom2", "upperEmom3")[(monday.isocalendar()[1] + upper_days.index(i)) % 3]
+                ukey = "upperEmom1"
                 ue = lib.get(ukey) or {}
                 udur = int(ue.get("durationMin") or 15)
                 ustart = self.slot_run(ctx, udur, after=(last_end[i] + 10) if last_end[i] else None)
                 if ustart is not None:
                     where = " · im Studio direkt nach der Schicht" if at_work(i) else (" · im Studio direkt vor der Schicht" if is_late(i) else "")
                     commit(i, mk_unit("Oberkörper-EMOM", "emom", "bonus", f"{ue.get('detail') or '15 min EMOM'}{where}{tsuf(ustart)}", udur,
-                                      planLabel=ukey[-1], exercises=exercises_for(lib, ukey),
+                                      exercises=exercises_for(lib, ukey),
                                       matchHint={"activityTypes": ["strength_training"]}), ustart, udur)
             if i == core_home_day:
                 ch = lib.get("core") or {}
@@ -1082,6 +1082,51 @@ class AllrounderPlanner(pl.Planner):
                     if ben:
                         body = ("Bringt: " + ben + (" " + body if body else "")).strip()
                 u["why"] = body
+
+        # ---------------------------------------------------------------- Hybrid: kompakte Anzeige
+        if hybrid:
+            core_lib = lib.get("coreHybrid") or {}
+            for i in range(n):
+                items = placed[i]
+                for e_ in items:                                     # Core immer unter dem Namen "Core" mit den vier festen Uebungen
+                    u_ = e_["unit"]
+                    if u_["name"] in ("Core (Studio)", "Core (zu Hause)"):
+                        m_ = re.search(r" · (\d{2}:\d{2}) Uhr.*$", u_.get("detail", ""))
+                        u_["name"] = "Core"
+                        u_["detail"] = (core_lib.get("detail") or "10 min Rumpf") + (m_.group(0) if m_ else "")
+                        u_["exercises"] = exercises_for(lib, "coreHybrid")
+                        u_["plannedDurationMin"] = int(core_lib.get("durationMin") or 10)
+                run_e = next((e_ for e_ in items if e_["unit"]["name"] in ("Zone-2-Lauf", "Langer Lauf")), None)
+                if run_e is None:
+                    continue
+                mini_e = next((e_ for e_ in items if e_["unit"]["name"] == "Nach dem Lauf: Wandsitzen + Waden"), None)
+                back_e = next((e_ for e_ in items if e_["unit"]["name"] == "Rückwärtsgehen am Berg"), None)
+                if mini_e is None and back_e is None:
+                    continue
+                ru = run_e["unit"]
+                mk = re.match(r"(\d+(?:[.,]\d+)?) km", ru.get("detail", ""))
+                km_txt = mk.group(1).replace(".", ",") if mk else ""
+                run_line = f"Laufen: {km_txt} km, Puls 130–140" if ru["name"] == "Zone-2-Lauf" else f"Laufen: {km_txt} km, Zone 2 (Puls 130–140)"
+                if indoor and ru["name"] == "Zone-2-Lauf":
+                    run_line += ", Laufband " + f"{float(st.get('z2Kmh') or 9.0):.1f}".replace(".", ",") + " km/h bei 1 % Steigung"
+                exs = [{"name": run_line, "sets": 1, "reps": f"ca. {ru.get('plannedDurationMin') or ''} min", "rest": "-"}]
+                title, extra_min, why_add = ru["name"], 0, []
+                if mini_e is not None:
+                    exs += mini_e["unit"].get("exercises") or []
+                    title += " + Wandsitzen/Waden"
+                    extra_min += mini_e["unit"].get("plannedDurationMin") or 5
+                    why_add.append("Wandsitzen und Waden direkt danach schützen Knie und Achillessehne.")
+                    items.remove(mini_e)
+                if back_e is not None:
+                    exs += back_e["unit"].get("exercises") or []
+                    title += " + Rückwärtsgehen"
+                    extra_min += back_e["unit"].get("plannedDurationMin") or 10
+                    why_add.append("Rückwärtsgehen am Berg kräftigt die Oberschenkel und schont das Knie.")
+                    items.remove(back_e)
+                ru["exercises"] = exs
+                ru["title"] = title
+                ru["plannedDurationMin"] = int(ru.get("plannedDurationMin") or 0) + extra_min
+                ru["why"] = (ru.get("why", "") + " " + " ".join(why_add)).strip()
 
         # Uebergabe an die naechste Woche
         run_idx = [i for i in range(n) if roles[i] & {"easy_run", "long_run", "intervals"}]

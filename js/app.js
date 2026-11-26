@@ -614,7 +614,7 @@ function unitAccordionHtml(u, dateStr, opts = {}) {
       <summary>
         ${opts.statusDot === false ? "" : statusDotHtml(dateStr, u)}
         <span class="uacc-time">${info.time || "–"}</span>
-        <span class="uacc-name">${escapeHtml(u.name)}</span>
+        <span class="uacc-name">${escapeHtml(u.title || u.name)}</span>
         ${chips}
         <span class="uacc-dur">${u.plannedDurationMin ? `${u.plannedDurationMin} min` : ""}</span>
       </summary>
@@ -1672,8 +1672,8 @@ function renderKraft(data) {
   document.getElementById("tab-kraft").innerHTML = `
     <div class="page-head">
       <div class="page-eyebrow">Kraft</div>
-      <div class="page-title">Kraft-Programm: Push · Pull · Beine</div>
-      <div class="page-sub">Push 2×, Pull 2×, Beine 1× pro Woche plus optionales Core – Übungen, Sätze und Gewichte änderst du unten in der Bibliothek</div>
+      <div class="page-title">Kraft-Programm: Beine · EMOM · Schulter/Arme</div>
+      <div class="page-sub">Schwere Beine 1×, Bein-Ausdauer 1×, Schulter/Arme 1×, EMOM 3× und Core pro Woche – Übungen, Sätze und Gewichte änderst du unten in der Bibliothek</div>
     </div>
 
     <div class="stack">

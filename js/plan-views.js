@@ -5,7 +5,9 @@
    Kraft: Übungsbibliothek (unabhängig vom Wochentag) + Extra-Einheiten einfügen
    --------------------------------------------------------------------------- */
 
-const LIB_ORDER = ["push", "pull", "heavyLegs", "core", "coreGym", "legStabi", "legSupersets", "emom1", "emom2", "armShoulders"];
+const LIB_ORDER = ["upperEmom1", "heavyLegsHybrid", "legEndurance", "armsHybrid", "coreHybrid", "ergoBlocks", "mobilityLegs"];
+/* Momentan nicht gebraucht: alte Pläne bleiben erhalten, stehen aber in einem eingeklappten Ordner */
+const LIB_ARCHIVE = ["push", "pull", "heavyLegs", "core", "coreGym", "legStabi", "legSupersets", "legAccessory", "emom1", "emom2", "armShoulders"];
 
 function currentLibrary(data) {
   const base = JSON.parse(JSON.stringify((data && data.library) || {}));
@@ -15,7 +17,7 @@ function currentLibrary(data) {
 }
 
 function libKeys(lib) {
-  const rest = Object.keys(lib).filter(k => !LIB_ORDER.includes(k)).sort();
+  const rest = Object.keys(lib).filter(k => !LIB_ORDER.includes(k) && !LIB_ARCHIVE.includes(k)).sort();
   return [...LIB_ORDER.filter(k => lib[k]), ...rest];
 }
 
@@ -34,7 +36,7 @@ function libExerciseRowHtml(e) {
 function kraftLibraryHtml(data) {
   const lib = currentLibrary(data);
   const edit = canEdit();
-  const cards = libKeys(lib).map(key => {
+  const cardFor = (key) => {
     const e = lib[key];
     const exs = e.exercises || [];
     const body = edit ? `
@@ -60,12 +62,20 @@ function kraftLibraryHtml(data) {
         <div class="card-note" style="margin-top:6px;">${escapeHtml(e.detail || "")}</div>
         ${body}
       </details>`;
-  }).join("");
+  };
+  const cards = libKeys(lib).map(cardFor).join("");
+  const archived = LIB_ARCHIVE.filter(k => lib[k]);
+  const archiveHtml = archived.length ? `
+      <details class="card lib-archive" style="margin-top:12px;">
+        <summary style="cursor:pointer;"><span class="card-title" style="text-transform:none; font-size:15px;">Momentan nicht gebraucht</span> <span class="card-note">${archived.length} alte Pläne (Push, Pull, Bein-Stabi …) – bleiben erhalten, der Plan nutzt sie nicht</span></summary>
+        <div class="stack" style="gap:8px; margin-top:10px;">${archived.map(cardFor).join("")}</div>
+      </details>` : "";
   return `
     <div>
       <div class="card-title" style="margin-bottom:10px;">Übungsbibliothek</div>
       <div class="card-note" style="margin-bottom:10px;">Unabhängig vom Wochentag. ${edit ? "Aufklappen, Übungen/Sätze/Wiederholungen ändern, speichern – der Plan übernimmt es bei der nächsten Berechnung." : ""}</div>
       <div class="stack" style="gap:8px;">${cards}</div>
+      ${archiveHtml}
       ${edit ? `<div style="margin-top:10px;"><button class="btn-small" type="button" id="lib-new">+ Neue Übungsgruppe</button></div>` : ""}
     </div>`;
 }

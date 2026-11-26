@@ -902,7 +902,24 @@ class HybridMode(unittest.TestCase):
         raw = {"settings": dict(base, miniForce={pl.iso(monday + timedelta(days=k)): {"after": "17:30", "units": ["Core (Studio)", "Rückwärtsgehen am Berg"]}},
                                   ergoForce=[pl.iso(monday + timedelta(days=k))])}
         w = self.week(monday, raw)
-        self.assertIn("Core (Studio)", names(w, WD[k]))
+        self.assertIn("Core", names(w, WD[k]))
         self.assertIn("Rückwärtsgehen am Berg", names(w, WD[k]))
         self.assertIn("Ergo-Blöcke (leicht)", names(w, WD[k]))
         self.assertNotIn("Rad Zone 2", names(w, WD[k]))
+
+    def test_compact_run_unit_and_single_core(self):
+        monday = date(2026, 12, 28)
+        w = self.week(monday)
+        runs = [(wd, u) for wd, u in all_units(w) if u["name"] in ("Zone-2-Lauf", "Langer Lauf")]
+        self.assertTrue(runs)
+        for wd, u in runs:
+            self.assertIn("+ Wandsitzen/Waden", u.get("title", ""))
+            self.assertTrue(u["exercises"][0]["name"].startswith("Laufen:"))
+            self.assertTrue(any("Wandsitzen" in e["name"] for e in u["exercises"]))
+            self.assertNotIn("Nach dem Lauf: Wandsitzen + Waden", names(w, wd))
+        found = [u["name"] for _, u in all_units(w)]
+        self.assertNotIn("Core (Studio)", found)
+        self.assertNotIn("Core (zu Hause)", found)
+        for _, u in all_units(w):
+            if u["name"] == "Core":
+                self.assertEqual([e["name"] for e in u["exercises"]], ["Plank", "Seitlicher Plank", "Russian Twist", "Leg Raises"])
