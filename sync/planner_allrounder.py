@@ -48,11 +48,34 @@ def pref_bonus(key: str, i: int) -> int:
     return 25 * (len(order) - order.index(i)) if i in order else 0
 
 
+HYBRID_BENEFIT = {
+    "Zone-2-Lauf": "verbessert die Grundlagenausdauer – mehr Mitochondrien, bessere Fettverbrennung, Sehnen und Gelenke gewöhnen sich an die Belastung.",
+    "Langer Lauf": "baut Ausdauer und Marathon-Basis auf und trainiert Sehnen, Fettstoffwechsel und den Kopf.",
+    "Backyard-Simulation": "testet Tempo, Essen und Technik unter Rennbedingungen.",
+    "VO2max-Intervalle": "hebt deine Obergrenze (VO2max): mehr Sauerstoff pro Herzschlag, schnelleres Tempo bei gleichem Puls.",
+    "Schwellentraining Rad": "verschiebt deine Schwelle nach oben – du kannst länger schnell bleiben, ohne zu übersäuern, und das ohne Aufprall für die Gelenke.",
+    "Ergo-Blöcke": "hebt die Schwelle und trainiert Rücken, Arme und Rumpf mit – hohe Ausdauer ohne Aufprall für die Knie.",
+    "Schweres Beintraining": "mehr Maximalkraft in Beinen und Gesäß – bessere Laufökonomie, stabilere Sehnen und Knie, Schutz vor Verletzungen.",
+    "Bein-Ausdauer-Tag": "Muskelausdauer in den Beinen – du hältst das Tempo länger, wenn es schwer wird, und Vorder- und Rückseite werden gleich stark.",
+    "Oberkörper-EMOM": "durchblutet Schulter und Arme und hält die Athletik – in nur 15 Minuten, ohne die Beine zu belasten.",
+    "Rad Zone 2": "Ausdauer-Grundlage ohne Aufprall; fördert Erholung und Fettstoffwechsel.",
+    "Rad Zone 1": "locker bewegen, damit die Beine durchblutet und erholt werden.",
+    "Stairmaster": "stärkt Gelenke und Muskulatur schonend – Ausdauerreiz ohne Aufprall, kräftigt Gesäß und Waden.",
+    "Rückwärtsgehen am Berg": "kräftigt die Oberschenkel und schont dabei das Knie.",
+    "Nach dem Lauf": "stabilisiert Knie und Achillessehne gegen Überlastung.",
+    "Core": "stabiler Rumpf für saubere Technik beim Laufen und Heben.",
+    "Sprungübungen": "federnde Beine – verbessert die Laufökonomie.",
+}
+
+
 class AllrounderPlanner(pl.Planner):
     def plan_week(self, monday, ctxs, params, today, carry=None):
         st, lib = self.st, self.lib
         carry = carry if carry is not None else {}
         n = 7
+        hybrid = bool(st.get("hybridFrom")) and pl.iso(monday) >= str(st["hybridFrom"])          # Hybrid-Wochenmuster ab hybridFrom
+        alt_week = hybrid and (monday.isocalendar()[1] % 2 == 1)                                 # ungerade Kalenderwoche: Ergo-Bloecke + Bein-Ausdauer
+        indoor = hybrid and bool(st.get("indoor"))
         dates = [c.date for c in ctxs]
         placed = {i: [] for i in range(n)}
         roles: list[set] = [set() for _ in range(n)]
@@ -161,9 +184,13 @@ class AllrounderPlanner(pl.Planner):
         if any(c.sick_return_level is not None for c in ctxs) and st.get("returnRamp") != "fast":
             want["Pull"] = min(want["Pull"], 1)       # Wiedereinstieg: Push 2x, Pull nur 1x in dieser Woche
         light_week = params["recovery"] or params["factor"] < 0.85 or phase in ("taper", "erholung", "wettkampf")
+        legs_libkey, legs_name = "heavyLegs", "Schweres Beintraining"
+        if hybrid:
+            want["Push"] = want["Pull"] = 0                  # Hybrid: statt Push/Pull Oberkoerper-EMOM
+            legs_libkey, legs_name = ("legEndurance", "Bein-Ausdauer-Tag") if alt_week else ("heavyLegsHybrid", "Schweres Beintraining")
         gym_dur = {"Push": int((lib.get("push") or {}).get("durationMin") or 60),
                    "Pull": int((lib.get("pull") or {}).get("durationMin") or 60),
-                   "Legs": int((lib.get("heavyLegs") or {}).get("durationMin") or 65)}
+                   "Legs": int((lib.get(legs_libkey) or {}).get("durationMin") or 65)}
         if light_week:
             gym_dur["Push"] = gym_dur["Pull"] = min(gym_dur["Push"], 45)
 
@@ -458,6 +485,28 @@ class AllrounderPlanner(pl.Planner):
             except Exception:
                 pass
 
+        # ---------------------------------------------------------------- 6b. Hybrid: Oberkoerper-EMOM (2x pro Woche, nach lockerem Lauf/Rad)
+        upper_days: list[int] = []
+        if hybrid and phase != "wettkampf" and not params.get("skipHeavy"):
+            ucands = [i for i in pool if i not in (li, ii, ti, legs_day) and not ctxs[i].no_gym and level[i] >= 0.85]
+
+            def uscore(i):
+                return ((12 if i in easy_days else 0) + (6 if i in (0, 3) else 0) + ctxs[i].largest_window() / 100
+                        - (4 if legs_day is not None and abs(i - legs_day) == 1 else 0))
+            best_u = None
+            for a_ in ucands:
+                for b_ in ucands:
+                    if b_ > a_ and b_ - a_ >= 3:
+                        v = uscore(a_) + uscore(b_)
+                        if best_u is None or v > best_u[0]:
+                            best_u = (v, [a_, b_])
+            if best_u is not None:
+                upper_days = best_u[1]
+            elif ucands:
+                upper_days = [max(ucands, key=uscore)]
+            for d_ in upper_days:
+                roles[d_].add("upper_emom")
+
         # ---------------------------------------------------------------- 7. Studio direkt nach der Schicht
         gym_start = {}
         # Beine ergaenzend: knieschonende Zusatz-Beinkraft nach Push/Pull, max. 2x pro Woche, nie direkt vor/nach schweren Beinen oder vor harten Laeufen
@@ -566,6 +615,17 @@ class AllrounderPlanner(pl.Planner):
                                   keySession=True,
                                   matchHint={"activityTypes": ["running"], "minDistanceKm": int(max(4, round(km * 0.8)))}),
                        start, dur)
+            elif "threshold" in r and hybrid and alt_week:
+                eb = lib.get("ergoBlocks") or {}
+                dur = int(eb.get("durationMin") or 55)
+                start = gym_slot(i, dur) or self.slot_run(ctx, dur)
+                if start is None:
+                    note_missing("Schwellentraining")
+                else:
+                    where = " · im Studio direkt nach der Schicht" if at_work(i) else (" · im Studio direkt vor der Schicht" if is_late(i) else " · im Studio")
+                    commit(i, mk_unit("Ergo-Blöcke (Rudern/SkiErg)", "rad", "pflicht", f"{eb.get('detail')}{where}{tsuf(start)}", dur,
+                                      keySession=True, exercises=exercises_for(lib, "ergoBlocks"),
+                                      matchHint={"activityTypes": ["rowing", "indoor_rowing", "cardio", "fitness_equipment", "other"]}), start, dur)
             elif "threshold" in r:
                 w = thr if lvl >= 0.85 else max(8, int(round(thr * 0.7)))
                 dur = threshold_total_min(w)
@@ -607,6 +667,11 @@ class AllrounderPlanner(pl.Planner):
                     fast = f" (schneller als dein 5-km-Tempo von {pl.fmt_pace(p5)} min/km, also schneller als {pl.fmt_pace(p5 * 0.4)} pro Runde)" if p5 else ""
                     text = (f"{rp}×400 m ALL OUT auf der Tartanbahn{fast} – jede Runde so schnell, wie du alle {rp} halten kannst · "
                             f"dazwischen genau 3 min Pause (erst ca. 1 min gehen, dann locker traben, nicht stehen bleiben – so schaffst du alle {rp} gleich schnell) · davor einlaufen (mind. 10 min, bis du an der Bahn bist), danach auslaufen{tsuf(start)}, nicht nüchtern")
+                elif indoor:
+                    kmh = f"{float(st.get('vo2Kmh') or 13.5):.1f}".replace(".", ",")
+                    text = (f"{rp}×{vm} min bei {kmh} km/h auf dem Laufband (1 % Steigung) · dazwischen je {vo2_rest_min(vm)} min mit 7 km/h gehen/traben · "
+                            f"Ziel: Puls in der letzten Minute 170–178 (kommt er nicht hoch: 0,5 km/h langsamer, schaffst du alle locker: 0,5 km/h schneller) · "
+                            f"davor 12 min einlaufen (9 → 11 km/h), danach auslaufen{tsuf(start)}, nicht nüchtern")
                 else:
                     text = (f"{rp}×{vm} min ALL OUT" + (f" · {vo2_pace_text(self.tg, vm)}" if vo2_pace_text(self.tg, vm) else " (deutlich schneller als dein Schwellentempo)")
                             + f" · je {vo2_rest_min(vm)} min locker traben · davor einlaufen (mind. 10 min, bis du am Platz bist), danach auslaufen{tsuf(start)}, nicht nüchtern")
@@ -634,12 +699,13 @@ class AllrounderPlanner(pl.Planner):
                         on_treadmill = True
                 if start is not None:
                     commit(i, mk_unit("Zone-2-Lauf", "lauf", "pflicht",
-                                      f"{fmt_km(km)} km · ganz locker, 130–140 bpm" + (" · auf dem Laufband im Studio direkt nach der Schicht" if on_treadmill else "") + f"{tsuf(start)}", run_minutes(km),
+                                      f"{fmt_km(km)} km · ganz locker, 130–140 bpm" + (" · auf dem Laufband im Studio direkt nach der Schicht" if on_treadmill else "")
+                                      + (" · Laufband: ca. " + f"{float(st.get('z2Kmh') or 9.0):.1f}".replace(".", ",") + " km/h bei 1 % Steigung (der Puls entscheidet, nicht das Tempo)" if indoor else "") + f"{tsuf(start)}", run_minutes(km),
                                       matchHint={"activityTypes": ["running"], "minDistanceKm": int(max(3, round(km * 0.7)))}),
                            start, dur)
 
             # ---- Kraft (Studio)
-            for kind, libkey, name in (("Push", "push", "Push"), ("Pull", "pull", "Pull"), ("Legs", "heavyLegs", "Schweres Beintraining")):
+            for kind, libkey, name in (("Push", "push", "Push"), ("Pull", "pull", "Pull"), ("Legs", legs_libkey, legs_name)):
                 is_mine = (kind == "Push" and i in push_days) or (kind == "Pull" and i in pull_days) or (kind == "Legs" and i == legs_day)
                 if not is_mine:
                     continue
@@ -676,6 +742,16 @@ class AllrounderPlanner(pl.Planner):
                     commit(i, mk_unit("Core (Studio)", "core", "bonus", f"{cg.get('detail') or '15 min'} · optional{' · im Studio direkt nach der Schicht' if at_work(i) else ''}{tsuf(core_after)}", cdur,
                                       exercises=exercises_for(lib, "coreGym"),
                                       matchHint={"activityTypes": ["strength_training", "cardio"]}), core_after, cdur)
+            if i in upper_days:
+                ukey = "upperEmom1" if ((monday.isocalendar()[1] + upper_days.index(i)) % 2 == 0) else "upperEmom2"
+                ue = lib.get(ukey) or {}
+                udur = int(ue.get("durationMin") or 15)
+                ustart = self.slot_run(ctx, udur, after=(last_end[i] + 10) if last_end[i] else None)
+                if ustart is not None:
+                    where = " · im Studio direkt nach der Schicht" if at_work(i) else (" · im Studio direkt vor der Schicht" if is_late(i) else "")
+                    commit(i, mk_unit("Oberkörper-EMOM", "emom", "bonus", f"{ue.get('detail') or '15 min EMOM'}{where}{tsuf(ustart)}", udur,
+                                      planLabel=ukey[-1], exercises=exercises_for(lib, ukey),
+                                      matchHint={"activityTypes": ["strength_training"]}), ustart, udur)
             if i == core_home_day:
                 ch = lib.get("core") or {}
                 cdur = int(ch.get("durationMin") or 12)
@@ -687,7 +763,7 @@ class AllrounderPlanner(pl.Planner):
         # ---------------------------------------------------------------- Mini-Einheiten (klein, aber sinnvoll)
         if st.get("miniSessions", True):
             run_names = ("Zone-2-Lauf", "Langer Lauf", "VO2max-Intervalle", "Backyard-Simulation")
-            gym_names = ("Push", "Pull")
+            gym_names = ("Push", "Pull", "Oberkörper-EMOM")
             b_race_week = params.get("bWeek") == 1
             limit_end = st["dayEndMin"]
             n_back = n_stairs = n_plyo = 0
@@ -753,7 +829,7 @@ class AllrounderPlanner(pl.Planner):
                 if ctxs[i].kind == "krank" or roles[i] == {"race"} or "race" in roles[i]:
                     continue
                 day_names = [p["unit"]["name"] for p in placed[i]]
-                legs_today = "Schweres Beintraining" in day_names
+                legs_today = "Schweres Beintraining" in day_names or "Bein-Ausdauer-Tag" in day_names
                 near_race = b_race_week
                 # 1) nach jedem Lauf: Wandsitzen + langsame Wadenheben (immer)
                 run_end = entry_end(i, run_names)
@@ -826,7 +902,7 @@ class AllrounderPlanner(pl.Planner):
                 return ""
             if "auf dem Laufband im Studio" in detail:
                 return "Zeit: direkt nach der Schicht auf dem Laufband im Studio, danach das Krafttraining."
-            if name in ("Push", "Pull", "Schweres Beintraining"):
+            if name in ("Push", "Pull", "Schweres Beintraining", "Bein-Ausdauer-Tag"):
                 if "direkt vor der Schicht" in detail:
                     return "Zeit: Spätschicht – deshalb das Studio direkt vor der Schicht."
                 if "direkt nach der Schicht" in detail:
@@ -890,10 +966,21 @@ class AllrounderPlanner(pl.Planner):
                     reason = "Gelenkschonender Ausdauerreiz, 2× pro Woche, locker."
                 elif name.startswith("Sprungübungen"):
                     reason = "Federnde Beine für bessere Laufökonomie; 2× pro Woche, nur nach lockeren Läufen."
+                elif name.startswith("Ergo-Blöcke"):
+                    reason = "Dritte harte Ausdauereinheit der Woche; wechselt wöchentlich mit der Schwelle auf dem Rad."
+                elif name == "Bein-Ausdauer-Tag":
+                    reason = "Wechselt wöchentlich mit dem schweren Beintag ab und liegt nie direkt vor Intervallen oder dem langen Lauf."
+                elif name == "Oberkörper-EMOM":
+                    reason = "2× pro Woche, kurz und ohne Beine – am besten nach einem lockeren Lauf oder Rad."
                 elif name.startswith("Wettkampf") or name == "Lockeres Auslaufen" or name.startswith("Regeneration"):
                     reason = ""
                 t = time_reason(i, name, entry.get("start"), u.get("detail", ""))
-                u["why"] = (reason + (" " if reason and t else "") + t).strip()
+                body = (reason + (" " if reason and t else "") + t).strip()
+                if hybrid:
+                    ben = HYBRID_BENEFIT.get(name) or next((v for k, v in HYBRID_BENEFIT.items() if name.startswith(k)), "")
+                    if ben:
+                        body = ("Bringt: " + ben + (" " + body if body else "")).strip()
+                u["why"] = body
 
         # Uebergabe an die naechste Woche
         run_idx = [i for i in range(n) if roles[i] & {"easy_run", "long_run", "intervals"}]

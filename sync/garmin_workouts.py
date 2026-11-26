@@ -80,11 +80,11 @@ def build_workout(unit):
     """Strukturiertes Garmin-Workout aus einer geplanten Einheit (oder None, wenn nichts Sinnvolles herauszulesen ist)."""
     name, detail = unit.get("name"), unit.get("detail") or ""
     if name == "VO2max-Intervalle":
-        m = re.search(r"(\d+)×(\d+) min ALL OUT", detail)
+        m = re.search(r"(\d+)×(\d+) min (?:ALL OUT|bei [\d,]+ km/h)", detail)
         if not m:
             return None
         reps, mins = int(m.group(1)), int(m.group(2))
-        rest = re.search(r"je (\d+) min locker traben", detail)
+        rest = re.search(r"je (\d+) min (?:locker traben|mit 7 km/h)", detail)
         rest_min = int(rest.group(1)) if rest else min(mins, 3)
         # ALL OUT: nur eine Untergrenze ("schneller als ..."), nach oben keine Grenze - sonst piept die Uhr, sobald du wirklich Gas gibst
         pace = re.search(r"schneller als (\d+):(\d+) min/km", detail)
@@ -92,13 +92,13 @@ def build_workout(unit):
         steps = [
             step(1, "warmup", "lap", desc="Einlaufen, bis du am Platz bist (mind. 10 min) – dann Lap-Taste"),
             repeat(2, reps, [
-                step(3, "interval", "time", mins * 60, target, desc=f"{mins} min ALL OUT"),
+                step(3, "interval", "time", mins * 60, target, desc=(f"{mins} min hart (Laufband)" if "km/h" in detail else f"{mins} min ALL OUT")),
                 step(4, "recovery", "time", rest_min * 60, desc="locker traben"),
             ]),
             step(5, "cooldown", "lap", desc="Auslaufen, so lange du magst – dann Lap-Taste"),
         ]
         seconds = (15 + reps * (mins + rest_min) + 10) * 60
-        return workout(f"Intervalle {reps}×{mins} min ALL OUT", steps, seconds, detail)
+        return workout(f"Intervalle {reps}×{mins} min " + ("hart" if "km/h" in detail else "ALL OUT"), steps, seconds, detail)
     if name == "Backyard-Simulation":
         m = re.search(r"(\d+) Runden à (\d+(?:[.,]\d+)?) km", detail)
         if not m:

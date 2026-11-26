@@ -818,3 +818,50 @@ class TrackIntervals(unittest.TestCase):
         self.assertIn("6×400 m ALL OUT", vo2["detail"])
         self.assertIn("Tartanbahn", vo2["detail"])
         self.assertIn("3 min Pause", vo2["detail"])
+
+
+class HybridMode(unittest.TestCase):
+    """Hybrid-Wochenmuster (hybridFrom): Sonntag frei, Oberkoerper-EMOM statt Push/Pull, Schwelle/Ergo und schwere Beine/Bein-Ausdauer im Wechsel."""
+    RAW = {"settings": {"hybridFrom": "2026-12-07", "restWeekdays": [6], "indoor": True}}
+    EVEN = date(2026, 12, 7)       # KW 50: Schwelle + schwere Beine
+    ODD = date(2026, 12, 14)       # KW 51: Ergo-Bloecke + Bein-Ausdauer-Tag
+
+    def week(self, monday, raw=None):
+        return plan(raw or self.RAW, start=monday)[pl.iso(monday)]
+
+    def test_sunday_is_free_and_no_push_pull(self):
+        for monday in (self.EVEN, self.ODD):
+            w = self.week(monday)
+            self.assertEqual(names(w, "Sonntag"), [])
+            self.assertIn("Ruhetag", w["days"]["Sonntag"]["focus"])
+            found = {u["name"] for _, u in all_units(w)}
+            self.assertNotIn("Push", found)
+            self.assertNotIn("Pull", found)
+
+    def test_alternating_weeks(self):
+        even = {u["name"] for _, u in all_units(self.week(self.EVEN))}
+        odd = {u["name"] for _, u in all_units(self.week(self.ODD))}
+        self.assertIn("Schwellentraining Rad", even)
+        self.assertNotIn("Ergo-Blöcke (Rudern/SkiErg)", even)
+        self.assertIn("Ergo-Blöcke (Rudern/SkiErg)", odd)
+        self.assertNotIn("Schwellentraining Rad", odd)
+        self.assertNotIn("Bein-Ausdauer-Tag", even)
+        self.assertIn("Bein-Ausdauer-Tag", odd)
+
+    def test_upper_emom_and_benefit_text(self):
+        w = self.week(self.EVEN)
+        emoms = [u for _, u in all_units(w) if u["name"] == "Oberkörper-EMOM"]
+        self.assertGreaterEqual(len(emoms), 1)
+        for _, u in all_units(w):
+            if u["name"] in ("Zone-2-Lauf", "Oberkörper-EMOM", "Langer Lauf", "Schweres Beintraining", "VO2max-Intervalle"):
+                self.assertTrue(u["why"].startswith("Bringt:"), (u["name"], u["why"]))
+
+    def test_treadmill_prescription(self):
+        texts = [u["detail"] for _, u in all_units(self.week(self.EVEN)) if u["name"] in ("VO2max-Intervalle", "Zone-2-Lauf")]
+        self.assertTrue(any("km/h" in t and "Laufband" in t for t in texts))
+
+    def test_before_hybrid_from_nothing_changes(self):
+        monday = date(2026, 11, 30)
+        base = plan({}, start=monday)[pl.iso(monday)]
+        with_flag = plan(self.RAW, start=monday)[pl.iso(monday)]
+        self.assertEqual([names(base, wd) for wd in WD], [names(with_flag, wd) for wd in WD])

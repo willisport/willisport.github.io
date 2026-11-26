@@ -65,6 +65,11 @@ DEFAULT_SETTINGS = {
     "legAccessory": False,      # zusaetzliche knieschonende Beinkraft (Beine ergaenzend) an bis zu 2 Push-/Pull-Tagen pro Woche
     "bikeFixedMin": None,       # feste Dauer fuer Rad Zone 2 in Minuten (sonst automatisch 45-60)
     "noRunDays": [],            # Tage ohne Lauf (z. B. Tag war schon Rad/Studio, Lauf bewusst ausgelassen)
+    "hybridFrom": None,         # ab diesem Montag (YYYY-MM-DD) Hybrid-Wochenmuster: Ergo-Bloecke/Schwelle im Wechsel, schwere Beine/Bein-Ausdauer im Wechsel, Oberkoerper-EMOM statt Push/Pull
+    "restWeekdays": [],         # feste freie Wochentage im Hybrid-Modus (0 = Montag ... 6 = Sonntag)
+    "indoor": False,            # Laufband-Vorgaben (km/h) in Lauf-Einheiten
+    "z2Kmh": 9.0,               # Laufband Zone 2 (Startwert, der Puls entscheidet)
+    "vo2Kmh": 13.5,             # Laufband-Intervalle (Startwert, wird nach Puls angepasst)
     "longForce": [],            # ausdruecklicher Tag fuer den langen Lauf, z. B. ["2026-11-14"]
     "noThrDays": [],            # an diesen Tagen keine Schwellen-Einheit (alles andere bleibt moeglich)
     "noHardDays": [],           # Tage ohne harte Einheiten (langer Lauf, VO2max, Schwelle, schwere Beine)
@@ -111,6 +116,40 @@ DEFAULT_LIBRARY = {
                                 {"name": "Adduktoren Außenseite", "sets": 2, "reps": "6–8", "rest": "3–4 min"},
                                 {"name": "Wadenheben", "sets": 2, "reps": "6–8", "rest": "3–4 min"},
                                 {"name": "Beinbeuger", "sets": 2, "reps": "6–8", "rest": "3–4 min"}]},
+    "heavyLegsHybrid": {"name": "Schweres Beintraining", "durationMin": 70,
+                        "detail": "Kniebeuge, Kreuzheben/RDL, Hip Thrust, Adduktoren, Waden · schwer und sauber, lange Pausen",
+                        "exercises": [{"name": "Kniebeuge (Stange auf dem Nacken)", "sets": 4, "reps": "5", "rest": "3 min"},
+                                      {"name": "Kreuzheben oder Rumänisches Kreuzheben", "sets": 3, "reps": "6", "rest": "3 min"},
+                                      {"name": "Hip Thrust", "sets": 3, "reps": "8", "rest": "2 min"},
+                                      {"name": "Adduktoren Innenseite", "sets": 3, "reps": "10", "rest": "90 s"},
+                                      {"name": "Adduktoren Außenseite", "sets": 3, "reps": "10", "rest": "90 s"},
+                                      {"name": "Wadenheben", "sets": 4, "reps": "8–12", "rest": "90 s"}]},
+    "legEndurance": {"name": "Bein-Ausdauer-Tag", "durationMin": 70,
+                     "detail": "Beinstrecker 4×30 direkt mit Beinbeuger, dazu Kniebeuge, Ausfallschritte, Wallballs, Schienbeinheber, Waden · viele Wiederholungen, Puls hoch",
+                     "exercises": [{"name": "Aufwärmen: Rad oder Rudern locker", "sets": 1, "reps": "10 min", "rest": "-"},
+                                   {"name": "Beinstrecker (Superset mit Beinbeuger)", "sets": 4, "reps": "30", "rest": "kurz, direkt weiter"},
+                                   {"name": "Beinbeuger (Superset mit Beinstrecker)", "sets": 4, "reps": "20–30", "rest": "60–90 s"},
+                                   {"name": "Kniebeuge (Stange auf dem Nacken, mittleres Gewicht)", "sets": 3, "reps": "10–12", "rest": "2 min"},
+                                   {"name": "Ausfallschritte", "sets": 3, "reps": "12 pro Seite", "rest": "60 s"},
+                                   {"name": "Wallballs (Puls ca. 150–165)", "sets": 4, "reps": "20", "rest": "60 s"},
+                                   {"name": "Schienbeinheber", "sets": 3, "reps": "20–25", "rest": "45 s"},
+                                   {"name": "Wadenheben", "sets": 3, "reps": "15–20", "rest": "45 s"}]},
+    "ergoBlocks": {"name": "Ergo-Blöcke (Rudern/SkiErg)", "durationMin": 55,
+                   "detail": "10 min locker · 6 × 5 min im Wechsel Rudern und SkiErg, je 1 min Pause · Puls Block 1–2: 140–150, Block 3–6: 150–162, nie über 165 · 5 min locker",
+                   "exercises": [{"name": "Einrollen locker (Rudern/SkiErg/Rad)", "sets": 1, "reps": "10 min", "rest": "-"},
+                                 {"name": "Block 1 + 2: Rudern, SkiErg (Puls 140–150)", "sets": 2, "reps": "5 min", "rest": "1 min"},
+                                 {"name": "Block 3–6: Rudern, SkiErg im Wechsel (Puls 150–162)", "sets": 4, "reps": "5 min", "rest": "1 min"},
+                                 {"name": "Ausrollen locker", "sets": 1, "reps": "5 min", "rest": "-"}]},
+    "upperEmom1": {"name": "Oberkörper-EMOM", "durationMin": 15,
+                   "detail": "15 min EMOM: Minute 1 Schulterdrücken (Kurzhanteln) 8×, Minute 2 Bizepscurls 10×, Minute 3 Trizepsdrücken am Kabel 10× · 5 Runden · Gewicht so, dass du immer sauber fertig wirst",
+                   "exercises": [{"name": "Schulterdrücken Kurzhanteln", "sets": 5, "reps": "8 (Minute 1)", "rest": "Rest der Minute"},
+                                 {"name": "Bizepscurls", "sets": 5, "reps": "10 (Minute 2)", "rest": "Rest der Minute"},
+                                 {"name": "Trizepsdrücken am Kabel", "sets": 5, "reps": "10 (Minute 3)", "rest": "Rest der Minute"}]},
+    "upperEmom2": {"name": "Oberkörper-EMOM", "durationMin": 15,
+                   "detail": "15 min EMOM: Minute 1 Seitheben 12×, Minute 2 Hammercurls 10×, Minute 3 Dips oder Trizepsstrecken 10× · 5 Runden · Gewicht so, dass du immer sauber fertig wirst",
+                   "exercises": [{"name": "Seitheben", "sets": 5, "reps": "12 (Minute 1)", "rest": "Rest der Minute"},
+                                 {"name": "Hammercurls", "sets": 5, "reps": "10 (Minute 2)", "rest": "Rest der Minute"},
+                                 {"name": "Dips oder Trizepsstrecken", "sets": 5, "reps": "10 (Minute 3)", "rest": "Rest der Minute"}]},
     "legAccessory": {"name": "Beine ergänzend", "durationMin": 25,
                      "detail": "Rumänisches Kreuzheben, Beinpresse, Beinbeuger, Hip Thrust · knieschonend, 3 Sätze, kontrolliert absenken",
                      "exercises": [{"name": "Rumänisches Kreuzheben (Kurzhanteln)", "sets": 3, "reps": "10", "rest": "90 s"},
@@ -497,7 +536,7 @@ def build_day_contexts(monday: date, inputs: dict, today: date) -> list[DayCtx]:
         if is_sick:
             ctx.kind = "krank"
             ctx.agenda.append({"kind": "krank", "title": "Krank", "start": None, "end": None})
-        elif ds in (st.get("restDays") or []):
+        elif ds in (st.get("restDays") or []) or (st.get("hybridFrom") and ds >= st["hybridFrom"] and d.weekday() in (st.get("restWeekdays") or [])):
             ctx.kind = "krank"                      # fuer den Planer: kein Training; angezeigt wird es als Ruhetag
             ctx.rest = True
             ctx.agenda.append({"kind": "frei", "title": "Ruhetag", "start": None, "end": None})
@@ -1297,7 +1336,7 @@ def short_label(unit: dict) -> str:
     n = unit["name"]
     return {"Rad Zone 2": "Rad", "Rad Zone 1 (locker)": "lockeres Rad", "Langes Rad Zone 2": "langes Rad",
             "VO2max-Intervalle": "VO2max-Intervalle", "Schwellentraining Rad": "Schwelle (Rad)",
-            "Zone-2-Lauf": "Lauf", "Langer Lauf": "langer Lauf", "Backyard-Simulation": "Backyard-Simulation", "Schweres Beintraining": "schwere Beine",
+            "Zone-2-Lauf": "Lauf", "Langer Lauf": "langer Lauf", "Ergo-Blöcke (Rudern/SkiErg)": "Ergo-Blöcke", "Bein-Ausdauer-Tag": "Bein-Ausdauer", "Oberkörper-EMOM": "EMOM", "Backyard-Simulation": "Backyard-Simulation", "Schweres Beintraining": "schwere Beine",
             "Arme/Schultern": "Arme/Schultern", "Core (zu Hause)": "Core", "Core (Studio)": "Core"}.get(n, n)
 
 
