@@ -491,7 +491,7 @@ class AllrounderPlanner(pl.Planner):
         upper_days: list[int] = []
         endu_day = None
         arms_day = None
-        if hybrid and phase != "wettkampf" and not params.get("skipHeavy"):
+        if hybrid and phase != "wettkampf":
             gym_dur["Endu"] = int((lib.get("legEndurance") or {}).get("durationMin") or 70)
             gym_dur["Arms"] = int((lib.get("armsHybrid") or {}).get("durationMin") or 40)
             hard_set = {d for d in (li, ii, ti) if d is not None}
@@ -506,19 +506,19 @@ class AllrounderPlanner(pl.Planner):
                 return (ctxs[i].largest_window() / 100 - (30 if i in easy_days else 0) - (15 if (i - 1) in hard_set else 0)
                         - (25 if (i + 1) in hard_set else 0) - (12 if legs_day is not None and abs(i - legs_day) == 2 else 0)
                         - (10 if g_ is not None and g_ < 3 else 0))
-            ecands = [i for i in pool if endu_ok(i)]
+            ecands = [i for i in pool if endu_ok(i)] if not params.get("skipHeavy") else []
             if ecands:
                 endu_day = max(ecands, key=escore)
                 roles[endu_day].add("legs_endu")
-            else:
+            elif not params.get("skipHeavy"):
                 note_missing("Bein-Ausdauer-Tag")
 
             def arms_ok(i):
-                return (i not in hard_set and i not in (legs_day, endu_day) and not ctxs[i].no_gym and level[i] >= 0.85
+                return (i != ti and i not in (legs_day, endu_day) and not ctxs[i].no_gym and level[i] >= 0.85
                         and gym_ok(i, gym_dur["Arms"], 0.85))
 
             def ascore(i):
-                return (ctxs[i].largest_window() / 100 + (8 if i in easy_days else 0)
+                return (ctxs[i].largest_window() / 100 + (8 if i in easy_days else 0) - (10 if i in (li, ii) else 0)
                         - (8 if endu_day is not None and abs(i - endu_day) == 1 else 0))
             acands = [i for i in pool if arms_ok(i)]
             if acands:
