@@ -892,8 +892,9 @@ class HybridMode(unittest.TestCase):
         self.assertEqual([names(base, wd) for wd in WD], [names(with_flag, wd) for wd in WD])
 
     def test_forced_extras_on_a_seminar_day_and_light_ergo(self):
-        base = {"hybridFrom": "2026-11-30", "restAuto": True, "indoor": True}
         monday = date(2026, 11, 30)
+        base = {"hybridFrom": "2026-11-30", "restAuto": True, "indoor": True,
+                "noHardDays": [pl.iso(monday + timedelta(days=k)) for k in range(7)]}          # ruhige Woche: ein Tag nur mit Rad
         w0 = self.week(monday, {"settings": dict(base)})
         bike_days = [k for k, wd in enumerate(WD) if "Rad Zone 2" in names(w0, wd) and not any(n in names(w0, wd) for n in ("Schweres Beintraining", "Bein-Ausdauer-Tag", "Schulter/Arme"))]
         self.assertTrue(bike_days)
