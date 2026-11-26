@@ -504,7 +504,8 @@ class AllrounderPlanner(pl.Planner):
             def escore(i):
                 g_ = carry_gap("Legs", i)
                 return (ctxs[i].largest_window() / 100 - (30 if i in easy_days else 0) - (15 if (i - 1) in hard_set else 0)
-                        - (25 if (i + 1) in hard_set else 0) - (12 if legs_day is not None and abs(i - legs_day) == 2 else 0)
+                        - (60 if (i + 1) in hard_set else 0) - (60 if ti is not None and (i + 1) == ti else 0)
+                        - (12 if legs_day is not None and abs(i - legs_day) == 2 else 0)
                         - (10 if g_ is not None and g_ < 3 else 0))
             ecands = [i for i in pool if endu_ok(i)] if not params.get("skipHeavy") else []
             if ecands:
@@ -605,6 +606,9 @@ class AllrounderPlanner(pl.Planner):
         core_home_day = None
         core_gym_day = None
         want_core = int(st.get("coreSessions", 2) or 0)
+        forced_core = sum(1 for k_, spec_ in (st.get("miniForce") or {}).items()
+                          if isinstance(spec_, dict) and "Core (Studio)" in (spec_.get("units") or []) and any(pl.iso(dt_) == k_ for dt_ in dates))
+        want_core = max(0, want_core - forced_core)               # ausdruecklich gewuenschtes Core an einem Tag zaehlt zu den Core-Einheiten der Woche
         if want_core >= 1 and phase != "wettkampf":
             # Studio-Core: an einem Studio-Tag (Pull bevorzugt), direkt hinter der Einheit
             gym_days = [d for d in list(pull_days) + list(push_days) + ([arms_day] if arms_day is not None else []) if not ctxs[d].no_core and dates[d] >= today]    # nie auf einen vergangenen Tag
