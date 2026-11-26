@@ -205,6 +205,14 @@ class AllrounderPlanner(pl.Planner):
         thr = params["thresholdMin"]
         iv_dur = interval_total_min(reps, params["vo2Min"]) if reps >= 3 else 0
         want_long, want_vo2, want_thr = phase != "wettkampf" and not params.get("bWeek") == 1, reps >= 3, bool(thr)
+        hp = (st.get("hardPlan") or {}).get(pl.iso(monday))          # Wiedereinstieg: nur die genannten harten Einheiten ("long", "vo2", "ergo", "legs", "endu")
+        if hp is not None:
+            want_long = want_long and "long" in hp
+            want_vo2 = want_vo2 and "vo2" in hp
+            want_thr = want_thr and "ergo" in hp
+            if "legs" not in hp:
+                want["Legs"] = 0
+        endu_allowed = hp is None or "endu" in hp
         win = [c.largest_window() for c in ctxs]
         MISSING = -6000
 
@@ -410,6 +418,13 @@ class AllrounderPlanner(pl.Planner):
                        and i not in (li, ii, ti, legs_day) and not ctxs[i].no_run}
         n_easy = max(0, n_easy - len(forced_runs))          # ausdruecklich gewuenschte Lauftage zaehlen zu den Laeufen der Woche
         z2_km = params["z2Km"]
+        try:
+            rwf = float((st.get("returnWeeks") or {}).get(pl.iso(monday)) or 1.0)
+        except (TypeError, ValueError):
+            rwf = 1.0
+        run_floor = 3.0 if rwf < 1 else 4.0                      # Wiedereinstieg nach einer Pause: auch kuerzere lockere Laeufe
+        if rwf < 1:
+            z2_km = max(3.0, round(z2_km * rwf * 2) / 2)
         easy_days: list[int] = []
 
         def easy_pen(i):
@@ -429,7 +444,7 @@ class AllrounderPlanner(pl.Planner):
             return pen
 
         # Alle Kombinationen bewerten: Laufen und Rad moeglichst abwechselnd (keine Laufserien an Folgetagen)
-        km_min = max(4.0, round(z2_km * 0.7 * 2) / 2)
+        km_min = max(run_floor, round(z2_km * 0.7 * 2) / 2)
         hard_runs = {d for d in (li, ii) if d is not None} | forced_runs
 
         def run_penalty(combo):
@@ -478,7 +493,7 @@ class AllrounderPlanner(pl.Planner):
                     and i not in (li, ii, ti, legs_day) and not ctxs[i].no_run):
                 easy_days.append(i)
                 roles[i].add("easy_run")
-        easy_km = {easy_days[k]: (z2_km if k == 0 else max(4.0, round(z2_km * 0.7 * 2) / 2)) for k in range(len(easy_days))}
+        easy_km = {easy_days[k]: (z2_km if k == 0 else max(run_floor, round(z2_km * 0.7 * 2) / 2)) for k in range(len(easy_days))}
         for ci in easy_days:
             try:
                 want_km = (st.get("runKmDay") or {}).get(pl.iso(dates[ci]))
@@ -507,11 +522,11 @@ class AllrounderPlanner(pl.Planner):
                         - (60 if (i + 1) in hard_set else 0) - (60 if ti is not None and (i + 1) == ti else 0)
                         - (12 if legs_day is not None and abs(i - legs_day) == 2 else 0)
                         - (10 if g_ is not None and g_ < 3 else 0))
-            ecands = [i for i in pool if endu_ok(i)] if not params.get("skipHeavy") else []
+            ecands = [i for i in pool if endu_ok(i)] if (not params.get("skipHeavy") and endu_allowed) else []
             if ecands:
                 endu_day = max(ecands, key=escore)
                 roles[endu_day].add("legs_endu")
-            elif not params.get("skipHeavy"):
+            elif not params.get("skipHeavy") and endu_allowed:
                 note_missing("Bein-Ausdauer-Tag")
 
             def arms_ok(i):

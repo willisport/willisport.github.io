@@ -923,3 +923,16 @@ class HybridMode(unittest.TestCase):
         for _, u in all_units(w):
             if u["name"] == "Core":
                 self.assertEqual([e["name"] for e in u["exercises"]], ["Plank", "Seitlicher Plank", "Russian Twist", "Leg Raises"])
+
+    def test_return_plan_limits_hard_sessions_and_scales_runs(self):
+        monday = date(2026, 12, 28)
+        raw = {"settings": {"hybridFrom": "2026-11-30", "restAuto": True, "indoor": True,
+                            "hardPlan": {pl.iso(monday): ["long"]}, "returnWeeks": {pl.iso(monday): 0.5}}}
+        w = plan(raw, start=monday)[pl.iso(monday)]
+        found = [u["name"] for _, u in all_units(w)]
+        self.assertIn("Langer Lauf", found + [u["name"] for _, u in all_units(w) if u.get("title", "").startswith("Langer Lauf")])
+        for gone in ("VO2max-Intervalle", "Ergo-Blöcke (Rudern/SkiErg)", "Schweres Beintraining", "Bein-Ausdauer-Tag"):
+            self.assertNotIn(gone, found)
+        base = plan({"settings": dict(raw["settings"], hardPlan={}, returnWeeks={})}, start=monday)[pl.iso(monday)]
+        km = lambda wk: [float(re.match(r"(\d+(?:[.,]\d+)?)", u["detail"]).group(1).replace(",", ".")) for _, u in all_units(wk) if u["name"] == "Zone-2-Lauf"]
+        self.assertTrue(km(w) and km(base) and max(km(w)) < max(km(base)))

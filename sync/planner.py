@@ -68,6 +68,8 @@ DEFAULT_SETTINGS = {
     "hybridFrom": None,         # ab diesem Montag (YYYY-MM-DD) Hybrid-Wochenmuster: Ergo-Bloecke/Schwelle im Wechsel, schwere Beine/Bein-Ausdauer im Wechsel, Oberkoerper-EMOM statt Push/Pull
     "miniForce": {},            # {"2026-12-03": {"after": "17:30", "units": ["Core (Studio)", "Rückwärtsgehen am Berg"]}}: Zusatzeinheiten an bestimmten Tagen (z. B. Studio bei einem Seminar)
     "ergoForce": [],            # Tage mit leichten Ergo-Bloecken (Rudern/SkiErg), auch in ruhigen Wochen
+    "hardPlan": {},             # {"2026-12-28": ["long", "legs"]}: in dieser Woche nur diese harten Einheiten (long, vo2, ergo, legs, endu) - Wiedereinstieg nach Pause
+    "returnWeeks": {},          # {"2026-12-14": 0.5, ...}: Faktor fuer Umfang/Kilometer in einzelnen Wochen (Wiedereinstieg nach Pause)
     "restAuto": False,          # Hybrid: freien Tag der Woche automatisch waehlen (bevorzugt ein Spaetschicht-Tag, sonst Sonntag)
     "restWeekdays": [],         # feste freie Wochentage im Hybrid-Modus (0 = Montag ... 6 = Sonntag)
     "indoor": False,            # Laufband-Vorgaben (km/h) in Lauf-Einheiten
@@ -781,6 +783,10 @@ def week_params(monday: date, inputs: dict, factor_override: float | None = None
         base_factor *= 0.85
 
     factor = base_factor * taper_factor * (0.7 if phase == "recovery" else 1.0)
+    try:
+        factor *= float((st.get("returnWeeks") or {}).get(iso(monday)) or 1.0)          # sanfter Wiedereinstieg nach einer Pause (z. B. {"2026-12-14": 0.5})
+    except (TypeError, ValueError):
+        pass
     if factor_override is not None:
         factor = factor_override
 
