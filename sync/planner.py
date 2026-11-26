@@ -66,6 +66,7 @@ DEFAULT_SETTINGS = {
     "bikeFixedMin": None,       # feste Dauer fuer Rad Zone 2 in Minuten (sonst automatisch 45-60)
     "noRunDays": [],            # Tage ohne Lauf (z. B. Tag war schon Rad/Studio, Lauf bewusst ausgelassen)
     "hybridFrom": None,         # ab diesem Montag (YYYY-MM-DD) Hybrid-Wochenmuster: Ergo-Bloecke/Schwelle im Wechsel, schwere Beine/Bein-Ausdauer im Wechsel, Oberkoerper-EMOM statt Push/Pull
+    "restAuto": False,          # Hybrid: freien Tag der Woche automatisch waehlen (bevorzugt ein Spaetschicht-Tag, sonst Sonntag)
     "restWeekdays": [],         # feste freie Wochentage im Hybrid-Modus (0 = Montag ... 6 = Sonntag)
     "indoor": False,            # Laufband-Vorgaben (km/h) in Lauf-Einheiten
     "z2Kmh": 9.0,               # Laufband Zone 2 (Startwert, der Puls entscheidet)
@@ -125,13 +126,13 @@ DEFAULT_LIBRARY = {
                                       {"name": "Adduktoren Außenseite", "sets": 3, "reps": "10", "rest": "90 s"},
                                       {"name": "Wadenheben", "sets": 4, "reps": "8–12", "rest": "90 s"}]},
     "legEndurance": {"name": "Bein-Ausdauer-Tag", "durationMin": 70,
-                     "detail": "Beinstrecker 4×30 direkt mit Beinbeuger, dazu Kniebeuge, Ausfallschritte, Wallballs, Schienbeinheber, Waden · viele Wiederholungen, Puls hoch",
+                     "detail": "Beinstrecker 4×30 direkt mit Beinbeuger, danach Highbox-Runden (Wallballs, Kniebeuge, Ausfallschritte), Schienbeinheber und Waden · viele Wiederholungen, Puls hoch · Woche 1: ein Satz weniger",
                      "exercises": [{"name": "Aufwärmen: Rad oder Rudern locker", "sets": 1, "reps": "10 min", "rest": "-"},
                                    {"name": "Beinstrecker (Superset mit Beinbeuger)", "sets": 4, "reps": "30", "rest": "kurz, direkt weiter"},
                                    {"name": "Beinbeuger (Superset mit Beinstrecker)", "sets": 4, "reps": "20–30", "rest": "60–90 s"},
-                                   {"name": "Kniebeuge (Stange auf dem Nacken, mittleres Gewicht)", "sets": 3, "reps": "10–12", "rest": "2 min"},
-                                   {"name": "Ausfallschritte", "sets": 3, "reps": "12 pro Seite", "rest": "60 s"},
-                                   {"name": "Wallballs (Puls ca. 150–165)", "sets": 4, "reps": "20", "rest": "60 s"},
+                                   {"name": "Highbox-Runde: 20 Wallballs", "sets": 4, "reps": "20", "rest": "direkt weiter"},
+                                   {"name": "Highbox-Runde: Kniebeuge mit Stange (mittleres Gewicht)", "sets": 4, "reps": "10–12", "rest": "direkt weiter"},
+                                   {"name": "Highbox-Runde: Ausfallschritte", "sets": 4, "reps": "12 pro Seite", "rest": "2 min Pause nach der Runde (Puls ca. 150–165)"},
                                    {"name": "Schienbeinheber", "sets": 3, "reps": "20–25", "rest": "45 s"},
                                    {"name": "Wadenheben", "sets": 3, "reps": "15–20", "rest": "45 s"}]},
     "ergoBlocks": {"name": "Ergo-Blöcke (Rudern/SkiErg)", "durationMin": 55,
@@ -140,6 +141,28 @@ DEFAULT_LIBRARY = {
                                  {"name": "Block 1 + 2: Rudern, SkiErg (Puls 140–150)", "sets": 2, "reps": "5 min", "rest": "1 min"},
                                  {"name": "Block 3–6: Rudern, SkiErg im Wechsel (Puls 150–162)", "sets": 4, "reps": "5 min", "rest": "1 min"},
                                  {"name": "Ausrollen locker", "sets": 1, "reps": "5 min", "rest": "-"}]},
+    "upperEmom3": {"name": "Oberkörper-EMOM", "durationMin": 15,
+                   "detail": "15 min EMOM: ungerade Minuten 5–6 Klimmzüge (mit Gummiband), gerade Minuten 12–15 Liegestütze (später mit Gewichtsweste) · Wiederholungen so, dass du die Minute sauber schaffst",
+                   "exercises": [{"name": "Klimmzüge mit Gummiband", "sets": 8, "reps": "5–6 (ungerade Minuten)", "rest": "Rest der Minute"},
+                                 {"name": "Liegestütze (später mit Zusatzgewicht)", "sets": 7, "reps": "12–15 (gerade Minuten)", "rest": "Rest der Minute"}]},
+    "armsHybrid": {"name": "Schulter/Arme", "durationMin": 40,
+                   "detail": "Schulterdrücken, Seitheben, Hinterschulter, Bizepscurls, Hammercurls, Trizepsdrücken, Dips · schwerer als der EMOM, saubere Technik",
+                   "exercises": [{"name": "Schulterdrücken (Kurzhanteln oder Maschine)", "sets": 4, "reps": "6–8", "rest": "2 min"},
+                                 {"name": "Seitheben", "sets": 3, "reps": "12", "rest": "60 s"},
+                                 {"name": "Hinterschulter (Reverse Butterfly)", "sets": 3, "reps": "12", "rest": "60 s"},
+                                 {"name": "Bizepscurls (Langhantel)", "sets": 3, "reps": "8–10", "rest": "90 s"},
+                                 {"name": "Hammercurls", "sets": 3, "reps": "10", "rest": "60 s"},
+                                 {"name": "Trizepsdrücken am Kabel", "sets": 3, "reps": "8–10", "rest": "90 s"},
+                                 {"name": "Dips oder Trizepsstrecken", "sets": 3, "reps": "10", "rest": "60 s"}]},
+    "mobilityLegs": {"name": "Mobility Beine", "durationMin": 12,
+                     "detail": "10–15 min Dehnen und Mobility für die Beine: Hüftbeuger, Oberschenkelvorderseite, Beinrückseite, Gesäß, Adduktoren, Waden",
+                     "exercises": [{"name": "Hüftbeuger (tiefer Ausfallschritt, Becken nach vorn)", "sets": 2, "reps": "45 s pro Seite", "rest": "-"},
+                                   {"name": "Oberschenkelvorderseite (Ferse zum Gesäß)", "sets": 2, "reps": "45 s pro Seite", "rest": "-"},
+                                   {"name": "Beinrückseite (Bein auf Stufe, Rücken gerade)", "sets": 2, "reps": "45 s pro Seite", "rest": "-"},
+                                   {"name": "Gesäß (Taube oder Figur 4)", "sets": 2, "reps": "45 s pro Seite", "rest": "-"},
+                                   {"name": "Adduktoren (Frosch oder Schmetterling)", "sets": 2, "reps": "60 s", "rest": "-"},
+                                   {"name": "Waden (Ferse am Boden, Knie gestreckt und gebeugt)", "sets": 2, "reps": "45 s pro Seite", "rest": "-"},
+                                   {"name": "90/90 Hüftrotation", "sets": 1, "reps": "8 pro Seite", "rest": "-"}]},
     "upperEmom1": {"name": "Oberkörper-EMOM", "durationMin": 15,
                    "detail": "15 min EMOM: Minute 1 Schulterdrücken (Kurzhanteln) 8×, Minute 2 Bizepscurls 10×, Minute 3 Trizepsdrücken am Kabel 10× · 5 Runden · Gewicht so, dass du immer sauber fertig wirst",
                    "exercises": [{"name": "Schulterdrücken Kurzhanteln", "sets": 5, "reps": "8 (Minute 1)", "rest": "Rest der Minute"},
@@ -1340,6 +1363,30 @@ def short_label(unit: dict) -> str:
             "Arme/Schultern": "Arme/Schultern", "Core (zu Hause)": "Core", "Core (Studio)": "Core"}.get(n, n)
 
 
+def pick_rest_day(ctxs):
+    """Hybrid (restAuto): ein freier Tag pro Woche, bevorzugt ein Spaetschicht-Tag (ausschlafen, entspannt zur Schicht), dann ein Seminartag, sonst Sonntag."""
+    best = None
+    for i, c in enumerate(ctxs):
+        if c.kind in ("krank", "urlaub"):
+            continue
+        sc = 0
+        if c.shift_start is not None and c.shift_start >= 12 * 60:
+            sc += 20 + (4 if c.shift_start >= 15 * 60 else 0)
+        elif c.kind == "school":
+            sc += 8
+        elif c.kind == "free":
+            sc += 3
+        if i == 6:
+            sc += 3
+        if best is None or sc > best[0]:
+            best = (sc, i)
+    if best is not None:
+        c = ctxs[best[1]]
+        c.kind = "krank"
+        c.rest = True
+        c.agenda.append({"kind": "frei", "title": "Ruhetag", "start": None, "end": None})
+
+
 def generate_week(monday: date, inputs: dict, today: date, template_library: dict | None = None,
                   carry: dict | None = None) -> dict:
     """carry: veraenderliche Uebergabe von der Vorwoche (letzte Push/Pull/Bein-/Hart-Tage), damit auch
@@ -1348,6 +1395,9 @@ def generate_week(monday: date, inputs: dict, today: date, template_library: dic
     project_open_ranges(inputs, today)
     params = week_params(monday, inputs)
     ctxs = build_day_contexts(monday, inputs, today)
+    _st = inputs["settings"]
+    if _st.get("hybridFrom") and _st.get("restAuto") and iso(monday) >= str(_st["hybridFrom"]) and not any(c.rest for c in ctxs):
+        pick_rest_day(ctxs)
     if inputs["settings"].get("planMode", "allrounder") == "allrounder":
         import planner_allrounder
         planner = planner_allrounder.AllrounderPlanner(inputs, lib)
@@ -1408,8 +1458,8 @@ def generate_week(monday: date, inputs: dict, today: date, template_library: dic
         if roles[i] == {"race"}:
             focus += "WETTKAMPFTAG"
         elif ctx.kind == "krank" and ctx.rest:
-            focus += "Ruhetag – Erholung, kein Training"
-            units = []
+            units = [u for u in units if u["name"].startswith("Mobility Beine")]          # Hybrid: nur die Abend-Mobility bleibt
+            focus += "Ruhetag – Erholung, kein Training" + (" (nur Mobility am Abend)" if units else "")
         elif ctx.kind == "krank":
             focus += "Krank – Training pausiert"
             if ctx.date == today:

@@ -57,6 +57,8 @@ HYBRID_BENEFIT = {
     "Ergo-Blöcke": "hebt die Schwelle und trainiert Rücken, Arme und Rumpf mit – hohe Ausdauer ohne Aufprall für die Knie.",
     "Schweres Beintraining": "mehr Maximalkraft in Beinen und Gesäß – bessere Laufökonomie, stabilere Sehnen und Knie, Schutz vor Verletzungen.",
     "Bein-Ausdauer-Tag": "Muskelausdauer in den Beinen – du hältst das Tempo länger, wenn es schwer wird, und Vorder- und Rückseite werden gleich stark.",
+    "Schulter/Arme": "baut Schulter und Arme gezielt auf – Kraft für Klimmzüge, Liegestütze und stabile Haltung beim Laufen.",
+    "Mobility Beine": "hält Hüfte, Oberschenkel und Waden beweglich und beugt Verspannungen und Überlastung vor.",
     "Oberkörper-EMOM": "durchblutet Schulter und Arme und hält die Athletik – in nur 15 Minuten, ohne die Beine zu belasten.",
     "Rad Zone 2": "Ausdauer-Grundlage ohne Aufprall; fördert Erholung und Fettstoffwechsel.",
     "Rad Zone 1": "locker bewegen, damit die Beine durchblutet und erholt werden.",
@@ -187,7 +189,7 @@ class AllrounderPlanner(pl.Planner):
         legs_libkey, legs_name = "heavyLegs", "Schweres Beintraining"
         if hybrid:
             want["Push"] = want["Pull"] = 0                  # Hybrid: statt Push/Pull Oberkoerper-EMOM
-            legs_libkey, legs_name = ("legEndurance", "Bein-Ausdauer-Tag") if alt_week else ("heavyLegsHybrid", "Schweres Beintraining")
+            legs_libkey, legs_name = "heavyLegsHybrid", "Schweres Beintraining"
         gym_dur = {"Push": int((lib.get("push") or {}).get("durationMin") or 60),
                    "Pull": int((lib.get("pull") or {}).get("durationMin") or 60),
                    "Legs": int((lib.get(legs_libkey) or {}).get("durationMin") or 65)}
@@ -485,25 +487,62 @@ class AllrounderPlanner(pl.Planner):
             except Exception:
                 pass
 
-        # ---------------------------------------------------------------- 6b. Hybrid: Oberkoerper-EMOM (2x pro Woche, nach lockerem Lauf/Rad)
+        # ---------------------------------------------------------------- 6b. Hybrid: Bein-Ausdauer, Schulter/Arme, Oberkoerper-EMOM (3x)
         upper_days: list[int] = []
+        endu_day = None
+        arms_day = None
         if hybrid and phase != "wettkampf" and not params.get("skipHeavy"):
-            ucands = [i for i in pool if i not in (li, ii, ti, legs_day) and not ctxs[i].no_gym and level[i] >= 0.85]
+            gym_dur["Endu"] = int((lib.get("legEndurance") or {}).get("durationMin") or 70)
+            gym_dur["Arms"] = int((lib.get("armsHybrid") or {}).get("durationMin") or 40)
+            hard_set = {d for d in (li, ii, ti) if d is not None}
+
+            def endu_ok(i):
+                return (i not in hard_set and i != legs_day and not ctxs[i].no_legs and not ctxs[i].no_gym and level[i] >= 0.85
+                        and (legs_day is None or abs(i - legs_day) >= 2)
+                        and gym_ok(i, gym_dur["Endu"], 0.85))
+
+            def escore(i):
+                g_ = carry_gap("Legs", i)
+                return (ctxs[i].largest_window() / 100 - (30 if i in easy_days else 0) - (15 if (i - 1) in hard_set else 0)
+                        - (25 if (i + 1) in hard_set else 0) - (12 if legs_day is not None and abs(i - legs_day) == 2 else 0)
+                        - (10 if g_ is not None and g_ < 3 else 0))
+            ecands = [i for i in pool if endu_ok(i)]
+            if ecands:
+                endu_day = max(ecands, key=escore)
+                roles[endu_day].add("legs_endu")
+            else:
+                note_missing("Bein-Ausdauer-Tag")
+
+            def arms_ok(i):
+                return (i not in hard_set and i not in (legs_day, endu_day) and not ctxs[i].no_gym and level[i] >= 0.85
+                        and gym_ok(i, gym_dur["Arms"], 0.85))
+
+            def ascore(i):
+                return (ctxs[i].largest_window() / 100 + (8 if i in easy_days else 0)
+                        - (8 if endu_day is not None and abs(i - endu_day) == 1 else 0))
+            acands = [i for i in pool if arms_ok(i)]
+            if acands:
+                arms_day = max(acands, key=ascore)
+                roles[arms_day].add("arms")
+            else:
+                note_missing("Schulter/Arme")
+
+            ucands = [i for i in pool if i != ii and not ctxs[i].no_gym and level[i] >= 0.85]
 
             def uscore(i):
-                return ((12 if i in easy_days else 0) + (6 if i in (0, 3) else 0) + ctxs[i].largest_window() / 100
-                        - (4 if legs_day is not None and abs(i - legs_day) == 1 else 0))
+                return ((10 if i in (legs_day, endu_day) else 0) + (6 if i in easy_days else 0) - (8 if i == ti else 0) - (20 if i == arms_day else 0)
+                        + ctxs[i].largest_window() / 100)
             best_u = None
-            for a_ in ucands:
-                for b_ in ucands:
-                    if b_ > a_ and b_ - a_ >= 3:
-                        v = uscore(a_) + uscore(b_)
+            for k_ in (3, 2, 1):
+                for combo in itertools.combinations(sorted(ucands), k_):
+                    if all(b_ - a_ >= 2 for a_, b_ in zip(combo, combo[1:])):          # nie zwei EMOM-Tage hintereinander
+                        v = sum(uscore(x) for x in combo)
                         if best_u is None or v > best_u[0]:
-                            best_u = (v, [a_, b_])
+                            best_u = (v, list(combo))
+                if best_u is not None:
+                    break
             if best_u is not None:
                 upper_days = best_u[1]
-            elif ucands:
-                upper_days = [max(ucands, key=uscore)]
             for d_ in upper_days:
                 roles[d_].add("upper_emom")
 
@@ -527,8 +566,8 @@ class AllrounderPlanner(pl.Planner):
         pre_minis = {pl.parse_date(k): v for k, v in (st.get("preMini") or {}).items() if isinstance(v, list)}
         pre_durs = {"Rückwärtsgehen am Berg": 10, "Stairmaster (15 min)": 15}
         premini_total: dict[int, int] = {}
-        for d in list(push_days) + list(pull_days) + ([legs_day] if legs_day is not None else []):
-            kind = "Push" if d in push_days else ("Pull" if d in pull_days else "Legs")
+        for d in list(push_days) + list(pull_days) + ([legs_day] if legs_day is not None else []) + [x for x in (endu_day, arms_day) if x is not None]:
+            kind = "Push" if d in push_days else ("Pull" if d in pull_days else ("Endu" if d == endu_day else ("Arms" if d == arms_day else "Legs")))
             block = gym_dur[kind] + (acc_dur + 5 if d in acc_days else 0)
             pre_total = 0
             if dates[d] in pre_minis and kind in ("Push", "Pull"):
@@ -561,7 +600,7 @@ class AllrounderPlanner(pl.Planner):
         want_core = int(st.get("coreSessions", 2) or 0)
         if want_core >= 1 and phase != "wettkampf":
             # Studio-Core: an einem Studio-Tag (Pull bevorzugt), direkt hinter der Einheit
-            gym_days = [d for d in list(pull_days) + list(push_days) if not ctxs[d].no_core and dates[d] >= today]    # nie auf einen vergangenen Tag
+            gym_days = [d for d in list(pull_days) + list(push_days) + ([arms_day] if arms_day is not None else []) if not ctxs[d].no_core and dates[d] >= today]    # nie auf einen vergangenen Tag
             # Core zu Hause: Tag ohne Studio und ohne harte Einheit
             cands = [i for i in pool if i not in gym_start and i not in hard_days and not ctxs[i].no_core and level[i] >= 0.7 and dates[i] >= today]
             # Regel: die beiden Core-Einheiten liegen mindestens 3 Tage auseinander (Bauch/Rumpf brauchen Erholung), sonst 2 Tage
@@ -615,7 +654,7 @@ class AllrounderPlanner(pl.Planner):
                                   keySession=True,
                                   matchHint={"activityTypes": ["running"], "minDistanceKm": int(max(4, round(km * 0.8)))}),
                        start, dur)
-            elif "threshold" in r and hybrid and alt_week:
+            elif "threshold" in r and hybrid:
                 eb = lib.get("ergoBlocks") or {}
                 dur = int(eb.get("durationMin") or 55)
                 start = gym_slot(i, dur) or self.slot_run(ctx, dur)
@@ -705,8 +744,10 @@ class AllrounderPlanner(pl.Planner):
                            start, dur)
 
             # ---- Kraft (Studio)
-            for kind, libkey, name in (("Push", "push", "Push"), ("Pull", "pull", "Pull"), ("Legs", legs_libkey, legs_name)):
-                is_mine = (kind == "Push" and i in push_days) or (kind == "Pull" and i in pull_days) or (kind == "Legs" and i == legs_day)
+            for kind, libkey, name in (("Push", "push", "Push"), ("Pull", "pull", "Pull"), ("Legs", legs_libkey, legs_name),
+                                       ("Endu", "legEndurance", "Bein-Ausdauer-Tag"), ("Arms", "armsHybrid", "Schulter/Arme")):
+                is_mine = ((kind == "Push" and i in push_days) or (kind == "Pull" and i in pull_days) or (kind == "Legs" and i == legs_day)
+                           or (kind == "Endu" and i == endu_day) or (kind == "Arms" and i == arms_day))
                 if not is_mine:
                     continue
                 dur = gym_dur[kind]
@@ -743,7 +784,7 @@ class AllrounderPlanner(pl.Planner):
                                       exercises=exercises_for(lib, "coreGym"),
                                       matchHint={"activityTypes": ["strength_training", "cardio"]}), core_after, cdur)
             if i in upper_days:
-                ukey = "upperEmom1" if ((monday.isocalendar()[1] + upper_days.index(i)) % 2 == 0) else "upperEmom2"
+                ukey = ("upperEmom1", "upperEmom2", "upperEmom3")[(monday.isocalendar()[1] + upper_days.index(i)) % 3]
                 ue = lib.get(ukey) or {}
                 udur = int(ue.get("durationMin") or 15)
                 ustart = self.slot_run(ctx, udur, after=(last_end[i] + 10) if last_end[i] else None)
@@ -763,7 +804,7 @@ class AllrounderPlanner(pl.Planner):
         # ---------------------------------------------------------------- Mini-Einheiten (klein, aber sinnvoll)
         if st.get("miniSessions", True):
             run_names = ("Zone-2-Lauf", "Langer Lauf", "VO2max-Intervalle", "Backyard-Simulation")
-            gym_names = ("Push", "Pull", "Oberkörper-EMOM")
+            gym_names = ("Push", "Pull", "Oberkörper-EMOM", "Schulter/Arme")
             b_race_week = params.get("bWeek") == 1
             limit_end = st["dayEndMin"]
             n_back = n_stairs = n_plyo = 0
@@ -882,6 +923,17 @@ class AllrounderPlanner(pl.Planner):
                             n_back += 1
 
 
+        # ---------------------------------------------------------------- Hybrid: Mobility jeden Abend (auch am freien Tag)
+        if hybrid:
+            mb = lib.get("mobilityLegs") or {}
+            mdur = int(mb.get("durationMin") or 12)
+            for i in range(n):
+                if (ctxs[i].kind == "krank" and not ctxs[i].rest) or "race" in roles[i]:
+                    continue
+                commit(i, mk_unit("Mobility Beine (12 min)", "core", "bonus", f"{mb.get('detail') or '12 min Dehnen und Mobility'} · abends, am besten kurz vor dem Schlafen",
+                                  mdur, exercises=exercises_for(lib, "mobilityLegs"),
+                                  matchHint={"activityTypes": ["yoga", "flexibility", "stretching", "other", "cardio"]}), None, mdur)
+
         # ---------------------------------------------------------------- Begruendung je Einheit ("Warum heute?")
         def prev_date(kind, i):
             ds = [dates[k] for k in {"Push": push_days, "Pull": pull_days, "Legs": [legs_day] if legs_day is not None else []}[kind] if k < i]
@@ -967,11 +1019,13 @@ class AllrounderPlanner(pl.Planner):
                 elif name.startswith("Sprungübungen"):
                     reason = "Federnde Beine für bessere Laufökonomie; 2× pro Woche, nur nach lockeren Läufen."
                 elif name.startswith("Ergo-Blöcke"):
-                    reason = "Dritte harte Ausdauereinheit der Woche; wechselt wöchentlich mit der Schwelle auf dem Rad."
+                    reason = "Ersetzt die Schwelle auf dem Rad: Dauer-Intensität mit Rudern und SkiErg, ohne Aufprall für Knie und Sehnen."
                 elif name == "Bein-Ausdauer-Tag":
-                    reason = "Wechselt wöchentlich mit dem schweren Beintag ab und liegt nie direkt vor Intervallen oder dem langen Lauf."
+                    reason = "Zweiter Beintag der Woche, mindestens drei Tage Abstand zu den schweren Beinen und nie direkt vor Intervallen oder dem langen Lauf."
                 elif name == "Oberkörper-EMOM":
-                    reason = "2× pro Woche, kurz und ohne Beine – am besten nach einem lockeren Lauf oder Rad."
+                    reason = "3× pro Woche, nie an zwei Tagen hintereinander – kurz genug, um auch an Beintagen zu passen."
+                elif name == "Schulter/Arme":
+                    reason = "1× pro Woche, schwerer: wenige Wiederholungen mit Gewicht, an einem Tag ohne harte Ausdauer."
                 elif name.startswith("Wettkampf") or name == "Lockeres Auslaufen" or name.startswith("Regeneration"):
                     reason = ""
                 t = time_reason(i, name, entry.get("start"), u.get("detail", ""))

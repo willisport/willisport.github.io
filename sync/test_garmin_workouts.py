@@ -112,8 +112,30 @@ class Matching(unittest.TestCase):
         wanted = gw.wanted_workouts(self.WEEKS, date(2026, 11, 10))
         msgs = []
         state = gw.sync_workouts(Broken(), wanted, {}, log=msgs.append)
-        self.assertEqual(state, {"items": {}})
+        self.assertTrue(state["items"] and all(v.get("failed") for v in state["items"].values()))
         self.assertTrue(any("fehlgeschlagen" in m for m in msgs))
+        msgs2 = []
+        gw.sync_workouts(Broken(), wanted, state, log=msgs2.append)           # derselbe Inhalt wird nicht bei jedem Sync neu versucht
+        self.assertEqual(msgs2, [])
+
+
+class NewUnits(unittest.TestCase):
+    def test_easy_run_bike_stairs_and_ergo(self):
+        z2 = gw.build_workout({"name": "Zone-2-Lauf", "detail": "6 km · ganz locker, 130–140 bpm · Laufband: ca. 9,0 km/h"})
+        self.assertEqual(z2["workoutName"], "Zone-2-Lauf 6 km")
+        self.assertEqual(z2["sportType"]["sportTypeKey"], "running")
+        bike = gw.build_workout({"name": "Rad Zone 2", "detail": "165 W · 60 min · 07:00 Uhr, nüchtern"})
+        self.assertEqual(bike["sportType"]["sportTypeKey"], "cycling")
+        self.assertEqual(bike["workoutSegments"][0]["workoutSteps"][0]["endConditionValue"], 3600.0)
+        stairs = gw.build_workout({"name": "Stairmaster (15 min)", "detail": "15 min gleichmäßig"})
+        self.assertEqual(stairs["estimatedDurationInSecs"], 900)
+        ergo = gw.build_workout({"name": "Ergo-Blöcke (Rudern/SkiErg)", "detail": "6 × 5 min"})
+        steps = ergo["workoutSegments"][0]["workoutSteps"]
+        self.assertEqual([x.get("numberOfIterations") for x in steps if x["type"] == "RepeatGroupDTO"], [2, 4])
+
+    def test_treadmill_intervals_are_understood(self):
+        w = gw.build_workout({"name": "VO2max-Intervalle", "detail": "5×3 min bei 13,5 km/h auf dem Laufband (1 % Steigung) · dazwischen je 3 min mit 7 km/h gehen/traben"})
+        self.assertEqual(w["workoutName"], "Intervalle 5×3 min hart")
 
 
 if __name__ == "__main__":

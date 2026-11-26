@@ -16,10 +16,12 @@ import json
 import re
 from datetime import date, timedelta
 
-KEY_UNITS = ("VO2max-Intervalle", "Backyard-Simulation", "Langer Lauf")
+KEY_UNITS = ("VO2max-Intervalle", "Backyard-Simulation", "Langer Lauf", "Zone-2-Lauf", "Rad Zone 2", "Ergo-Blöcke (Rudern/SkiErg)", "Stairmaster (15 min)")
 DAYS_AHEAD = 21
 
 SPORT_RUN = {"sportTypeId": 1, "sportTypeKey": "running", "displayOrder": 1}
+SPORT_BIKE = {"sportTypeId": 2, "sportTypeKey": "cycling", "displayOrder": 2}
+SPORT_CARDIO = {"sportTypeId": 6, "sportTypeKey": "cardio_training", "displayOrder": 6}
 NO_TARGET = {"workoutTargetTypeId": 1, "workoutTargetTypeKey": "no.target", "displayOrder": 1}
 COND = {
     "lap": {"conditionTypeId": 1, "conditionTypeKey": "lap.button", "displayOrder": 1, "displayable": True},
@@ -67,9 +69,15 @@ def repeat(order, iterations, children):
             "smartRepeat": False, "childStepId": 1}
 
 
-def workout(name, steps, seconds, description=""):
-    return {"workoutName": name[:80], "description": description[:500], "sportType": SPORT_RUN, "estimatedDurationInSecs": int(seconds),
-            "workoutSegments": [{"segmentOrder": 1, "sportType": SPORT_RUN, "workoutSteps": steps}]}
+def power_target(lo, hi):
+    return {"targetType": {"workoutTargetTypeId": 2, "workoutTargetTypeKey": "power.zone", "displayOrder": 2},
+            "targetValueOne": float(lo), "targetValueTwo": float(hi)}
+
+
+def workout(name, steps, seconds, description="", sport=None):
+    sport = sport or SPORT_RUN
+    return {"workoutName": name[:80], "description": description[:500], "sportType": sport, "estimatedDurationInSecs": int(seconds),
+            "workoutSegments": [{"segmentOrder": 1, "sportType": sport, "workoutSteps": steps}]}
 
 
 def _num(txt):
@@ -120,6 +128,33 @@ def build_workout(unit):
         km = _num(m.group(1))
         return workout(f"Langer Lauf {km:g} km", [step(1, "interval", "distance", km * 1000, hr_target(130, 140), desc="locker, Zone 2")],
                        km * 6.2 * 60, detail)
+    if name == "Zone-2-Lauf":
+        m = re.search(r"^(\d+(?:[.,]\d+)?) km", detail)
+        if not m:
+            return None
+        km = _num(m.group(1))
+        return workout(f"Zone-2-Lauf {km:g} km", [step(1, "interval", "distance", km * 1000, hr_target(130, 140), desc="ganz locker, Puls 130–140")],
+                       km * 6.5 * 60, detail)
+    if name == "Rad Zone 2":
+        m = re.search(r"(\d+) W · (\d+) min", detail)
+        if not m:
+            return None
+        watt, mins = int(m.group(1)), int(m.group(2))
+        return workout(f"Rad Zone 2 {mins} min", [step(1, "interval", "time", mins * 60, power_target(max(100, watt - 20), watt + 30), desc=f"locker, ca. {watt} W")],
+                       mins * 60, detail, SPORT_BIKE)
+    if name == "Stairmaster (15 min)":
+        return workout("Stairmaster 15 min", [step(1, "interval", "time", 15 * 60, hr_target(125, 140), desc="gleichmäßig, du kannst noch sprechen")],
+                       15 * 60, detail, SPORT_CARDIO)
+    if name.startswith("Ergo-Blöcke"):
+        steps = [
+            step(1, "warmup", "time", 10 * 60, desc="locker einrollen (Rudern/SkiErg/Rad)"),
+            repeat(2, 2, [step(3, "interval", "time", 5 * 60, hr_target(140, 150), desc="Block 1–2: Rudern bzw. SkiErg, Puls 140–150"),
+                          step(4, "recovery", "time", 60, desc="1 min Pause, Gerät wechseln")]),
+            repeat(5, 4, [step(6, "interval", "time", 5 * 60, hr_target(150, 162), desc="Block 3–6: Rudern/SkiErg im Wechsel, Puls 150–162"),
+                          step(7, "recovery", "time", 60, desc="1 min Pause, Gerät wechseln")]),
+            step(8, "cooldown", "time", 5 * 60, desc="locker ausrollen"),
+        ]
+        return workout("Ergo-Blöcke 6×5 min", steps, 55 * 60, detail, SPORT_CARDIO)
     return None
 
 
@@ -173,6 +208,7 @@ def sync_workouts(api, wanted, state, log=print):
             log(f"  Garmin-Workout angelegt: {day} {w['workoutName']}")
         except Exception as e:  # noqa: BLE001 - darf den Sync nie abbrechen
             log(f"  [warn] Garmin-Workout {key} fehlgeschlagen: {type(e).__name__}: {e}")
+            items[key] = {"hash": h, "failed": True}                 # gleicher Inhalt wird nicht bei jedem Sync neu versucht
     return {"items": items}
 
 
