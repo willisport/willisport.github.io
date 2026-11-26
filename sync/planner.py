@@ -66,6 +66,8 @@ DEFAULT_SETTINGS = {
     "bikeFixedMin": None,       # feste Dauer fuer Rad Zone 2 in Minuten (sonst automatisch 45-60)
     "noRunDays": [],            # Tage ohne Lauf (z. B. Tag war schon Rad/Studio, Lauf bewusst ausgelassen)
     "hybridFrom": None,         # ab diesem Montag (YYYY-MM-DD) Hybrid-Wochenmuster: Ergo-Bloecke/Schwelle im Wechsel, schwere Beine/Bein-Ausdauer im Wechsel, Oberkoerper-EMOM statt Push/Pull
+    "miniForce": {},            # {"2026-12-03": {"after": "17:30", "units": ["Core (Studio)", "Rückwärtsgehen am Berg"]}}: Zusatzeinheiten an bestimmten Tagen (z. B. Studio bei einem Seminar)
+    "ergoForce": [],            # Tage mit leichten Ergo-Bloecken (Rudern/SkiErg), auch in ruhigen Wochen
     "restAuto": False,          # Hybrid: freien Tag der Woche automatisch waehlen (bevorzugt ein Spaetschicht-Tag, sonst Sonntag)
     "restWeekdays": [],         # feste freie Wochentage im Hybrid-Modus (0 = Montag ... 6 = Sonntag)
     "indoor": False,            # Laufband-Vorgaben (km/h) in Lauf-Einheiten

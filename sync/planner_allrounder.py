@@ -546,6 +546,13 @@ class AllrounderPlanner(pl.Planner):
             for d_ in upper_days:
                 roles[d_].add("upper_emom")
 
+        ergo_light_days = set()
+        if hybrid:
+            for i in range(n):
+                if pl.iso(dates[i]) in (st.get("ergoForce") or []) and i in pool and i not in (li, ii, ti, legs_day, endu_day):
+                    ergo_light_days.add(i)
+                    roles[i].add("ergo_light")
+
         # ---------------------------------------------------------------- 7. Studio direkt nach der Schicht
         gym_start = {}
         # Beine ergaenzend: knieschonende Zusatz-Beinkraft nach Push/Pull, max. 2x pro Woche, nie direkt vor/nach schweren Beinen oder vor harten Laeufen
@@ -675,7 +682,7 @@ class AllrounderPlanner(pl.Planner):
                                   + (f", HF ca. {self.tg['thrHr'][0]}–{self.tg['thrHr'][1]} bpm" if self.tg["thrHr"] else "")
                                   + f", „kontrolliert unbequem“) · 5 min locker dazwischen · 10 min ausrollen{tsuf(start)}, nicht nüchtern",
                                   dur, keySession=True, matchHint=hint_bike()), start, dur)
-            elif "intervals" not in r and "easy_run" not in r and not easy_only[i]:
+            elif "intervals" not in r and "easy_run" not in r and "ergo_light" not in r and not easy_only[i]:
                 # taegliches Rad: nuechtern am Morgen, sonst nach Feierabend
                 if ctx.bike_easy:
                     dur = 30 if ctx.kind != "free" else 40
@@ -692,6 +699,17 @@ class AllrounderPlanner(pl.Planner):
                     if start is not None:
                         commit(i, mk_unit("Rad Zone 2", "rad", "pflicht",
                                           f"{self.tg['z2Watt']} W · {dur} min{tsuf(start, fasted)}", dur, matchHint=hint_bike()), start, dur)
+            if "ergo_light" in r:
+                edur = 45
+                estart = gym_slot(i, edur) or self.slot_run(ctx, edur)
+                if estart is not None:
+                    ewhere = " · im Studio direkt nach der Schicht" if at_work(i) else (" · im Studio direkt vor der Schicht" if is_late(i) else " · im Studio")
+                    commit(i, mk_unit("Ergo-Blöcke (leicht)", "rad", "pflicht",
+                                      f"10 min locker · 4 × 5 min im Wechsel Rudern und SkiErg, je 1 min Pause · Puls 140–150, nichts erzwingen (ruhige Woche) · 5 min locker{ewhere}{tsuf(estart)}",
+                                      edur, exercises=[{"name": "Einrollen locker", "sets": 1, "reps": "10 min", "rest": "-"},
+                                                       {"name": "Rudern / SkiErg im Wechsel (Puls 140–150)", "sets": 4, "reps": "5 min", "rest": "1 min"},
+                                                       {"name": "Ausrollen locker", "sets": 1, "reps": "5 min", "rest": "-"}],
+                                      matchHint={"activityTypes": ["rowing", "indoor_rowing", "cardio", "fitness_equipment", "other"]}), estart, edur)
             if "intervals" in r:
                 rp = reps if lvl >= 0.85 else max(3, reps - 1)
                 vm = params["vo2Min"]
@@ -923,6 +941,33 @@ class AllrounderPlanner(pl.Planner):
                             n_back += 1
 
 
+        # ---------------------------------------------------------------- Zusatzeinheiten an bestimmten Tagen (miniForce)
+        if st.get("miniSessions", True) and st.get("miniForce"):
+            for iso_d, spec in (st.get("miniForce") or {}).items():
+                idx = next((k for k in range(n) if pl.iso(dates[k]) == iso_d), None)
+                if idx is None or ctxs[idx].kind == "krank" or not isinstance(spec, dict):
+                    continue
+                cur = pl.hm_to_min(spec.get("after") or "17:30")
+                for nm in spec.get("units") or []:
+                    if any(pp["unit"]["name"] == nm for pp in placed[idx]):
+                        continue
+                    if nm == "Core (Studio)":
+                        cg = lib.get("coreGym") or {}
+                        ok = add_mini(idx, nm, cg.get("detail") or "15 min an Maschinen/Kabel", int(cg.get("durationMin") or 15), exercises_for(lib, "coreGym"), cur)
+                        dur_ = int(cg.get("durationMin") or 15)
+                    elif nm == "Rückwärtsgehen am Berg":
+                        ex = [{"name": f"Rückwärtsgehen, Laufband {incline} % Steigung, {back_speed} km/h", "sets": 1, "reps": "10 min", "rest": "-"}]
+                        ok = add_mini(idx, nm, f"10 min Laufband, {incline} % Steigung, {back_speed} km/h rückwärts (Handlauf nur leicht berühren) – schont das Knie und kräftigt die Oberschenkel", 10, ex, cur)
+                        dur_ = 10
+                    elif nm == "Stairmaster (15 min)":
+                        ex = [{"name": "Stairmaster, Puls ca. 125–140, du kannst noch sprechen", "sets": 1, "reps": "15 min", "rest": "-"}]
+                        ok = add_mini(idx, nm, "15 min gleichmäßig, Puls ca. 125–140 (du kannst noch sprechen), nicht am Geländer abstützen – gelenkschonendes Ausdauerplus", 15, ex, cur)
+                        dur_ = 15
+                    else:
+                        continue
+                    if ok:
+                        cur = (entry_end(idx, (nm,)) or cur + dur_) + 0
+
         # ---------------------------------------------------------------- Hybrid: Mobility jeden Abend (auch am freien Tag)
         if hybrid:
             mb = lib.get("mobilityLegs") or {}
@@ -1018,6 +1063,8 @@ class AllrounderPlanner(pl.Planner):
                     reason = "Gelenkschonender Ausdauerreiz, 2× pro Woche, locker."
                 elif name.startswith("Sprungübungen"):
                     reason = "Federnde Beine für bessere Laufökonomie; 2× pro Woche, nur nach lockeren Läufen."
+                elif name == "Ergo-Blöcke (leicht)":
+                    reason = "Auf deinen Wunsch auch in der ruhigen Woche: ohne Aufprall und locker, damit die Beine nach dem Backyard weiter erholen."
                 elif name.startswith("Ergo-Blöcke"):
                     reason = "Ersetzt die Schwelle auf dem Rad: Dauer-Intensität mit Rudern und SkiErg, ohne Aufprall für Knie und Sehnen."
                 elif name == "Bein-Ausdauer-Tag":
