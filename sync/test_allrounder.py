@@ -892,11 +892,16 @@ class HybridMode(unittest.TestCase):
         self.assertEqual([names(base, wd) for wd in WD], [names(with_flag, wd) for wd in WD])
 
     def test_forced_extras_on_a_seminar_day_and_light_ergo(self):
-        raw = {"settings": {"hybridFrom": "2026-11-30", "restAuto": True, "indoor": True,
-                            "miniForce": {"2026-12-03": {"after": "17:30", "units": ["Core (Studio)", "Rückwärtsgehen am Berg"]}},
-                            "ergoForce": ["2026-12-05"]}}
-        w = self.week(date(2026, 11, 30), raw)
-        self.assertIn("Core (Studio)", names(w, "Donnerstag"))
-        self.assertIn("Rückwärtsgehen am Berg", names(w, "Donnerstag"))
-        self.assertIn("Ergo-Blöcke (leicht)", names(w, "Samstag"))
-        self.assertNotIn("Rad Zone 2", names(w, "Samstag"))
+        base = {"hybridFrom": "2026-11-30", "restAuto": True, "indoor": True}
+        monday = date(2026, 11, 30)
+        w0 = self.week(monday, {"settings": dict(base)})
+        bike_days = [k for k, wd in enumerate(WD) if "Rad Zone 2" in names(w0, wd) and not any(n in names(w0, wd) for n in ("Schweres Beintraining", "Bein-Ausdauer-Tag", "Schulter/Arme"))]
+        self.assertTrue(bike_days)
+        k = bike_days[0]
+        raw = {"settings": dict(base, miniForce={pl.iso(monday + timedelta(days=k)): {"after": "17:30", "units": ["Core (Studio)", "Rückwärtsgehen am Berg"]}},
+                                  ergoForce=[pl.iso(monday + timedelta(days=k))])}
+        w = self.week(monday, raw)
+        self.assertIn("Core (Studio)", names(w, WD[k]))
+        self.assertIn("Rückwärtsgehen am Berg", names(w, WD[k]))
+        self.assertIn("Ergo-Blöcke (leicht)", names(w, WD[k]))
+        self.assertNotIn("Rad Zone 2", names(w, WD[k]))
