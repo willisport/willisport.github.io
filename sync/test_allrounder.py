@@ -892,11 +892,11 @@ class HybridMode(unittest.TestCase):
         self.assertEqual([names(base, wd) for wd in WD], [names(with_flag, wd) for wd in WD])
 
     def test_forced_extras_on_a_seminar_day_and_light_ergo(self):
-        raw = {"settings": {"hybridFrom": "2026-12-07", "restAuto": True, "indoor": True,
-                            "miniForce": {"2026-12-09": {"after": "17:30", "units": ["Core (Studio)", "Rückwärtsgehen am Berg"]}},
-                            "ergoForce": ["2026-12-12"]}}
-        w = self.week(date(2026, 12, 7), raw)
-        self.assertIn("Core (Studio)", names(w, "Mittwoch"))
-        self.assertIn("Rückwärtsgehen am Berg", names(w, "Mittwoch"))
+        raw = {"settings": {"hybridFrom": "2026-11-30", "restAuto": True, "indoor": True,
+                            "miniForce": {"2026-12-03": {"after": "17:30", "units": ["Core (Studio)", "Rückwärtsgehen am Berg"]}},
+                            "ergoForce": ["2026-12-05"]}}
+        w = self.week(date(2026, 11, 30), raw)
+        self.assertIn("Core (Studio)", names(w, "Donnerstag"))
+        self.assertIn("Rückwärtsgehen am Berg", names(w, "Donnerstag"))
         self.assertIn("Ergo-Blöcke (leicht)", names(w, "Samstag"))
         self.assertNotIn("Rad Zone 2", names(w, "Samstag"))
