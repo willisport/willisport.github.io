@@ -1,94 +1,24 @@
 {
  "items": {
-  "2026-11-26|Zone-2-Lauf": {
-   "hash": "086447472ad7",
-   "scheduleId": 1853015744,
-   "workoutId": 1774027723
-  },
-  "2026-11-30|Zone-2-Lauf": {
-   "hash": "fd91719e4435",
-   "scheduleId": 1853015746,
-   "workoutId": 1774027724
-  },
-  "2026-12-02|Langer Lauf": {
-   "hash": "f05afbc9b3ab",
-   "scheduleId": 1843851964,
-   "workoutId": 1764862199
-  },
-  "2026-12-02|Stairmaster (15 min)": {
-   "hash": "a9e2aa53ca0c",
-   "scheduleId": 1853018921,
-   "workoutId": 1774030974
-  },
-  "2026-12-03|Rad Zone 2": {
-   "hash": "64fb57d4ff19",
-   "scheduleId": 1853015747,
-   "workoutId": 1774027725
-  },
-  "2026-12-04|Zone-2-Lauf": {
-   "hash": "579013a002c4",
-   "scheduleId": 1853018922,
-   "workoutId": 1774030977
-  },
-  "2026-12-05|Stairmaster (15 min)": {
-   "hash": "05cb74bcb401",
-   "scheduleId": 1853021919,
-   "workoutId": 1774034033
-  },
-  "2026-12-06|Zone-2-Lauf": {
-   "hash": "fd91719e4435",
-   "scheduleId": 1853015753,
-   "workoutId": 1774027732
-  },
-  "2026-12-08|VO2max-Intervalle": {
-   "hash": "c862fbced7c1",
-   "scheduleId": 1853015756,
-   "workoutId": 1774027734
-  },
-  "2026-12-09|Zone-2-Lauf": {
-   "hash": "6edac0ea23ff",
-   "scheduleId": 1853015758,
-   "workoutId": 1774027736
-  },
-  "2026-12-10|Ergo-Bl\u00f6cke (Rudern/SkiErg)": {
-   "hash": "caf20ce1402e",
-   "scheduleId": 1853032211,
-   "workoutId": 1774044608
-  },
-  "2026-12-11|Rad Zone 2": {
-   "hash": "cb8cf24e1e94",
-   "scheduleId": 1853015763,
-   "workoutId": 1774027741
-  },
-  "2026-12-12|Stairmaster (15 min)": {
-   "hash": "3b083a027f94",
-   "scheduleId": 1853015767,
-   "workoutId": 1774027746
-  },
-  "2026-12-13|Langer Lauf": {
-   "hash": "c2ba2f5b15a5",
-   "scheduleId": 1853015769,
-   "workoutId": 1774027747
-  },
   "2026-12-15|Zone-2-Lauf": {
-   "hash": "13efd2f77b9e",
-   "scheduleId": 1853015770,
-   "workoutId": 1774027750
+   "hash": "e86611236bdd",
+   "scheduleId": 1853241970,
+   "workoutId": 1774255883
   },
   "2026-12-16|Rad Zone 2": {
    "hash": "6d159343d99b",
    "scheduleId": 1853015773,
    "workoutId": 1774027753
   },
-  "2026-12-16|Stairmaster (15 min)": {
-   "hash": "464c3f04a87b",
-   "scheduleId": 1853018925,
-   "workoutId": 1774030979
+  "2026-12-17|Stairmaster (15 min)": {
+   "hash": "0eac131eb187",
+   "scheduleId": 1853241974,
+   "workoutId": 1774255890
   },
   "2026-12-17|Zone-2-Lauf": {
-   "hash": "05c4cb36666c",
-   "scheduleId": 1853015780,
-   "workoutId": 1774027758
+   "hash": "e86611236bdd",
+   "scheduleId": 1853241972,
+   "workoutId": 1774255886
   }
  }
 }
