@@ -571,8 +571,10 @@ function setupWeekPlanClicks(weeks) {
 
 const OPEN_UNITS = new Set();          // aufgeklappte Einheiten bleiben beim Neuzeichnen offen
 const UNIT_TIME_RE = / · (\d{2}):(\d{2}) Uhr(, [^·(]*)?( \(angepasst\))?/g;
-const UNIT_LIB_KEY = { "Push": "push", "Pull": "pull", "Schweres Beintraining": "heavyLegs", "Core (zu Hause)": "core", "Core (Studio)": "coreGym",
-  "Bein-Stabi": "legStabi", "Bein-Supersätze": "legSupersets", "Arme/Schultern": "armShoulders" };
+const UNIT_LIB_KEY = { "Push": "push", "Pull": "pull", "Schweres Beintraining": "heavyLegsHybrid", "Core (zu Hause)": "core", "Core (Studio)": "coreGym",
+  "Bein-Stabi": "legStabi", "Bein-Supersätze": "legSupersets", "Arme/Schultern": "armShoulders",
+  "Bein-Ausdauer-Tag": "legEndurance", "Schulter/Arme": "armsHybrid", "Oberkörper-EMOM": "upperEmom1", "Core": "coreHybrid",
+  "Ergo-Blöcke (Rudern/SkiErg)": "ergoBlocks", "Mobility Beine (12 min)": "mobilityLegs" };
 
 function unitTimeInfo(u) {
   const detail = u.detail || "";

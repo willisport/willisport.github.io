@@ -1622,9 +1622,11 @@ def compact_week(week: dict) -> dict:
         units = []
         for u in d["units"]:
             cu = {k: u[k] for k in ("name", "type", "tag", "detail", "plannedDurationMin") if k in u}
-            for k in ("keySession", "planLabel", "why"):
+            for k in ("keySession", "planLabel", "why", "title"):
                 if u.get(k):
                     cu[k] = u[k]
+            if u.get("title") and u.get("exercises"):
+                cu["exercises"] = u["exercises"]          # zusammengefasste Lauf-Einheit: Laufen + Wandsitzen/Waden + Rueckwaertsgehen
             units.append(cu)
         days[wd] = {"focus": d["focus"], "units": units, **({"fallbackNote": d["fallbackNote"]} if d.get("fallbackNote") else {})}
     return {"note": week["note"], "meta": week["meta"], "days": days}
